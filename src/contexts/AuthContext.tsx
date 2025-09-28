@@ -3,13 +3,14 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { useRouter } from 'next/navigation'
 
 interface AuthContextType {
   user: User | null
   session: Session | null
   loading: boolean
   signUp: (email: string, password: string, name?: string) => Promise<{ error: string | null }>
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>
+  signIn: (email: string, password: string, rememberMe?: boolean) => Promise<{ error: string | null }>
   signOut: () => Promise<{ error: string | null }>
   resetPassword: (email: string) => Promise<{ error: string | null }>
 }
@@ -44,7 +45,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email)
         setSession(session)
         setUser(session?.user ?? null)
         setLoading(false)
@@ -93,7 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (email: string, password: string, name?: string) => {
     try {
       setLoading(true)
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -108,17 +108,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       return { error: null }
-    } catch (error: any) {
-      return { error: error.message || 'An unexpected error occurred during sign up' }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred during sign up'
+      return { error: errorMessage }
     } finally {
       setLoading(false)
     }
   }
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, rememberMe: boolean = false) => {
     try {
       setLoading(true)
-      const { data, error } = await supabase.auth.signInWithPassword({
+      
+      // Store remember me preference
+      if (rememberMe) {
+        localStorage.setItem('finance-tracker-remember', 'true')
+        localStorage.setItem('finance-tracker-email', email)
+      } else {
+        localStorage.removeItem('finance-tracker-remember')
+        localStorage.removeItem('finance-tracker-email')
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password
       })
@@ -128,8 +139,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       return { error: null }
-    } catch (error: any) {
-      return { error: error.message || 'An unexpected error occurred during sign in' }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred during sign in'
+      return { error: errorMessage }
     } finally {
       setLoading(false)
     }
@@ -138,6 +150,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     try {
       setLoading(true)
+      
+      // Clear remember me data on sign out
+      localStorage.removeItem('finance-tracker-remember')
+      localStorage.removeItem('finance-tracker-email')
+      
       const { error } = await supabase.auth.signOut()
 
       if (error) {
@@ -145,8 +162,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       return { error: null }
-    } catch (error: any) {
-      return { error: error.message || 'An unexpected error occurred during sign out' }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred during sign out'
+      return { error: errorMessage }
     } finally {
       setLoading(false)
     }
@@ -163,8 +181,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       return { error: null }
-    } catch (error: any) {
-      return { error: error.message || 'An unexpected error occurred' }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred'
+      return { error: errorMessage }
     }
   }
 
@@ -196,13 +215,13 @@ export function useAuth() {
 // Helper hook for protected routes
 export function useRequireAuth() {
   const { user, loading } = useAuth()
+  const router = useRouter()
 
   useEffect(() => {
     if (!loading && !user) {
-      // Redirect to login page
-      window.location.href = '/login'
+      router.push('/login')
     }
-  }, [user, loading])
+  }, [user, loading, router])
 
   return { user, loading }
 }

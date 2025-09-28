@@ -91,7 +91,7 @@ export interface CreditCardBenefits {
   railway_lounge?: boolean
   dining_discounts?: boolean
   fuel_surcharge_waiver?: boolean
-  [key: string]: any
+  [key: string]: boolean | string | number | undefined
 }
 
 export interface CreditCardTransaction {
