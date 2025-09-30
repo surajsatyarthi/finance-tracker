@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useRequireAuth } from '@/contexts/AuthContext'
 import { getAccounts } from '@/lib/simpleSupabaseManager'
+import { getAccountBalanceWithTransfers } from '@/lib/transferManager'
 import { 
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -22,6 +23,7 @@ interface Account {
   currency: string
   is_active: boolean
   created_at: string
+  computed_balance?: number
 }
 
 const accountTypeColors = {
@@ -49,12 +51,23 @@ export default function AccountsPage() {
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [showBalances, setShowBalances] = useState(true)
   
-  // Load accounts from Supabase
+  // Load accounts from Supabase (with computed balances incl. transfers)
   useEffect(() => {
     const loadAccounts = async () => {
       try {
-        const accountsData = await getAccounts()
-        setAccounts(accountsData)
+        const baseAccounts = await getAccounts()
+        // Enrich with computed balances via RPC
+        const enriched = await Promise.all(
+          baseAccounts.map(async (acc: Account) => {
+            try {
+              const computed = await getAccountBalanceWithTransfers(acc.id)
+              return { ...acc, computed_balance: computed }
+            } catch {
+              return acc
+            }
+          })
+        )
+        setAccounts(enriched)
       } catch (error) {
         console.error('Error loading accounts:', error)
       } finally {
@@ -67,16 +80,17 @@ export default function AccountsPage() {
 
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
-    const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0)
+    const pick = (a: Account) => (typeof a.computed_balance === 'number' ? a.computed_balance : a.balance)
+    const totalBalance = accounts.reduce((sum, account) => sum + pick(account), 0)
     const activeAccounts = accounts.filter(account => account.is_active)
     const inactiveAccounts = accounts.filter(account => !account.is_active)
-    const totalActiveBalance = activeAccounts.reduce((sum, account) => sum + account.balance, 0)
+    const totalActiveBalance = activeAccounts.reduce((sum, account) => sum + pick(account), 0)
     
     // Type breakdown
     const typeBreakdown = accounts.reduce((acc, account) => {
       if (!acc[account.type]) acc[account.type] = { count: 0, balance: 0 }
       acc[account.type].count += 1
-      acc[account.type].balance += account.balance
+      acc[account.type].balance += pick(account)
       return acc
     }, {} as Record<string, { count: number; balance: number }>)
 
@@ -159,8 +173,8 @@ export default function AccountsPage() {
         <div className="mb-8">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Accounts & Assets</h1>
-              <p className="text-gray-600">Track your bank accounts, cash holdings, and investment assets</p>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Accounts</h1>
+              <p className="text-gray-600">Track your bank accounts, cash holdings, investment assets (balances include transfers)</p>
             </div>
             <button
               onClick={() => setShowBalances(!showBalances)}
@@ -368,8 +382,8 @@ export default function AccountsPage() {
                       <span className="text-sm text-gray-900 font-medium">{account.name}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text-sm font-bold ${account.balance > 0 ? 'text-green-600' : 'text-gray-400'}`}>
-                        {showBalances ? formatCurrency(account.balance) : '₹••••••'}
+                      <span className={`text-sm font-bold ${(account.computed_balance ?? account.balance) > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                        {showBalances ? formatCurrency(account.computed_balance ?? account.balance) : '₹••••••'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

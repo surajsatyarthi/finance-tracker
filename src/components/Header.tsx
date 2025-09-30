@@ -28,7 +28,6 @@ export default function Header() {
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-    { name: 'Bank Accounts', href: '/bank-accounts', icon: BuildingLibraryIcon },
     { name: 'Accounts', href: '/accounts', icon: BuildingLibraryIcon },
     { name: 'Income', href: '/income', icon: ArrowTrendingUpIcon },
     { name: 'Expenses', href: '/expenses/add', icon: ArrowTrendingDownIcon },

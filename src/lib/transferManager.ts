@@ -35,6 +35,18 @@ export interface TransferTransaction {
   updated_at: string
 }
 
+// Shape returned by process_transfer_transaction RPC
+interface TransferRPCResult {
+  success: boolean
+  transfer_reference_id?: string
+  from_transaction_id?: string
+  to_transaction_id?: string
+  amount?: number
+  from_account_id?: string
+  to_account_id?: string
+  error?: string
+}
+
 // Process a transfer between accounts (atomic via RPC)
 export const processTransfer = async (transferData: TransferData): Promise<TransferResult> => {
   try {
@@ -56,16 +68,17 @@ export const processTransfer = async (transferData: TransferData): Promise<Trans
       return { success: false, error: error.message }
     }
 
-    if (!data || data.success !== true) {
-      const errMsg = typeof data?.error === 'string' ? data.error : 'Transfer failed (unknown)'
+    const result = data as unknown as TransferRPCResult
+    if (!result || result.success !== true) {
+      const errMsg = typeof result?.error === 'string' ? result.error : 'Transfer failed (unknown)'
       return { success: false, error: errMsg }
     }
 
     return {
       success: true,
-      transferReferenceId: data.transfer_reference_id,
-      fromTransactionId: data.from_transaction_id,
-      toTransactionId: data.to_transaction_id
+      transferReferenceId: result.transfer_reference_id,
+      fromTransactionId: result.from_transaction_id,
+      toTransactionId: result.to_transaction_id
     }
   } catch (error) {
     console.error('Transfer processing error:', error)
