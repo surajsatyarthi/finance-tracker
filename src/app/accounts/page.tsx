@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRequireAuth } from '@/contexts/AuthContext'
+import { useNotification } from '@/contexts/NotificationContext'
 import { getAccounts } from '@/lib/simpleSupabaseManager'
 import { getAccountBalanceWithTransfers } from '@/lib/transferManager'
+import { supabase } from '@/lib/supabase'
 import { 
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -12,7 +14,9 @@ import {
   ArrowTrendingUpIcon,
   ChartPieIcon,
   EyeIcon,
-  EyeSlashIcon
+  EyeSlashIcon,
+  PencilIcon,
+  LockClosedIcon
 } from '@heroicons/react/24/outline'
 
 interface Account {
@@ -44,39 +48,49 @@ const accountTypeIcons = {
 
 export default function AccountsPage() {
   useRequireAuth() // Just call for authentication check
+  const { showNotification } = useNotification()
+
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedType, setSelectedType] = useState('all')
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [showBalances, setShowBalances] = useState(true)
+
+  // Edit modal state
+  const [editOpen, setEditOpen] = useState(false)
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null)
+  const [newBalance, setNewBalance] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const loadAccounts = useCallback(async () => {
+    try {
+      const baseAccounts = await getAccounts()
+      // Enrich with computed balances via RPC
+      const enriched = await Promise.all(
+        baseAccounts.map(async (acc: Account) => {
+          try {
+            const computed = await getAccountBalanceWithTransfers(acc.id)
+            return { ...acc, computed_balance: computed }
+          } catch {
+            return acc
+          }
+        })
+      )
+      setAccounts(enriched)
+    } catch (error) {
+      console.error('Error loading accounts:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
   
   // Load accounts from Supabase (with computed balances incl. transfers)
   useEffect(() => {
-    const loadAccounts = async () => {
-      try {
-        const baseAccounts = await getAccounts()
-        // Enrich with computed balances via RPC
-        const enriched = await Promise.all(
-          baseAccounts.map(async (acc: Account) => {
-            try {
-              const computed = await getAccountBalanceWithTransfers(acc.id)
-              return { ...acc, computed_balance: computed }
-            } catch {
-              return acc
-            }
-          })
-        )
-        setAccounts(enriched)
-      } catch (error) {
-        console.error('Error loading accounts:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    
     loadAccounts()
-  }, [])
+  }, [loadAccounts])
 
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
@@ -359,6 +373,9 @@ export default function AccountsPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -395,6 +412,21 @@ export default function AccountsPage() {
                         {account.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <button
+                        onClick={() => {
+                          setEditingAccount(account)
+                          setNewBalance((account.computed_balance ?? account.balance).toString())
+                          setPassword('')
+                          setConfirmPassword('')
+                          setEditOpen(true)
+                        }}
+                        className="inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        <PencilIcon className="h-4 w-4 mr-1" />
+                        Edit
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -402,6 +434,171 @@ export default function AccountsPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit Balance Modal */}
+      {editOpen && editingAccount && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md bg-white rounded-xl shadow-xl border border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                <LockClosedIcon className="h-5 w-5 text-gray-600 mr-2" />
+                Edit Balance (Sensitive)
+              </h3>
+              <button
+                onClick={() => setEditOpen(false)}
+                className="text-gray-500 hover:text-gray-700"
+                aria-label="Close modal"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Account</label>
+                <div className="text-sm text-gray-900 font-semibold">{editingAccount.name}</div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New Balance (₹)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={newBalance}
+                  onChange={(e) => setNewBalance(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+
+              {(() => {
+                const hasHash = typeof window !== 'undefined' && !!localStorage.getItem('finance-tracker-pass-hash')
+                if (!hasHash) {
+                  return (
+                    <div className="space-y-3">
+                      <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-3">
+                        No password set yet. Create a password to protect sensitive updates.
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Set Password</label>
+                        <input
+                          type="password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+                        <input
+                          type="password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  )
+                }
+                return (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Enter Password</label>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                )
+              })()}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3 bg-gray-50 rounded-b-xl">
+              <button
+                onClick={() => setEditOpen(false)}
+                className="px-4 py-2 rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                disabled={saving}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    setSaving(true)
+
+                    // Validate amount
+                    const amount = parseFloat(newBalance)
+                    if (isNaN(amount) || amount < 0) {
+                      showNotification('Please enter a valid non-negative amount', 'error')
+                      setSaving(false)
+                      return
+                    }
+
+                    // Prepare password/hash
+                    const email = localStorage.getItem('finance-tracker-user-email') || ''
+                    const hasHash = !!localStorage.getItem('finance-tracker-pass-hash')
+                    const encoder = new TextEncoder()
+
+                    const hashHex = async (text: string) => {
+                      const data = encoder.encode(text)
+                      const digest = await crypto.subtle.digest('SHA-256', data)
+                      const bytes = Array.from(new Uint8Array(digest))
+                      return bytes.map(b => b.toString(16).padStart(2, '0')).join('')
+                    }
+
+                    const salted = (pwd: string) => `${email}|${pwd}|ft_v1_salt`
+
+                    if (!hasHash) {
+                      if (!password || password.length < 6) {
+                        showNotification('Password must be at least 6 characters', 'error')
+                        setSaving(false)
+                        return
+                      }
+                      if (password !== confirmPassword) {
+                        showNotification('Passwords do not match', 'error')
+                        setSaving(false)
+                        return
+                      }
+                      const newHash = await hashHex(salted(password))
+                      localStorage.setItem('finance-tracker-pass-hash', newHash)
+                    } else {
+                      const stored = localStorage.getItem('finance-tracker-pass-hash') || ''
+                      const entered = await hashHex(salted(password))
+                      if (!stored || entered !== stored) {
+                        showNotification('Incorrect password', 'error')
+                        setSaving(false)
+                        return
+                      }
+                    }
+
+                    // Update account balance
+                    const { error } = await supabase
+                      .from('accounts')
+                      .update({ balance: Math.round(amount * 100) / 100, updated_at: new Date().toISOString() })
+                      .eq('id', editingAccount!.id)
+                      .eq('user_id', '00000000-0000-0000-0000-000000000001')
+
+                    if (error) {
+                      showNotification(`Failed to update balance: ${error.message}`, 'error')
+                      setSaving(false)
+                      return
+                    }
+
+                    showNotification('Balance updated successfully', 'success')
+                    setEditOpen(false)
+                    await loadAccounts()
+                  } catch (e) {
+                    showNotification('Update failed. Please try again.', 'error')
+                  } finally {
+                    setSaving(false)
+                  }
+                }}
+                className="px-4 py-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+                disabled={saving}
+              >
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
