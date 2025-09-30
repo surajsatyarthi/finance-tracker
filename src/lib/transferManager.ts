@@ -162,8 +162,15 @@ export const getAccountTransferSummary = async (accountId: string) => {
       return { transfersIn: 0, transfersOut: 0, netTransfers: 0 }
     }
 
-    const transfersIn = (inData || []).reduce((sum, t: any) => sum + (t.amount || 0), 0)
-    const transfersOut = (outData || []).reduce((sum, t: any) => sum + (t.amount || 0), 0)
+    type AmountRow = { amount: number | null }
+    const transfersIn = ((inData as AmountRow[] | null | undefined) || []).reduce(
+      (sum, t) => sum + (t.amount ?? 0),
+      0
+    )
+    const transfersOut = ((outData as AmountRow[] | null | undefined) || []).reduce(
+      (sum, t) => sum + (t.amount ?? 0),
+      0
+    )
     return { transfersIn, transfersOut, netTransfers: transfersIn - transfersOut }
   } catch (error) {
     console.error('Error calculating transfer summary:', error)
@@ -198,11 +205,3 @@ export const validateTransferData = (data: TransferData): string[] => {
   return errors
 }
 
-export default {
-  processTransfer,
-  getUserTransfers,
-  getGroupedTransfers,
-  getAccountBalanceWithTransfers,
-  getAccountTransferSummary,
-  validateTransferData
-}
