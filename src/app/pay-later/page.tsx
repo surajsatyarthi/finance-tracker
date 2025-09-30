@@ -45,52 +45,52 @@ export default function PayLaterPage() {
   // Current date for calculations
   const today = new Date('2025-09-21')
 
-  // Pay Later accounts data
+  // Pay Later accounts data - Your actual BNPL services
   const payLaterAccounts: PayLaterAccount[] = [
     {
       id: '1',
       serviceName: 'Amazon Pay Later',
       serviceCode: 'AMZN-PAY-LATER',
-      creditLimit: 80000,
-      usedAmount: 1792,
-      availableAmount: 78208, // 80000 - 1792
+      creditLimit: 0, // Please update with your actual limit
+      usedAmount: 1792, // Your confirmed outstanding amount
+      availableAmount: 0, // Will be calculated when limit is updated
       currentDue: 1792,
-      nextDueDate: '2025-10-05',
-      dueSchedule: '5th of every month',
+      nextDueDate: '2025-10-05', // Please update with actual due date
+      dueSchedule: 'Please update with your actual schedule',
       status: 'active',
-      lastUsed: '2025-09-15',
-      interestRate: 24.0,
-      penaltyFee: 100
+      lastUsed: '', // Please update with last usage date
+      interestRate: undefined, // Removed dummy rate
+      penaltyFee: undefined // Removed dummy fee
     },
     {
       id: '2',
       serviceName: 'Simpl',
       serviceCode: 'SIMPL-BNPL',
-      creditLimit: 5000,
-      usedAmount: 0, // Currently no outstanding
-      availableAmount: 5000,
+      creditLimit: 0, // Please update with your actual limit
+      usedAmount: 0, // Update if you have outstanding amount
+      availableAmount: 0, // Will be calculated when limit is updated
       currentDue: 0,
-      nextDueDate: '2025-09-30', // Next due date (30th)
-      dueSchedule: '15th & 30th of every month',
+      nextDueDate: '2025-09-30', // Please update with actual due date
+      dueSchedule: 'Please update with your actual schedule',
       status: 'active',
-      lastUsed: '2025-09-01',
-      interestRate: 18.0,
-      penaltyFee: 50
+      lastUsed: '', // Please update with last usage date
+      interestRate: undefined, // Removed dummy rate
+      penaltyFee: undefined // Removed dummy fee
     },
     {
       id: '3',
       serviceName: 'LazyPay',
       serviceCode: 'LAZY-PAY',
-      creditLimit: 2000,
-      usedAmount: 0, // Currently no outstanding
-      availableAmount: 2000,
+      creditLimit: 0, // Please update with your actual limit
+      usedAmount: 0, // Update if you have outstanding amount
+      availableAmount: 0, // Will be calculated when limit is updated
       currentDue: 0,
-      nextDueDate: '2025-10-01',
-      dueSchedule: '1st of every month',
+      nextDueDate: '2025-10-01', // Please update with actual due date
+      dueSchedule: 'Please update with your actual schedule',
       status: 'active',
-      lastUsed: '2025-08-25',
-      interestRate: 30.0,
-      penaltyFee: 75
+      lastUsed: '', // Please update with last usage date
+      interestRate: undefined, // Removed dummy rate
+      penaltyFee: undefined // Removed dummy fee
     }
   ]
 
@@ -457,7 +457,9 @@ export default function PayLaterPage() {
                     </div>
                     <div>
                       <span className="text-gray-600">Interest Rate:</span>
-                      <span className="ml-2 font-medium text-purple-600">{account.interestRate}% p.a.</span>
+                      <span className="ml-2 font-medium text-purple-600">
+                        {account.interestRate ? `${account.interestRate}% p.a.` : 'Not specified'}
+                      </span>
                     </div>
                     <div>
                       <span className="text-gray-600">Last Used:</span>

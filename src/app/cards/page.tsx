@@ -40,8 +40,8 @@ interface CreditCardBill {
   totalSpend?: number // amountDue + unbilledAmount
 }
 
-export default function CreditCardBills() {
-  const { user } = useRequireAuth()
+export default function CardsPage() {
+  useRequireAuth() // Just call for authentication check
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterCard, setFilterCard] = useState('all')

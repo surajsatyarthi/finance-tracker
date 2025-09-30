@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Lato, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from '../contexts/AuthContext';
+import { NotificationProvider } from '../contexts/NotificationContext';
 import Header from '../components/Header';
-import Footer from '../components/Footer';
 
-const inter = Inter({
-  variable: "--font-inter",
+const lato = Lato({
+  variable: "--font-lato",
   subsets: ["latin"],
+  weight: ["300", "400", "700", "900"],
   display: 'swap',
 });
 
@@ -30,16 +31,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased bg-gradient-to-br from-slate-50 to-gray-100`}
+        className={`${lato.variable} ${jetbrainsMono.variable} font-sans antialiased bg-gradient-to-br from-slate-50 to-gray-100`}
+        style={{ fontFamily: 'var(--font-lato), sans-serif' }}
       >
         <AuthProvider>
-          <div className="min-h-screen flex flex-col">
-            <Header />
-            <main className="flex-grow">
-              {children}
-            </main>
-            <Footer />
-          </div>
+          <NotificationProvider>
+            <div className="min-h-screen">
+              <Header />
+              <main>
+                {children}
+              </main>
+            </div>
+          </NotificationProvider>
         </AuthProvider>
       </body>
     </html>

@@ -2,17 +2,19 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
 import { useAuth } from '../../contexts/AuthContext'
+import { useNotification } from '@/contexts/NotificationContext'
 
 export default function LoginPage() {
+  const router = useRouter()
+  const { signIn } = useAuth()
+  const { showNotification } = useNotification()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const { signIn } = useAuth()
-  const router = useRouter()
 
   // Load remembered email on component mount
   useEffect(() => {
@@ -27,88 +29,159 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
     setLoading(true)
 
-    const { error } = await signIn(email, password, rememberMe)
-
-    if (error) {
-      setError(error)
-    } else {
-      router.push('/dashboard')
+    try {
+      const result = await signIn(email, password, rememberMe)
+      
+      if (result.error) {
+        showNotification(result.error, 'error')
+      } else {
+        showNotification('Successfully logged in!', 'success')
+        // Small delay to let user see success message
+        setTimeout(() => {
+          router.push('/dashboard')
+        }, 1000)
+      }
+    } catch (error) {
+      showNotification('Login failed. Please try again.', 'error')
+    } finally {
+      setLoading(false)
     }
-    
-    setLoading(false)
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden" style={{ backgroundColor: '#fafafa' }}>
+      {/* Diagonal Watermark Pattern */}
+      <div className="absolute inset-0 pointer-events-none z-0" style={{ width: '100vw', height: '100vh' }}>
+        <div className="absolute" style={{ 
+          top: '-50vh', 
+          left: '-50vw', 
+          width: '200vw', 
+          height: '200vh',
+          transform: 'rotate(-15deg)',
+          transformOrigin: 'center'
+        }}>
+          {/* Generate multiple rows of watermark text */}
+          {Array.from({ length: 60 }, (_, rowIndex) => (
+            <div
+              key={rowIndex}
+              className="flex whitespace-nowrap"
+              style={{
+                transform: `translateY(${rowIndex * 80}px)`,
+                opacity: 0.25
+              }}
+            >
+              {Array.from({ length: 30 }, (_, colIndex) => {
+                const colors = [
+                  'text-gray-800',
+                  'text-gray-700', 
+                  'text-gray-600',
+                  'text-slate-800',
+                  'text-slate-700',
+                  'text-zinc-800',
+                  'text-zinc-700',
+                  'text-neutral-800',
+                  'text-neutral-700',
+                  'text-stone-800'
+                ]
+                const colorClass = colors[(rowIndex + colIndex) % colors.length]
+                return (
+                  <span
+                    key={colIndex}
+                    className={`font-semibold ${colorClass}`}
+                    style={{ 
+                      userSelect: 'none', 
+                      pointerEvents: 'none',
+                      fontSize: '18px',
+                      letterSpacing: '3px',
+                      marginRight: '60px',
+                      display: 'inline-block'
+                    }}
+                  >
+                    Suraj Satyarthi
+                  </span>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="max-w-md w-full space-y-8 relative z-10">
         <div className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg border-2 border-gray-200">
-              <span className="text-black font-bold text-xl">₹</span>
+            <div className="w-12 h-12 bg-success-500 rounded-lg flex items-center justify-center">
+              <span className="text-white font-semibold text-xl">₹</span>
             </div>
           </div>
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+          <h2 className="text-3xl font-semibold text-neutral-900">
             Welcome Back
           </h2>
-          <p className="mt-2 text-black font-medium">
-            Sign in to your Finance Tracker account
-          </p>
-          <p className="mt-4 text-sm text-gray-700">
-            Don&apos;t have an account?{' '}
-            <Link
-              href="/signup"
-              className="font-medium text-blue-600 hover:text-blue-700 transition-colors"
-            >
-              Create one here
-            </Link>
+          <p className="mt-2 text-neutral-600">
+            Personal Finance Management System
           </p>
         </div>
-        <form className="mt-8 bg-white/90 backdrop-blur-lg rounded-2xl shadow-premium border border-white/20 p-8" onSubmit={handleSubmit}>
-          {error && (
-            <div className="rounded-xl bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 p-4 mb-6">
-              <div className="text-sm font-medium text-red-800">{error}</div>
-            </div>
-          )}
+        <form 
+          className="mt-8 bg-white rounded-lg border border-neutral-200 p-8" 
+          onSubmit={handleSubmit}
+          name="login"
+          method="post"
+          action="/login"
+        >
           
           <div className="space-y-6">
             <div>
-              <label htmlFor="email" className="block text-sm font-semibold text-black mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-neutral-700 mb-2">
                 Email Address
               </label>
               <input
                 id="email"
                 name="email"
                 type="email"
-                autoComplete="email"
+                autoComplete="username email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-black placeholder-gray-500"
+                className="w-full px-3 py-2 rounded-md border border-neutral-300 bg-white focus:ring-2 focus:ring-success-500 focus:border-success-500 transition-colors text-neutral-900 placeholder-neutral-500"
                 placeholder="Enter your email address"
+                data-lpignore="false"
+                data-form-type="login"
               />
             </div>
             <div>
-              <label htmlFor="password" className="block text-sm font-semibold text-black mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-neutral-700 mb-2">
                 Password
               </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-black placeholder-gray-500"
-                placeholder="Enter your password"
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-3 py-2 pr-10 rounded-md border border-neutral-300 bg-white focus:ring-2 focus:ring-success-500 focus:border-success-500 transition-colors text-neutral-900 placeholder-neutral-500"
+                  placeholder="Enter your password"
+                  data-lpignore="false"
+                  data-form-type="login"
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeSlashIcon className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                  ) : (
+                    <EyeIcon className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                  )}
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center mt-6">
             <div className="flex items-center">
               <input
                 id="remember-me"
@@ -116,25 +189,20 @@ export default function LoginPage() {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-premium-300 rounded transition-colors"
+                className="h-4 w-4 text-success-600 focus:ring-success-500 border-neutral-300 rounded transition-colors"
               />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-black font-medium">
-                Remember me
+              <label htmlFor="remember-me" className="ml-2 block text-sm text-neutral-700 font-medium">
+                Remember me for 30 days
               </label>
             </div>
-            <Link
-              href="/forgot-password"
-              className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
-            >
-              Forgot password?
-            </Link>
           </div>
 
-          <div>
+          <div className="mt-6">
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center items-center py-3 px-6 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-200"
+              className="w-full flex justify-center items-center py-3 px-4 rounded-md text-base font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[48px]"
+              style={{ backgroundColor: '#16a34a', minHeight: '48px' }}
             >
               {loading ? (
                 <>

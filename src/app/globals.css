@@ -241,3 +241,138 @@ a {
 a:hover {
   color: #1d4ed8 !important;
 }
+
+/* White Icons on Golden Gradient Cards */
+.icon-golden-card {
+  background: linear-gradient(135deg, #FFD700, #FFA500, #FF8C00) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3) !important;
+  transition: all 0.3s ease !important;
+  padding: 0.5rem !important;
+  border-radius: 0.5rem !important;
+}
+
+.icon-golden-card:hover {
+  background: linear-gradient(135deg, #FFA500, #FF8C00, #FFD700) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(255, 215, 0, 0.4) !important;
+}
+
+.icon-white {
+  color: white !important;
+}
+
+/* Remove old conflicting classes */
+.text-golden-500,
+.icon-golden-shine {
+  color: white !important;
+}
+
+/* Notification Animations */
+@keyframes notification-slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes notification-slide-out {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.notification-enter {
+  animation: notification-slide-in 0.3s ease-out;
+}
+
+.notification-exit {
+  animation: notification-slide-out 0.3s ease-in;
+}
+
+/* ========================================
+   PERMANENT SCROLLBAR FIX - NO MORE BLACK BARS!
+   ======================================== */
+
+/* Hide scrollbars completely on all elements */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+/* Hide scrollbars on webkit browsers (Chrome, Safari, Edge) */
+*::-webkit-scrollbar {
+  width: 0px;
+  height: 0px;
+  background: transparent; /* Chrome/Edge/Safari */
+  display: none; /* Completely hide */
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 0px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: transparent;
+}
+
+/* Force hide on all overflow containers */
+.overflow-x-auto::-webkit-scrollbar,
+.overflow-y-auto::-webkit-scrollbar,
+.overflow-auto::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Alternative approach - make scrollbars invisible */
+.overflow-x-auto,
+.overflow-y-auto,
+.overflow-auto {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+/* Body and HTML scrollbar hiding */
+body::-webkit-scrollbar,
+html::-webkit-scrollbar {
+  width: 0px;
+  height: 0px;
+  display: none;
+}
+
+/* Table specific scrollbar hiding */
+table::-webkit-scrollbar,
+.table-container::-webkit-scrollbar {
+  display: none !important;
+}
+
+/* NUCLEAR OPTION - Hide ALL scrollbars */
+::-webkit-scrollbar {
+  display: none !important;
+}
+
+/* Ensure smooth scrolling without visible scrollbars */
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden; /* Prevent horizontal page scroll */
+}
+
+body {
+  overflow-x: hidden; /* Prevent horizontal page scroll */
+}

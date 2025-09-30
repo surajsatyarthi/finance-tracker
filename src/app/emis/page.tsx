@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { useRequireAuth } from '@/contexts/AuthContext'
-import { 
+import {
   MagnifyingGlassIcon,
   FunnelIcon,
   CreditCardIcon,
@@ -14,7 +14,6 @@ import {
   ExclamationTriangleIcon,
   PlusIcon
 } from '@heroicons/react/24/outline'
-import Link from 'next/link'
 
 interface EMIData {
   id: string
@@ -35,7 +34,7 @@ interface EMIData {
 }
 
 export default function EMITracker() {
-  const { user } = useRequireAuth()
+  useRequireAuth() // Just call for authentication check
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterCard, setFilterCard] = useState('all')
@@ -97,9 +96,12 @@ export default function EMITracker() {
     }
   ]
 
+  // Wrap emiData in useMemo to fix dependency warning
+  const memoizedEmiData = useMemo(() => emiData, [])
+
   // Filter and sort logic
   const filteredAndSortedEmis = useMemo(() => {
-    const filtered = emiData.filter(emi => {
+    const filtered = memoizedEmiData.filter(emi => {
       const matchesSearch = emi.purchaseItem.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            emi.cardName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            emi.vendor?.toLowerCase().includes(searchTerm.toLowerCase()) || ''
@@ -128,20 +130,20 @@ export default function EMITracker() {
     })
 
     return filtered
-  }, [searchTerm, filterStatus, filterCard, sortBy, sortOrder])
+  }, [memoizedEmiData, searchTerm, filterStatus, filterCard, sortBy, sortOrder])
 
   // Summary calculations
   const summaryStats = useMemo(() => {
-    const totalEmis = emiData.length
-    const activeEmis = emiData.filter(emi => emi.status === 'active').length
-    const completedEmis = emiData.filter(emi => emi.status === 'completed').length
-    const totalMonthlyPayment = emiData
+    const totalEmis = memoizedEmiData.length
+    const activeEmis = memoizedEmiData.filter(emi => emi.status === 'active').length
+    const completedEmis = memoizedEmiData.filter(emi => emi.status === 'completed').length
+    const totalMonthlyPayment = memoizedEmiData
       .filter(emi => emi.status === 'active')
       .reduce((sum, emi) => sum + emi.emiAmount, 0)
-    const totalOutstanding = emiData
+    const totalOutstanding = memoizedEmiData
       .filter(emi => emi.status === 'active')
       .reduce((sum, emi) => sum + emi.remainingAmount, 0)
-    const totalPaid = emiData.reduce((sum, emi) => sum + emi.paidAmount, 0)
+    const totalPaid = memoizedEmiData.reduce((sum, emi) => sum + emi.paidAmount, 0)
 
     return {
       totalEmis,
@@ -151,7 +153,7 @@ export default function EMITracker() {
       totalOutstanding,
       totalPaid
     }
-  }, [emiData])
+  }, [memoizedEmiData])
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -198,7 +200,7 @@ export default function EMITracker() {
     return diffDays
   }
 
-  const uniqueCards = [...new Set(emiData.map(emi => emi.cardName))].sort()
+  const uniqueCards = [...new Set(memoizedEmiData.map(emi => emi.cardName))].sort()
   const statuses = [
     { key: 'all', label: 'All Status' },
     { key: 'active', label: 'Active' },

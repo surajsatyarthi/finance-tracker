@@ -1,24 +1,29 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRequireAuth } from '@/contexts/AuthContext'
-import { 
+import {
   PlusIcon,
-  BanknotesIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
-  CalendarIcon,
+  BanknotesIcon,
   CurrencyRupeeIcon,
+  ClockIcon,
+  CalendarIcon,
   DocumentTextIcon,
   BuildingOfficeIcon,
   TagIcon,
-  ClockIcon
+  BuildingLibraryIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
 import Link from 'next/link'
 import { sanitizeFinancialInput } from '@/lib/security'
+import { processTransfer, validateTransferData, type TransferData } from '@/lib/transferManager'
+import { supabase } from '@/lib/supabase'
+import { getBusinessCategories, calculateGST, GST_RATES, type BusinessCategory, type GSTCalculation } from '@/lib/businessManager'
 
 interface TransactionForm {
-  type: 'income' | 'expense'
+  type: 'income' | 'expense' | 'transfer'
   timestamp: string
   date: string
   item: string
@@ -26,18 +31,31 @@ interface TransactionForm {
   purpose: string
   paidVia: string
   paymentType: string
+  source: string
+  fromAccount: string
+  toAccount: string
   category: string
   subcategory: string
-  // Income specific
-  source?: string
+  // Business fields
+  isBusinessExpense: boolean
+  gstRate: number
+  gstAmount: number
+  isGstInclusive: boolean
+  invoiceNumber: string
+  vendorGstNumber: string
+  hsnSacCode: string
 }
 
 export default function AddTransactionPage() {
-  const { user } = useRequireAuth()
-  const [activeTab, setActiveTab] = useState<'income' | 'expense'>('expense')
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { user, loading, LoadingComponent } = useRequireAuth()
+  const [activeTab, setActiveTab] = useState<'income' | 'expense' | 'transfer'>('expense')
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [accounts, setAccounts] = useState<Array<{id: string, name: string, type: string, account_type: string}>>([])
+  const [businessCategories, setBusinessCategories] = useState<BusinessCategory[]>([])
+  const [gstCalculation, setGstCalculation] = useState<GSTCalculation | null>(null)
+  const [showBusinessFields, setShowBusinessFields] = useState(false)
   
   const [formData, setFormData] = useState<TransactionForm>({
     type: 'expense',
@@ -50,10 +68,79 @@ export default function AddTransactionPage() {
     paymentType: '',
     category: '',
     subcategory: '',
-    source: ''
+    source: '',
+    fromAccount: '',
+    toAccount: '',
+    // Business fields
+    isBusinessExpense: false,
+    gstRate: 0,
+    gstAmount: 0,
+    isGstInclusive: false,
+    invoiceNumber: '',
+    vendorGstNumber: '',
+    hsnSacCode: ''
   })
 
-  // Income sources
+  // Load accounts and business categories on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      // Load accounts
+      const { data: accountsData, error: accountsError } = await supabase
+        .from('accounts')
+        .select('id, name, type')
+        .eq('user_id', '00000000-0000-0000-0000-000000000001')
+        .order('name')
+      
+      if (!accountsError && accountsData) {
+        setAccounts(accountsData.map(account => ({
+          id: account.id,
+          name: account.name,
+          type: account.type,
+          account_type: 'personal' // Default until migration is applied
+        })))
+      }
+
+      // Load business categories - disabled until migration is applied
+      // try {
+      //   const categories = await getBusinessCategories()
+      //   setBusinessCategories(categories)
+      // } catch (error) {
+      //   console.error('Error loading business categories:', error)
+      // }
+    }
+    loadData()
+  }, [])
+
+  // Calculate GST when amount or GST rate changes
+  useEffect(() => {
+    const calculateGSTAmount = async () => {
+      if (formData.amount && formData.gstRate > 0 && formData.isBusinessExpense) {
+        try {
+          const calculation = await calculateGST(
+            parseFloat(formData.amount),
+            formData.gstRate,
+            formData.isGstInclusive
+          )
+          if (calculation) {
+            setGstCalculation(calculation)
+            setFormData(prev => ({
+              ...prev,
+              gstAmount: calculation.gst_amount
+            }))
+          }
+        } catch (error) {
+          console.error('Error calculating GST:', error)
+        }
+      } else {
+        setGstCalculation(null)
+        setFormData(prev => ({ ...prev, gstAmount: 0 }))
+      }
+    }
+    
+    calculateGSTAmount()
+  }, [formData.amount, formData.gstRate, formData.isGstInclusive, formData.isBusinessExpense])
+
+  // Income sources array
   const incomeSources = [
     'Salary',
     'Freelance',
@@ -123,14 +210,14 @@ export default function AddTransactionPage() {
     'RBL Platinum Delight'
   ]
 
-  const handleInputChange = (field: keyof TransactionForm, value: string) => {
+  const handleInputChange = (field: keyof TransactionForm, value: string | number | boolean) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }))
   }
 
-  const handleTabChange = (tab: 'income' | 'expense') => {
+  const handleTabChange = (tab: 'income' | 'expense' | 'transfer') => {
     setActiveTab(tab)
     setFormData(prev => ({
       ...prev,
@@ -140,7 +227,9 @@ export default function AddTransactionPage() {
       category: tab === 'expense' ? prev.category : '',
       subcategory: tab === 'expense' ? prev.subcategory : '',
       paidVia: tab === 'expense' ? prev.paidVia : '',
-      paymentType: tab === 'expense' ? prev.paymentType : ''
+      paymentType: tab === 'expense' ? prev.paymentType : '',
+      fromAccount: tab === 'transfer' ? prev.fromAccount : '',
+      toAccount: tab === 'transfer' ? prev.toAccount : ''
     }))
   }
 
@@ -164,10 +253,35 @@ export default function AddTransactionPage() {
         }
       }
 
-      // Simulate API call – replace with a server action/API route wired to Supabase
-      await new Promise(resolve => setTimeout(resolve, 800))
-
-      setSuccessMessage(`${activeTab === 'income' ? 'Income' : 'Expense'} added successfully!`)
+      if (activeTab === 'transfer') {
+        if (!formData.fromAccount || !formData.toAccount) {
+          throw new Error('Please select both source and destination accounts')
+        }
+        
+        const transferData: TransferData = {
+          fromAccountId: formData.fromAccount,
+          toAccountId: formData.toAccount,
+          amount: parseFloat(formData.amount),
+          description: formData.item,
+          date: formData.date
+        }
+        
+        const validationErrors = validateTransferData(transferData)
+        if (validationErrors.length > 0) {
+          throw new Error(validationErrors[0])
+        }
+        
+        const result = await processTransfer(transferData)
+        if (!result.success) {
+          throw new Error(result.error || 'Transfer failed')
+        }
+        
+        setSuccessMessage('Transfer completed successfully!')
+      } else {
+        // Simulate API call for income/expense – replace with actual Supabase call
+        await new Promise(resolve => setTimeout(resolve, 800))
+        setSuccessMessage(`${activeTab === 'income' ? 'Income' : 'Expense'} added successfully!`)
+      }
 
       // Reset form
       setFormData({
@@ -181,8 +295,19 @@ export default function AddTransactionPage() {
         paymentType: '',
         category: '',
         subcategory: '',
-        source: ''
+        source: '',
+        fromAccount: '',
+        toAccount: '',
+        isBusinessExpense: false,
+        gstRate: 0,
+        gstAmount: 0,
+        isGstInclusive: false,
+        invoiceNumber: '',
+        vendorGstNumber: '',
+        hsnSacCode: ''
       })
+      setShowBusinessFields(false)
+      setGstCalculation(null)
 
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(''), 3000)
@@ -198,12 +323,16 @@ export default function AddTransactionPage() {
     const baseValid = formData.amount && formData.item && formData.date
     if (activeTab === 'income') {
       return baseValid && formData.source
-    } else {
+    } else if (activeTab === 'expense') {
       return baseValid && formData.purpose && formData.category && formData.paidVia && formData.paymentType
+    } else if (activeTab === 'transfer') {
+      return baseValid && formData.fromAccount && formData.toAccount && formData.fromAccount !== formData.toAccount
     }
+    return false
   }
 
   return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-lg shadow-lg border-b border-white/20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -266,6 +395,17 @@ export default function AddTransactionPage() {
               <ArrowTrendingUpIcon className="h-5 w-5 mr-2" />
               Add Income
             </button>
+            <button
+              onClick={() => handleTabChange('transfer')}
+              className={`flex-1 flex items-center justify-center px-6 py-4 rounded-xl font-semibold transition-all duration-200 ${
+                activeTab === 'transfer'
+                  ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg'
+                  : 'text-premium-600 hover:bg-white/50'
+              }`}
+            >
+              <BuildingLibraryIcon className="h-5 w-5 mr-2" />
+              Transfer
+            </button>
           </div>
         </div>
 
@@ -278,17 +418,24 @@ export default function AddTransactionPage() {
                   <BanknotesIcon className="h-6 w-6 mr-3 text-emerald-600" />
                   Income Details
                 </>
-              ) : (
+              ) : activeTab === 'expense' ? (
                 <>
                   <CurrencyRupeeIcon className="h-6 w-6 mr-3 text-red-600" />
                   Expense Details
+                </>
+              ) : (
+                <>
+                  <BuildingLibraryIcon className="h-6 w-6 mr-3 text-blue-600" />
+                  Transfer Details
                 </>
               )}
             </h2>
             <p className="text-premium-600 mt-2">
               {activeTab === 'income' 
                 ? 'Record money coming into your accounts' 
-                : 'Track your spending and expenses'
+                : activeTab === 'expense'
+                ? 'Track your spending and expenses'
+                : 'Transfer funds between your bank accounts'
               }
             </p>
           </div>
@@ -383,6 +530,62 @@ export default function AddTransactionPage() {
                   ))}
                 </select>
               </div>
+            )}
+
+            {/* Transfer Fields */}
+            {activeTab === 'transfer' && (
+              <>
+                {/* From Account */}
+                <div>
+                  <label className="flex items-center text-sm font-semibold text-black mb-2">
+                    <BuildingLibraryIcon className="h-4 w-4 mr-2" />
+                    From Account
+                  </label>
+                  <select
+                    value={formData.fromAccount}
+                    onChange={(e) => handleInputChange('fromAccount', e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-black"
+                    required
+                  >
+                    <option value="">Select source account...</option>
+                    {accounts.map(account => (
+                      <option key={account.id} value={account.id}>
+                        {account.name} ({account.type})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* To Account */}
+                <div>
+                  <label className="flex items-center text-sm font-semibold text-black mb-2">
+                    <BuildingLibraryIcon className="h-4 w-4 mr-2" />
+                    To Account
+                  </label>
+                  <select
+                    value={formData.toAccount}
+                    onChange={(e) => handleInputChange('toAccount', e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-black"
+                    required
+                  >
+                    <option value="">Select destination account...</option>
+                    {accounts.filter(account => account.id !== formData.fromAccount).map(account => (
+                      <option key={account.id} value={account.id}>
+                        {account.name} ({account.type})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {formData.fromAccount && formData.toAccount && formData.fromAccount === formData.toAccount && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p className="text-sm text-red-600 flex items-center">
+                      <ExclamationTriangleIcon className="h-4 w-4 mr-2" />
+                      Source and destination accounts must be different
+                    </p>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Comprehensive Expense Fields */}
@@ -485,6 +688,164 @@ export default function AddTransactionPage() {
                     </select>
                   </div>
                 </div>
+
+                {/* Business Expense Toggle */}
+                <div className="border rounded-lg p-4 bg-blue-50">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center">
+                      <BuildingOfficeIcon className="h-5 w-5 text-blue-600 mr-2" />
+                      <span className="text-sm font-semibold text-blue-800">Business Expense</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.isBusinessExpense}
+                        onChange={(e) => {
+                          handleInputChange('isBusinessExpense', e.target.checked)
+                          setShowBusinessFields(e.target.checked)
+                        }}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+                  
+                  {formData.isBusinessExpense && (
+                    <p className="text-sm text-blue-700">
+                      This expense will be tracked for business tax purposes and GST calculations
+                    </p>
+                  )}
+                </div>
+
+                {/* Business Fields */}
+                {formData.isBusinessExpense && showBusinessFields && (
+                  <div className="space-y-4 border rounded-lg p-4 bg-orange-50">
+                    <h3 className="text-lg font-semibold text-orange-800 mb-3 flex items-center">
+                      <DocumentTextIcon className="h-5 w-5 mr-2" />
+                      Business & GST Details
+                    </h3>
+
+                    {/* Business Categories */}
+                    {businessCategories.length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-orange-700 mb-1">
+                          Business Category
+                        </label>
+                        <select
+                          value={formData.category}
+                          onChange={(e) => handleInputChange('category', e.target.value)}
+                          className="w-full px-3 py-2 border border-orange-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
+                        >
+                          <option value="">Select business category...</option>
+                          {businessCategories.map(category => (
+                            <option key={category.id} value={category.name}>
+                              {category.name} {category.is_deductible ? '(Tax Deductible)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* GST Rate */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-orange-700 mb-1">
+                          GST Rate (%)
+                        </label>
+                        <select
+                          value={formData.gstRate}
+                          onChange={(e) => handleInputChange('gstRate', parseFloat(e.target.value))}
+                          className="w-full px-3 py-2 border border-orange-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
+                        >
+                          {GST_RATES.map(rate => (
+                            <option key={rate} value={rate}>
+                              {rate}% {rate === 0 ? '(Exempt)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-orange-700 mb-1">
+                          GST Treatment
+                        </label>
+                        <select
+                          value={formData.isGstInclusive ? 'inclusive' : 'exclusive'}
+                          onChange={(e) => handleInputChange('isGstInclusive', e.target.value === 'inclusive')}
+                          className="w-full px-3 py-2 border border-orange-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
+                          disabled={formData.gstRate === 0}
+                        >
+                          <option value="exclusive">GST Extra</option>
+                          <option value="inclusive">GST Inclusive</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* GST Calculation Display */}
+                    {gstCalculation && formData.gstRate > 0 && (
+                      <div className="bg-white border border-orange-200 rounded-md p-3">
+                        <h4 className="text-sm font-semibold text-orange-800 mb-2">GST Calculation</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                          <div>
+                            <span className="text-gray-600">Taxable Amount:</span>
+                            <span className="ml-1 font-semibold">₹{gstCalculation.taxable_amount.toFixed(2)}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">GST Amount:</span>
+                            <span className="ml-1 font-semibold text-orange-600">₹{gstCalculation.gst_amount.toFixed(2)}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Total Amount:</span>
+                            <span className="ml-1 font-semibold">₹{gstCalculation.total_amount.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Invoice Details */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-orange-700 mb-1">
+                          Invoice Number
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.invoiceNumber}
+                          onChange={(e) => handleInputChange('invoiceNumber', e.target.value)}
+                          className="w-full px-3 py-2 border border-orange-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          placeholder="INV-001"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-orange-700 mb-1">
+                          HSN/SAC Code
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.hsnSacCode}
+                          onChange={(e) => handleInputChange('hsnSacCode', e.target.value)}
+                          className="w-full px-3 py-2 border border-orange-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          placeholder="9981"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-orange-700 mb-1">
+                        Vendor GST Number
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.vendorGstNumber}
+                        onChange={(e) => handleInputChange('vendorGstNumber', e.target.value.toUpperCase())}
+                        className="w-full px-3 py-2 border border-orange-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        placeholder="22AAAAA0000A1Z5"
+                        maxLength={15}
+                      />
+                    </div>
+                  </div>
+                )}
               </>
             )}
 
@@ -496,7 +857,9 @@ export default function AddTransactionPage() {
                 className={`flex-1 flex items-center justify-center px-8 py-4 rounded-xl font-semibold text-white transition-all duration-200 ${
                   activeTab === 'income'
                     ? 'bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 shadow-lg hover:shadow-xl'
-                    : 'bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 shadow-lg hover:shadow-xl'
+                    : activeTab === 'expense'
+                    ? 'bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 shadow-lg hover:shadow-xl'
+                    : 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg hover:shadow-xl'
                 } disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105`}
               >
                 {isSubmitting ? (
@@ -505,12 +868,12 @@ export default function AddTransactionPage() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Adding {activeTab}...
+                    {activeTab === 'transfer' ? 'Processing Transfer...' : `Adding ${activeTab}...`}
                   </>
                 ) : (
                   <>
                     <PlusIcon className="h-5 w-5 mr-2" />
-                    Add {activeTab === 'income' ? 'Income' : 'Expense'}
+                    {activeTab === 'income' ? 'Add Income' : activeTab === 'expense' ? 'Add Expense' : 'Process Transfer'}
                   </>
                 )}
               </button>

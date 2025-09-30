@@ -9,7 +9,6 @@ interface AuthContextType {
   user: User | null
   session: Session | null
   loading: boolean
-  signUp: (email: string, password: string, name?: string) => Promise<{ error: string | null }>
   signIn: (email: string, password: string, rememberMe?: boolean) => Promise<{ error: string | null }>
   signOut: () => Promise<{ error: string | null }>
   resetPassword: (email: string) => Promise<{ error: string | null }>
@@ -23,120 +22,114 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Get initial session
-    const initializeAuth = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession()
-        if (error) {
-          console.error('Error getting session:', error)
-        } else {
-          setSession(session)
-          setUser(session?.user ?? null)
+    // Check localStorage for login state (single-user mode)
+    const isLoggedIn = localStorage.getItem('finance-tracker-logged-in')
+    const userEmail = localStorage.getItem('finance-tracker-user-email')
+    const sessionExpiry = localStorage.getItem('finance-tracker-session-expiry')
+    const rememberMe = localStorage.getItem('finance-tracker-remember')
+    
+    if (isLoggedIn === 'true' && userEmail) {
+      // Check if session is still valid
+      let sessionValid = true
+      
+      if (rememberMe === 'true' && sessionExpiry) {
+        // Long-term session with remember me
+        const expiryDate = new Date(sessionExpiry)
+        if (new Date() > expiryDate) {
+          sessionValid = false
         }
-      } catch (error) {
-        console.error('Error initializing auth:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    initializeAuth()
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session)
-        setUser(session?.user ?? null)
-        setLoading(false)
-
-        // Create user record in our users table if it doesn't exist
-        if (event === 'SIGNED_IN' && session?.user) {
-          await createUserProfile(session.user)
-        }
-      }
-    )
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [])
-
-  const createUserProfile = async (user: User) => {
-    try {
-      // Check if user already exists
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', user.id)
-        .single()
-
-      if (!existingUser) {
-        // Create user profile
-        const { error } = await supabase
-          .from('users')
-          .insert({
-            id: user.id,
-            email: user.email!,
-            name: user.user_metadata?.name || user.email?.split('@')[0],
-            default_currency: 'INR'
-          })
-
-        if (error) {
-          console.error('Error creating user profile:', error)
-        }
-      }
-    } catch (error) {
-      console.error('Error in createUserProfile:', error)
-    }
-  }
-
-  const signUp = async (email: string, password: string, name?: string) => {
-    try {
-      setLoading(true)
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name: name || email.split('@')[0]
+      } else {
+        // Short-term session without remember me (24 hours)
+        const loginTime = localStorage.getItem('finance-tracker-login-time')
+        if (loginTime) {
+          const loginDate = new Date(loginTime)
+          const now = new Date()
+          const hoursSinceLogin = (now.getTime() - loginDate.getTime()) / (1000 * 60 * 60)
+          if (hoursSinceLogin > 24) {
+            sessionValid = false
           }
         }
-      })
-
-      if (error) {
-        return { error: error.message }
       }
-
-      return { error: null }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred during sign up'
-      return { error: errorMessage }
-    } finally {
-      setLoading(false)
+      
+      if (sessionValid) {
+        // Create a mock user object for single-user mode
+        const mockUser = {
+          id: 'single-user',
+          email: userEmail,
+          app_metadata: {},
+          aud: 'authenticated',
+          created_at: new Date().toISOString(),
+          user_metadata: {
+            name: userEmail.split('@')[0]
+          }
+        } as User
+        
+        setUser(mockUser)
+        setSession({ user: mockUser } as Session)
+      } else {
+        // Session expired, clear storage
+        localStorage.removeItem('finance-tracker-logged-in')
+        localStorage.removeItem('finance-tracker-user-email')
+        localStorage.removeItem('finance-tracker-login-time')
+        setUser(null)
+        setSession(null)
+      }
+    } else {
+      setUser(null)
+      setSession(null)
     }
-  }
+    
+    setLoading(false)
+  }, [])
+
+
 
   const signIn = async (email: string, password: string, rememberMe: boolean = false) => {
     try {
       setLoading(true)
       
-      // Store remember me preference
+      // Simple validation for single-user mode
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(email)) {
+        return { error: 'Please enter a valid email address' }
+      }
+      
+      if (!password) {
+        return { error: 'Please enter a password' }
+      }
+      
+      // Store login state
+      localStorage.setItem('finance-tracker-logged-in', 'true')
+      localStorage.setItem('finance-tracker-user-email', email)
+      localStorage.setItem('finance-tracker-login-time', new Date().toISOString())
+      
+      // Store remember me preference with timestamp
       if (rememberMe) {
+        const expiryTime = new Date()
+        expiryTime.setDate(expiryTime.getDate() + 30) // 30 days persistence
         localStorage.setItem('finance-tracker-remember', 'true')
         localStorage.setItem('finance-tracker-email', email)
+        localStorage.setItem('finance-tracker-session-expiry', expiryTime.toISOString())
       } else {
         localStorage.removeItem('finance-tracker-remember')
         localStorage.removeItem('finance-tracker-email')
+        localStorage.removeItem('finance-tracker-session-expiry')
       }
-
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      })
-
-      if (error) {
-        return { error: error.message }
-      }
+      
+      // Create mock user and update state
+      const mockUser = {
+        id: 'single-user',
+        email: email,
+        app_metadata: {},
+        aud: 'authenticated',
+        created_at: new Date().toISOString(),
+        user_metadata: {
+          name: email.split('@')[0]
+        }
+      } as User
+      
+      setUser(mockUser)
+      setSession({ user: mockUser } as Session)
 
       return { error: null }
     } catch (error: unknown) {
@@ -151,15 +144,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true)
       
-      // Clear remember me data on sign out
+      // Clear all login data
+      localStorage.removeItem('finance-tracker-logged-in')
+      localStorage.removeItem('finance-tracker-user-email')
       localStorage.removeItem('finance-tracker-remember')
       localStorage.removeItem('finance-tracker-email')
+      localStorage.removeItem('finance-tracker-session-expiry')
+      localStorage.removeItem('finance-tracker-login-time')
       
-      const { error } = await supabase.auth.signOut()
-
-      if (error) {
-        return { error: error.message }
-      }
+      // Clear user state
+      setUser(null)
+      setSession(null)
 
       return { error: null }
     } catch (error: unknown) {
@@ -191,7 +186,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     session,
     loading,
-    signUp,
     signIn,
     signOut,
     resetPassword
@@ -216,12 +210,37 @@ export function useAuth() {
 export function useRequireAuth() {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const [shouldRedirect, setShouldRedirect] = useState(false)
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login')
+    if (!loading) {
+      if (!user) {
+        setShouldRedirect(true)
+        router.push('/login')
+      } else {
+        setShouldRedirect(false)
+      }
     }
   }, [user, loading, router])
 
-  return { user, loading }
+  // Show loading screen while checking authentication or redirecting
+  if (loading || shouldRedirect) {
+    return { 
+      user: null, 
+      loading: true,
+      LoadingComponent: (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-gray-100">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-success-500 rounded-lg flex items-center justify-center mx-auto mb-4">
+              <span className="text-white font-semibold text-2xl">₹</span>
+            </div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-success-500 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading your finance tracker...</p>
+          </div>
+        </div>
+      )
+    }
+  }
+
+  return { user, loading: false, LoadingComponent: null }
 }

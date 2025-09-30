@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRequireAuth } from '@/contexts/AuthContext'
 import { 
   MagnifyingGlassIcon,
@@ -8,223 +8,61 @@ import {
   CurrencyRupeeIcon,
   ArrowTrendingUpIcon,
   CalendarIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  ExclamationTriangleIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  BellIcon
 } from '@heroicons/react/24/outline'
-
-// Budget data for all months in 2025
-const budgetData = [
-  {
-    month: 'January 2025',
-    loan: 18000,
-    transport: 8000,
-    food: 15000,
-    health: 5000,
-    subscriptions: 1000,
-    insurance: 5000,
-    miscellaneous: 10000,
-    total: 62000
-  },
-  {
-    month: 'February 2025',
-    loan: 18000,
-    transport: 8000,
-    food: 15000,
-    health: 5000,
-    subscriptions: 1000,
-    insurance: 5000,
-    miscellaneous: 10000,
-    total: 62000
-  },
-  {
-    month: 'March 2025',
-    loan: 18000,
-    transport: 8000,
-    food: 15000,
-    health: 5000,
-    subscriptions: 1000,
-    insurance: 5000,
-    miscellaneous: 10000,
-    total: 62000
-  },
-  {
-    month: 'April 2025',
-    loan: 18000,
-    transport: 8000,
-    food: 15000,
-    health: 5000,
-    subscriptions: 1000,
-    insurance: 5000,
-    miscellaneous: 10000,
-    total: 62000
-  },
-  {
-    month: 'May 2025',
-    loan: 18000,
-    transport: 8000,
-    food: 15000,
-    health: 5000,
-    subscriptions: 1000,
-    insurance: 5000,
-    miscellaneous: 10000,
-    total: 62000
-  },
-  {
-    month: 'June 2025',
-    loan: 18000,
-    transport: 8000,
-    food: 15000,
-    health: 5000,
-    subscriptions: 1000,
-    insurance: 5000,
-    miscellaneous: 10000,
-    total: 62000
-  },
-  {
-    month: 'July 2025',
-    loan: 18000,
-    transport: 8000,
-    food: 15000,
-    health: 5000,
-    subscriptions: 1000,
-    insurance: 5000,
-    miscellaneous: 10000,
-    total: 62000
-  },
-  {
-    month: 'August 2025',
-    loan: 18000,
-    transport: 8000,
-    food: 15000,
-    health: 5000,
-    subscriptions: 1000,
-    insurance: 5000,
-    miscellaneous: 10000,
-    total: 62000
-  },
-  {
-    month: 'September 2025',
-    loan: 18000,
-    transport: 8000,
-    food: 15000,
-    health: 5000,
-    subscriptions: 1000,
-    insurance: 5000,
-    miscellaneous: 10000,
-    total: 62000
-  },
-  {
-    month: 'October 2025',
-    loan: 18000,
-    transport: 8000,
-    food: 15000,
-    health: 5000,
-    subscriptions: 1000,
-    insurance: 5000,
-    miscellaneous: 10000,
-    total: 62000
-  },
-  {
-    month: 'November 2025',
-    loan: 18000,
-    transport: 8000,
-    food: 15000,
-    health: 5000,
-    subscriptions: 1000,
-    insurance: 5000,
-    miscellaneous: 10000,
-    total: 62000
-  },
-  {
-    month: 'December 2025',
-    loan: 18000,
-    transport: 8000,
-    food: 15000,
-    health: 5000,
-    subscriptions: 1000,
-    insurance: 5000,
-    miscellaneous: 10000,
-    total: 62000
-  }
-]
-
-const categoryColors = {
-  loan: 'bg-red-100 text-red-800 border-red-200',
-  transport: 'bg-blue-100 text-blue-800 border-blue-200',
-  food: 'bg-green-100 text-green-800 border-green-200',
-  health: 'bg-purple-100 text-purple-800 border-purple-200',
-  subscriptions: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-  insurance: 'bg-orange-100 text-orange-800 border-orange-200',
-  miscellaneous: 'bg-gray-100 text-gray-800 border-gray-200'
-}
-
-const categoryIcons = {
-  loan: '🏠',
-  transport: '🚗',
-  food: '🍽️',
-  health: '⚕️',
-  subscriptions: '📱',
-  insurance: '🛡️',
-  miscellaneous: '💼'
-}
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell
+} from 'recharts'
+import {
+  monthlyBudgets,
+  budgetCategories,
+  annualBudgetSummary,
+  getCurrentMonthBudget,
+  formatCurrency
+} from '@/lib/budgetData'
+import {
+  getCurrentMonthAnalysis,
+  type MonthlyAnalysis,
+  type BudgetAlert
+} from '@/lib/budgetAnalysis'
 
 export default function BudgetPage() {
-  const { user } = useRequireAuth()
+  const { user, loading: authLoading, LoadingComponent } = useRequireAuth()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedQuarter, setSelectedQuarter] = useState('all')
-
-  // Calculate summary statistics
-  const summaryStats = useMemo(() => {
-    const totalBudget = budgetData.reduce((sum, month) => sum + month.total, 0)
-    const avgMonthlyBudget = totalBudget / budgetData.length
-    
-    // Category totals across all months
-    const categoryTotals = budgetData.reduce((acc, month) => {
-      acc.loan += month.loan
-      acc.transport += month.transport
-      acc.food += month.food
-      acc.health += month.health
-      acc.subscriptions += month.subscriptions
-      acc.insurance += month.insurance
-      acc.miscellaneous += month.miscellaneous
-      return acc
-    }, {
-      loan: 0,
-      transport: 0,
-      food: 0,
-      health: 0,
-      subscriptions: 0,
-      insurance: 0,
-      miscellaneous: 0
-    })
-
-    const highestCategory = Object.entries(categoryTotals).reduce((a, b) => 
-      categoryTotals[a[0] as keyof typeof categoryTotals] > categoryTotals[b[0] as keyof typeof categoryTotals] ? a : b
-    )
-
-    return {
-      totalBudget,
-      avgMonthlyBudget,
-      categoryTotals,
-      highestCategory: highestCategory[0],
-      highestCategoryAmount: highestCategory[1]
-    }
-  }, [])
+  const [analysis, setAnalysis] = useState<MonthlyAnalysis | null>(null)
+  const [analysisLoading, setAnalysisLoading] = useState(true)
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth())
 
   // Filter budget data based on search and filters
   const filteredBudgetData = useMemo(() => {
-    return budgetData.filter(month => {
+    return monthlyBudgets.filter(month => {
       const matchesSearch = month.month.toLowerCase().includes(searchTerm.toLowerCase())
       
       let matchesCategory = true
       if (selectedCategory !== 'all') {
-        const categoryValue = month[selectedCategory as keyof typeof month]
-        matchesCategory = typeof categoryValue === 'number' && categoryValue > 0
+        const categoryValue = month.categories[selectedCategory]
+        matchesCategory = categoryValue > 0
       }
 
       let matchesQuarter = true
       if (selectedQuarter !== 'all') {
-        const monthNum = new Date(month.month).getMonth() + 1
+        const monthNum = month.monthIndex + 1
         if (selectedQuarter === 'q1') matchesQuarter = monthNum <= 3
         else if (selectedQuarter === 'q2') matchesQuarter = monthNum >= 4 && monthNum <= 6
         else if (selectedQuarter === 'q3') matchesQuarter = monthNum >= 7 && monthNum <= 9
@@ -235,24 +73,128 @@ export default function BudgetPage() {
     })
   }, [searchTerm, selectedCategory, selectedQuarter])
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount)
+  // Load budget analysis
+  useEffect(() => {
+    const loadAnalysis = async () => {
+      try {
+        setAnalysisLoading(true)
+        const monthAnalysis = await getCurrentMonthAnalysis()
+        setAnalysis(monthAnalysis)
+      } catch (error) {
+        console.error('Error loading budget analysis:', error)
+      } finally {
+        setAnalysisLoading(false)
+      }
+    }
+
+    loadAnalysis()
+  }, [])
+
+  // Alert component
+  const AlertCard = ({ alert }: { alert: BudgetAlert }) => {
+    const getAlertIcon = () => {
+      switch (alert.type) {
+        case 'danger':
+          return <XCircleIcon className="h-5 w-5 text-red-500" />
+        case 'warning':
+          return <ExclamationTriangleIcon className="h-5 w-5 text-yellow-500" />
+        case 'success':
+          return <CheckCircleIcon className="h-5 w-5 text-green-500" />
+        default:
+          return <BellIcon className="h-5 w-5 text-blue-500" />
+      }
+    }
+
+    const getAlertStyle = () => {
+      switch (alert.type) {
+        case 'danger':
+          return 'bg-red-50 border-red-200 text-red-800'
+        case 'warning':
+          return 'bg-yellow-50 border-yellow-200 text-yellow-800'
+        case 'success':
+          return 'bg-green-50 border-green-200 text-green-800'
+        default:
+          return 'bg-blue-50 border-blue-200 text-blue-800'
+      }
+    }
+
+    return (
+      <div className={`border rounded-lg p-4 ${getAlertStyle()}`}>
+        <div className="flex items-start">
+          <div className="flex-shrink-0">
+            {getAlertIcon()}
+          </div>
+          <div className="ml-3 flex-1">
+            <p className="text-sm font-medium">{alert.message}</p>
+            {alert.amount !== 0 && (
+              <p className="text-sm mt-1">
+                {alert.amount > 0 ? 'Over by' : 'Under by'} {formatCurrency(Math.abs(alert.amount))}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Progress bar component
+  const ProgressBar = ({ 
+    budgeted, 
+    actual, 
+    category 
+  }: { 
+    budgeted: number
+    actual: number
+    category: string 
+  }) => {
+    const percentage = budgeted > 0 ? Math.min((actual / budgeted) * 100, 150) : 0
+    const status = actual > budgeted * 1.1 ? 'over' : actual < budgeted * 0.8 ? 'under' : 'on-track'
+    
+    const getProgressColor = () => {
+      if (status === 'over') return 'bg-red-500'
+      if (status === 'under') return 'bg-yellow-500'
+      return 'bg-green-500'
+    }
+
+    return (
+      <div className="w-full">
+        <div className="flex justify-between text-sm text-gray-600 mb-1">
+          <span>{budgetCategories[category as keyof typeof budgetCategories]?.name || category}</span>
+          <span>{percentage.toFixed(0)}%</span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2">
+          <div 
+            className={`h-2 rounded-full transition-all duration-300 ${getProgressColor()}`}
+            style={{ width: `${Math.min(percentage, 100)}%` }}
+          ></div>
+        </div>
+        <div className="flex justify-between text-xs text-gray-500 mt-1">
+          <span>{formatCurrency(actual)}</span>
+          <span>of {formatCurrency(budgeted)}</span>
+        </div>
+      </div>
+    )
+  }
+
+  // Show loading screen
+  if (LoadingComponent) return LoadingComponent
+  if (analysisLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading budget analysis...</p>
+        </div>
+      </div>
+    )
   }
 
   const categories = [
     { key: 'all', label: 'All Categories' },
-    { key: 'loan', label: 'Loan' },
-    { key: 'transport', label: 'Transport' },
-    { key: 'food', label: 'Food' },
-    { key: 'health', label: 'Health' },
-    { key: 'subscriptions', label: 'Subscriptions' },
-    { key: 'insurance', label: 'Insurance' },
-    { key: 'miscellaneous', label: 'Miscellaneous' }
+    ...Object.entries(budgetCategories).map(([key, value]) => ({
+      key,
+      label: value.name
+    }))
   ]
 
   const quarters = [
@@ -268,9 +210,24 @@ export default function BudgetPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Budget Overview</h1>
-          <p className="text-gray-600">Track your monthly budget allocation across all categories for 2025</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Advanced Budget Management</h1>
+          <p className="text-gray-600">Track your 2025 budget with real-time analysis and smart alerts</p>
         </div>
+
+        {/* Budget Alerts */}
+        {analysis && analysis.alerts.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+              <BellIcon className="h-5 w-5 mr-2 text-red-500" />
+              Budget Alerts ({analysis.alerts.length})
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {analysis.alerts.map((alert, index) => (
+                <AlertCard key={index} alert={alert} />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Summary Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -280,8 +237,9 @@ export default function BudgetPage() {
                 <CurrencyRupeeIcon className="h-8 w-8 text-indigo-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Annual Budget</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(summaryStats.totalBudget)}</p>
+                <p className="text-sm font-medium text-gray-600">Annual Budget</p>
+                <p className="text-2xl font-bold text-gray-900">{formatCurrency(annualBudgetSummary.totalBudget)}</p>
+                <p className="text-sm text-gray-500">₹12.3 Lakhs total</p>
               </div>
             </div>
           </div>
@@ -292,8 +250,9 @@ export default function BudgetPage() {
                 <CalendarIcon className="h-8 w-8 text-green-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Average Monthly</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(summaryStats.avgMonthlyBudget)}</p>
+                <p className="text-sm font-medium text-gray-600">Monthly Average</p>
+                <p className="text-2xl font-bold text-gray-900">{formatCurrency(annualBudgetSummary.averageMonthly)}</p>
+                <p className="text-sm text-gray-500">Planned spending</p>
               </div>
             </div>
           </div>
@@ -301,12 +260,22 @@ export default function BudgetPage() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <ArrowTrendingUpIcon className="h-8 w-8 text-red-600" />
+                <ArrowTrendingUpIcon className={`h-8 w-8 ${
+                  analysis?.overallStatus === 'over' ? 'text-red-600' : 
+                  analysis?.overallStatus === 'under' ? 'text-yellow-600' : 'text-green-600'
+                }`} />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Highest Category</p>
-                <p className="text-xl font-bold text-gray-900 capitalize">{summaryStats.highestCategory}</p>
-                <p className="text-sm text-gray-500">{formatCurrency(summaryStats.highestCategoryAmount)}</p>
+                <p className="text-sm font-medium text-gray-600">This Month</p>
+                <p className={`text-2xl font-bold ${
+                  analysis?.overallStatus === 'over' ? 'text-red-600' : 
+                  analysis?.overallStatus === 'under' ? 'text-yellow-600' : 'text-green-600'
+                }`}>
+                  {analysis ? `${analysis.overallPercentage.toFixed(0)}%` : '0%'}
+                </p>
+                <p className="text-sm text-gray-500">
+                  {analysis ? formatCurrency(analysis.totalActual) : '₹0'} spent
+                </p>
               </div>
             </div>
           </div>
@@ -318,26 +287,91 @@ export default function BudgetPage() {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Categories</p>
-                <p className="text-2xl font-bold text-gray-900">7</p>
+                <p className="text-2xl font-bold text-gray-900">{Object.keys(budgetCategories).length}</p>
                 <p className="text-sm text-gray-500">Budget categories</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Category Breakdown */}
+        {/* Monthly Progress Visualization */}
+        {analysis && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-6">Budget vs Actual Progress</h2>
+            <div className="space-y-6">
+              {analysis.categories
+                .filter(cat => cat.budgeted > 0)
+                .slice(0, 8)
+                .map((category) => (
+                <div key={category.category} className="space-y-2">
+                  <ProgressBar 
+                    budgeted={category.budgeted}
+                    actual={category.actual}
+                    category={category.category}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Budget vs Actual Chart */}
+        {analysis && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-6">Category Comparison</h2>
+            <div className="h-96">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={analysis.categories
+                    .filter(cat => cat.budgeted > 0)
+                    .slice(0, 10)
+                    .map(cat => ({
+                      name: budgetCategories[cat.category as keyof typeof budgetCategories]?.name || cat.category,
+                      budgeted: cat.budgeted,
+                      actual: cat.actual,
+                      category: cat.category
+                    }))}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <XAxis 
+                    dataKey="name" 
+                    stroke="#374151" 
+                    fontSize={11}
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                  />
+                  <YAxis stroke="#374151" fontSize={12} />
+                  <Tooltip 
+                    formatter={(value, name) => [
+                      formatCurrency(Number(value)), 
+                      name === 'budgeted' ? 'Budgeted' : 'Actual'
+                    ]} 
+                  />
+                  <Legend />
+                  <Bar dataKey="budgeted" fill="#3B82F6" name="Budgeted" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="actual" fill="#10B981" name="Actual" radius={[2, 2, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* Annual Category Breakdown */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">Annual Category Breakdown</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {Object.entries(summaryStats.categoryTotals).map(([category, total]) => {
-              const percentage = (total / summaryStats.totalBudget * 100).toFixed(1)
+            {Object.entries(annualBudgetSummary.categoryTotals).map(([category, total]) => {
+              const percentage = (total / annualBudgetSummary.totalBudget * 100).toFixed(1)
+              const categoryInfo = budgetCategories[category as keyof typeof budgetCategories]
               return (
-                <div key={category} className={`rounded-lg border-2 p-4 ${categoryColors[category as keyof typeof categoryColors]}`}>
+                <div key={category} className={`rounded-lg border-2 p-4 ${categoryInfo?.color || 'bg-gray-100 text-gray-800 border-gray-200'}`}>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-lg">{categoryIcons[category as keyof typeof categoryIcons]}</span>
+                    <span className="text-lg">{categoryInfo?.icon || '💼'}</span>
                     <span className="text-sm font-medium">{percentage}%</span>
                   </div>
-                  <h3 className="font-semibold capitalize mb-1">{category}</h3>
+                  <h3 className="font-semibold mb-1">{categoryInfo?.name || category}</h3>
                   <p className="text-xl font-bold">{formatCurrency(total)}</p>
                   <p className="text-sm opacity-75">{formatCurrency(total / 12)}/month</p>
                 </div>
@@ -401,7 +435,7 @@ export default function BudgetPage() {
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">Monthly Budget Details</h2>
             <p className="text-sm text-gray-600 mt-1">
-              Showing {filteredBudgetData.length} of {budgetData.length} months
+              Showing {filteredBudgetData.length} of {monthlyBudgets.length} months
             </p>
           </div>
 
@@ -445,25 +479,25 @@ export default function BudgetPage() {
                       <div className="text-sm font-medium text-gray-900">{month.month}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900 font-medium">{formatCurrency(month.loan)}</span>
+                      <span className="text-sm text-gray-900 font-medium">{formatCurrency(month.categories.loan || 0)}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900 font-medium">{formatCurrency(month.transport)}</span>
+                      <span className="text-sm text-gray-900 font-medium">{formatCurrency(month.categories.transport || 0)}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900 font-medium">{formatCurrency(month.food)}</span>
+                      <span className="text-sm text-gray-900 font-medium">{formatCurrency(month.categories.food || 0)}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900 font-medium">{formatCurrency(month.health)}</span>
+                      <span className="text-sm text-gray-900 font-medium">{formatCurrency(month.categories.health || 0)}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900 font-medium">{formatCurrency(month.subscriptions)}</span>
+                      <span className="text-sm text-gray-900 font-medium">{formatCurrency(month.categories.subscriptions || 0)}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900 font-medium">{formatCurrency(month.insurance)}</span>
+                      <span className="text-sm text-gray-900 font-medium">{formatCurrency(month.categories.insurance || 0)}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900 font-medium">{formatCurrency(month.miscellaneous)}</span>
+                      <span className="text-sm text-gray-900 font-medium">{formatCurrency(month.categories.miscellaneous || 0)}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="text-sm font-bold text-indigo-600">{formatCurrency(month.total)}</span>

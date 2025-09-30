@@ -1,6 +1,9 @@
 {
   "framework": "nextjs",
   "buildCommand": "npm run build",
+  "projectSettings": {
+    "framework": "nextjs"
+  },
   "headers": [
     {
       "source": "/(.*)",
