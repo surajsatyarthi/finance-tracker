@@ -41,6 +41,7 @@ export const processTransfer = async (transferData: TransferData): Promise<Trans
     const description = transferData.description || 'Bank Transfer'
     const date = transferData.date || new Date().toISOString().split('T')[0]
 
+    // @ts-expect-error RPC function exists in DB but is not in generated types
     const { data, error } = await supabase.rpc('process_transfer_transaction', {
       p_user_id: USER_ID,
       p_from_account_id: transferData.fromAccountId,
@@ -121,6 +122,7 @@ export const getGroupedTransfers = async (): Promise<Record<string, TransferTran
 // Get account balance including transfers (via RPC)
 export const getAccountBalanceWithTransfers = async (accountId: string): Promise<number> => {
   try {
+    // @ts-expect-error RPC function exists in DB but is not in generated types
     const { data, error } = await supabase.rpc('get_account_balance_with_transfers', {
       p_account_id: accountId
     })
