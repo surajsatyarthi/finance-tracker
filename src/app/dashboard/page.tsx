@@ -75,7 +75,7 @@ export default function Dashboard() {
       const { data: creditCards, error: ccError } = await supabase
         .from('credit_cards')
         .select('current_balance')
-        .eq('user_id', '00000000-0000-0000-0000-000000000001')
+        .eq('user_id', user!.id)
         .eq('is_active', true)
       
       const totalCreditCardBalance = ccError || !creditCards 
@@ -93,7 +93,7 @@ export default function Dashboard() {
       const { data: transactions, error: txError } = await supabase
         .from('transactions')
         .select('*')
-        .eq('user_id', '00000000-0000-0000-0000-000000000001')
+        .eq('user_id', user!.id)
         .gte('date', `${currentYear}-${currentMonth.toString().padStart(2, '0')}-01`)
         .lt('date', currentMonth === 12 
           ? `${currentYear + 1}-01-01` 

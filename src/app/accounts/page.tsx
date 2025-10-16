@@ -47,7 +47,7 @@ const accountTypeIcons = {
 }
 
 export default function AccountsPage() {
-  useRequireAuth() // Just call for authentication check
+  const { user: authUser } = useRequireAuth() // Ensure we have the authenticated user
   const { showNotification } = useNotification()
 
   const [accounts, setAccounts] = useState<Account[]>([])
@@ -573,7 +573,7 @@ export default function AccountsPage() {
                       .from('accounts')
                       .update({ balance: Math.round(amount * 100) / 100, updated_at: new Date().toISOString() })
                       .eq('id', editingAccount!.id)
-                      .eq('user_id', '00000000-0000-0000-0000-000000000001')
+                      .eq('user_id', authUser!.id)
 
                     if (error) {
                       showNotification(`Failed to update balance: ${error.message}`, 'error')

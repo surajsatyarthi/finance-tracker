@@ -2,7 +2,6 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { User, Session } from '@supabase/supabase-js'
-import { supabase } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
 
 interface AuthContextType {
@@ -54,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (sessionValid) {
         // Create a mock user object for single-user mode
         const mockUser = {
-          id: 'single-user',
+          id: '00000000-0000-0000-0000-000000000001',
           email: userEmail,
           app_metadata: {},
           aud: 'authenticated',
@@ -118,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Create mock user and update state
       const mockUser = {
-        id: 'single-user',
+        id: '00000000-0000-0000-0000-000000000001',
         email: email,
         app_metadata: {},
         aud: 'authenticated',
@@ -130,6 +129,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       setUser(mockUser)
       setSession({ user: mockUser } as Session)
+
+      // Attempt data migration from localStorage to Supabase (non-blocking)
+      try {
+        const { FinanceDataManager } = await import('../lib/supabaseDataManager')
+        const mgr = FinanceDataManager.getInstance()
+        const init = await mgr.initialize()
+        if (init.success) {
+          await mgr.migrateFromLocalStorage()
+        }
+      } catch (e) {
+        // Silent fail; migration is best-effort
+        console.warn('Migration skipped or failed:', e)
+      }
 
       return { error: null }
     } catch (error: unknown) {
@@ -167,6 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resetPassword = async (email: string) => {
     try {
+      const { supabase } = await import('../lib/supabase')
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`
       })

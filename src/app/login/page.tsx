@@ -125,8 +125,6 @@ export default function LoginPage() {
           className="mt-8 bg-white rounded-lg border border-neutral-200 p-8" 
           onSubmit={handleSubmit}
           name="login"
-          method="post"
-          action="/login"
         >
           
           <div className="space-y-6">
