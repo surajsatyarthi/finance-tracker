@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { getExpenseTransactions } from './dataManager'
 import { 
   getBudgetForMonth, 
   getBudgetForCategory, 
@@ -7,6 +8,7 @@ import {
   budgetCategories,
   type BudgetVsActual 
 } from './budgetData'
+import { getLocalBudget } from './dataManager'
 
 export interface ExpenseData {
   id: string
@@ -165,9 +167,38 @@ export const categorizeTransaction = (description: string, paymentMethod: string
 
 // Get actual expenses from Supabase for a specific month
 export const getActualExpenses = async (monthIndex: number, year: number = 2025): Promise<ExpenseData[]> => {
+  const localMode = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_LOCAL_MODE === 'true'
   const startDate = new Date(year, monthIndex, 1)
-  const endDate = new Date(year, monthIndex + 1, 0) // Last day of month
-  
+  const endDate = new Date(year, monthIndex + 1, 0)
+
+  if (localMode) {
+    try {
+      const local = getExpenseTransactions()
+      const filtered = local.filter((t) => {
+        const d = new Date(t.date)
+        return d >= startDate && d <= endDate
+      })
+      return filtered.map((t) => ({
+        id: t.id,
+        amount: t.amount,
+        type: 'expense',
+        description: t.description,
+        date: t.date,
+        payment_method: t.paymentMethod,
+        category: t.category,
+        subcategory: null,
+        user_id: 'local',
+        account_id: null,
+        category_id: null,
+        created_at: t.timestamp,
+        updated_at: t.timestamp,
+      }))
+    } catch (e) {
+      console.error('Local expense fetch failed:', e)
+      return []
+    }
+  }
+
   const { data: transactions, error } = await supabase
     .from('transactions')
     .select('*')
@@ -175,18 +206,19 @@ export const getActualExpenses = async (monthIndex: number, year: number = 2025)
     .eq('user_id', '00000000-0000-0000-0000-000000000001')
     .gte('date', startDate.toISOString().split('T')[0])
     .lte('date', endDate.toISOString().split('T')[0])
-  
+
   if (error) {
     console.error('Error fetching expenses:', error)
     return []
   }
-  
   return transactions || []
 }
 
 // Analyze budget vs actual for a specific month
 export const analyzeMonthlyBudget = async (monthIndex: number, year: number = 2025): Promise<MonthlyAnalysis> => {
-  const budget = getBudgetForMonth(monthIndex)
+  const base = getBudgetForMonth(monthIndex)
+  const local = getLocalBudget(monthIndex, year)
+  const budget = base && local ? { ...base, categories: local.categories, total: local.total } : base
   const actualExpenses = await getActualExpenses(monthIndex, year)
   
   if (!budget) {

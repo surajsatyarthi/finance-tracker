@@ -20,17 +20,16 @@
 }
 
 body {
-  background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
 
 /* Ensure high contrast for all text elements */
-.bg-white/80 {
+.bg-white\/80 {
   --tw-bg-opacity: 0.95;
 }
 
-.bg-white/90 {
+.bg-white\/90 {
   --tw-bg-opacity: 0.98;
 }
 
@@ -167,46 +166,9 @@ p, span, div {
   color: #1f2937 !important;
 }
 
-/* NUCLEAR OPTION - FORCE HIGH CONTRAST EVERYWHERE */
-/* Login page specific fixes */
-body * {
-  font-weight: 500;
-}
-
-.text-black {
-  color: #000000 !important;
-}
-
-.text-gray-700 {
-  color: #374151 !important;
-}
-
-.text-blue-600 {
-  color: #2563eb !important;
-}
-
-.text-blue-700 {
-  color: #1d4ed8 !important;
-}
-
-.placeholder-gray-500::placeholder {
-  color: #6b7280 !important;
-  opacity: 1;
-}
-
-/* Force dark text on ALL light backgrounds */
-[class*="bg-white"],
-[class*="bg-gray-50"],
-[class*="bg-gray-100"],
-[class*="bg-slate-50"],
-[class*="bg-blue-50"],
-[class*="bg-indigo-50"] {
-  color: #000000 !important;
-}
-
-[class*="bg-white"] *:not(.text-white):not([class*="bg-gradient"]):not([class*="text-gradient"]) {
-  color: #000000 !important;
-}
+.text-blue-600 { color: #2563eb !important; }
+.text-blue-700 { color: #1d4ed8 !important; }
+.placeholder-gray-500::placeholder { color: #6b7280 !important; opacity: 1; }
 
 /* Ensure input text is always visible */
 input[type="email"],
@@ -233,14 +195,7 @@ p {
   color: #000000 !important;
 }
 
-/* Link colors should be clearly blue */
-a {
-  color: #2563eb !important;
-}
-
-a:hover {
-  color: #1d4ed8 !important;
-}
+/* Link colors scoped elsewhere to avoid conflicting with buttons */
 
 /* White Icons on Golden Gradient Cards */
 .icon-golden-card {
@@ -375,4 +330,74 @@ html {
 
 body {
   overflow-x: hidden; /* Prevent horizontal page scroll */
+}
+
+.glass-surface {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 30px rgba(17, 24, 39, 0.08);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  box-shadow: 0 6px 24px rgba(17, 24, 39, 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 0.75rem;
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(17, 24, 39, 0.06);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.glass-nav {
+  background: rgba(255, 255, 255, 0.55);
+  border-bottom: 1px solid rgba(17, 24, 39, 0.08);
+  backdrop-filter: saturate(140%) blur(10px);
+  -webkit-backdrop-filter: saturate(140%) blur(10px);
+}
+
+.glass-input {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.glass-divider {
+  border-color: rgba(17, 24, 39, 0.06);
+}
+
+.watermark-bg {
+  background-color: #D22B2B;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='160'><text x='0' y='50' font-family='Lato, sans-serif' font-size='24' fill='rgba(255,255,255,0.3)' transform='rotate(-20 0 0)'>Suraj Satyarthi</text></svg>");
+  background-repeat: repeat;
+  background-size: 260px 160px;
+  background-attachment: fixed;
+}
+
+.app-shell {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.btn-primary {
+  color: #ffffff !important;
+  background-image: linear-gradient(to right, #4f46e5, #6366f1);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  box-shadow: 0 10px 24px rgba(17, 24, 39, 0.12);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+}
+
+.btn-primary:hover {
+  background-image: linear-gradient(to right, #4338ca, #4f46e5);
+}
+
+.btn-primary svg {
+  color: #ffffff !important;
 }

@@ -1,7 +1,5 @@
 import { supabase } from './supabase'
 
-const USER_ID = '00000000-0000-0000-0000-000000000001'
-
 export interface TransferData {
   fromAccountId: string
   toAccountId: string
@@ -48,14 +46,14 @@ interface TransferRPCResult {
 }
 
 // Process a transfer between accounts (atomic via RPC)
-export const processTransfer = async (transferData: TransferData): Promise<TransferResult> => {
+export const processTransfer = async (userId: string, transferData: TransferData): Promise<TransferResult> => {
   try {
     const description = transferData.description || 'Bank Transfer'
     const date = transferData.date || new Date().toISOString().split('T')[0]
 
     // @ts-expect-error RPC function exists in DB but is not in generated types
     const { data, error } = await supabase.rpc('process_transfer_transaction', {
-      p_user_id: USER_ID,
+      p_user_id: userId,
       p_from_account_id: transferData.fromAccountId,
       p_to_account_id: transferData.toAccountId,
       p_amount: transferData.amount,
@@ -90,12 +88,12 @@ export const processTransfer = async (transferData: TransferData): Promise<Trans
 }
 
 // Get all transfers for a user
-export const getUserTransfers = async (): Promise<TransferTransaction[]> => {
+export const getUserTransfers = async (userId: string): Promise<TransferTransaction[]> => {
   try {
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
-      .eq('user_id', USER_ID)
+      .eq('user_id', userId)
       .eq('is_transfer', true)
       .order('date', { ascending: false })
 
@@ -112,9 +110,9 @@ export const getUserTransfers = async (): Promise<TransferTransaction[]> => {
 }
 
 // Get transfers grouped by reference ID (to show both sides of transfer)
-export const getGroupedTransfers = async (): Promise<Record<string, TransferTransaction[]>> => {
+export const getGroupedTransfers = async (userId: string): Promise<Record<string, TransferTransaction[]>> => {
   try {
-    const transfers = await getUserTransfers()
+    const transfers = await getUserTransfers(userId)
     
     const grouped: Record<string, TransferTransaction[]> = {}
     
@@ -155,19 +153,19 @@ export const getAccountBalanceWithTransfers = async (accountId: string): Promise
 }
 
 // Get transfer summary for an account
-export const getAccountTransferSummary = async (accountId: string) => {
+export const getAccountTransferSummary = async (userId: string, accountId: string) => {
   try {
     const [{ data: inData, error: inErr }, { data: outData, error: outErr }] = await Promise.all([
       supabase
         .from('transactions')
         .select('amount')
-        .eq('user_id', USER_ID)
+        .eq('user_id', userId)
         .eq('is_transfer', true)
         .eq('to_account_id', accountId),
       supabase
         .from('transactions')
         .select('amount')
-        .eq('user_id', USER_ID)
+        .eq('user_id', userId)
         .eq('is_transfer', true)
         .eq('from_account_id', accountId)
     ])
@@ -219,4 +217,3 @@ export const validateTransferData = (data: TransferData): string[] => {
   
   return errors
 }
-

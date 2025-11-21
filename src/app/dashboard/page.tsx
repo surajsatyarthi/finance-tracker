@@ -2,9 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRequireAuth } from '../../contexts/AuthContext'
-// All data now comes from Supabase exclusively
-import { 
-  BanknotesIcon, 
+import {
+  BanknotesIcon,
   ChartBarIcon,
   FlagIcon as TargetIcon,
   PlusIcon,
@@ -14,18 +13,29 @@ import {
 } from '@heroicons/react/24/outline'
 import Link from 'next/link'
 import {
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  PieChart, 
-  Pie, 
-  Cell, 
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
   ResponsiveContainer
 } from 'recharts'
+import {
+  getLiquidityData,
+  getIncomeTransactions,
+  getExpenseTransactions,
+  getCreditCardLiabilitySummary,
+  getFuturePayables,
+  getLoans
+} from '@/lib/dataManager'
+import { getFDs, getCreditCards } from '@/lib/dataManager'
+import { usePrivacy } from '@/contexts/PrivacyContext'
+import GlassCard from '@/components/GlassCard'
 
 interface Transaction {
   id: string
@@ -49,6 +59,7 @@ interface DashboardStats {
 
 export default function Dashboard() {
   const { user, loading, LoadingComponent } = useRequireAuth()
+  const { locked } = usePrivacy()
   const [stats, setStats] = useState<DashboardStats>({
     totalAssets: 0,
     totalLiabilities: 0,
@@ -63,77 +74,46 @@ export default function Dashboard() {
 
   const loadDashboardData = useCallback(async () => {
     try {
-      // Use Supabase data exclusively - NO localStorage fallback
-      const { getTotalLiquidity } = await import('@/lib/simpleSupabaseManager')
-      const { supabase } = await import('@/lib/supabase')
-      
-      // Get total assets from Supabase
-      const totalAssets = await getTotalLiquidity()
-      console.log('📊 Supabase total assets:', totalAssets)
-      
-      // Get credit card data from Supabase
-      const { data: creditCards, error: ccError } = await supabase
-        .from('credit_cards')
-        .select('current_balance')
-        .eq('user_id', user!.id)
-        .eq('is_active', true)
-      
-      const totalCreditCardBalance = ccError || !creditCards 
-        ? 0 
-        : creditCards.reduce((sum, card) => sum + (card.current_balance || 0), 0)
-      
-      console.log('💳 Credit card liabilities:', totalCreditCardBalance)
-      
-      // Get transactions from Supabase
+      const liquidity = getLiquidityData()
+      const totalAssets = liquidity.totalLiquidity
+      const ccSummary = getCreditCardLiabilitySummary()
+      const totalCreditCardBalance = ccSummary.totalOutstanding
+
       const currentDate = new Date()
-      const currentMonth = currentDate.getMonth() + 1
-      const currentYear = currentDate.getFullYear()
-      
-      // Get current month transactions from Supabase
-      const { data: transactions, error: txError } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('user_id', user!.id)
-        .gte('date', `${currentYear}-${currentMonth.toString().padStart(2, '0')}-01`)
-        .lt('date', currentMonth === 12 
-          ? `${currentYear + 1}-01-01` 
-          : `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-01`)
-      
-      let monthlyIncome = 0
-      let monthlyExpenses = 0
-      let recentTransactions: Transaction[] = []
-      
-      if (!txError && transactions) {
-        const incomeTransactions = transactions.filter(t => t.type === 'income')
-        const expenseTransactions = transactions.filter(t => t.type === 'expense')
-        
-        monthlyIncome = incomeTransactions.reduce((sum, t) => sum + t.amount, 0)
-        monthlyExpenses = expenseTransactions.reduce((sum, t) => sum + t.amount, 0)
-        
-        // Get recent 5 transactions
-        recentTransactions = transactions
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-          .slice(0, 5)
-          .map(t => ({
-            id: t.id,
-            amount: t.amount,
-            type: t.type,
-            description: t.description || '',
-            date: t.date,
-            categories: null
-          }))
-      }
-      
-      console.log('📈 Monthly income from Supabase:', monthlyIncome)
-      console.log('📉 Monthly expenses from Supabase:', monthlyExpenses)
+      const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+      const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
+
+      const incomes = getIncomeTransactions().filter(t => {
+        const d = new Date(t.date)
+        return d >= startOfMonth && d <= endOfMonth
+      })
+      const expenses = getExpenseTransactions().filter(t => {
+        const d = new Date(t.date)
+        return d >= startOfMonth && d <= endOfMonth
+      })
+
+      const monthlyIncome = incomes.reduce((sum, t) => sum + t.amount, 0)
+      const monthlyExpenses = expenses.reduce((sum, t) => sum + t.amount, 0)
+
+      const recentTransactions: Transaction[] = [...incomes, ...expenses]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 5)
+        .map(t => ({
+          id: t.id,
+          amount: t.amount,
+          type: (t as { type?: string; paymentMethod?: string }).type || (t as { paymentMethod?: string }).paymentMethod ? 'expense' : 'income',
+          description: (t as { description?: string }).description || '',
+          date: t.date,
+          categories: null
+        }))
 
       setStats({
         totalAssets,
-        totalLiabilities: totalCreditCardBalance, // Only credit cards for now, will add loans later
+        totalLiabilities: totalCreditCardBalance,
         monthlyIncome,
         monthlyExpenses,
-        activeLoans: 0, // Will get from Supabase loans table later
-        activeGoals: 0, // Will get from Supabase goals table later
+        activeLoans: 0,
+        activeGoals: 0,
         totalCreditCardBalance,
         recentTransactions
       })
@@ -150,6 +130,126 @@ export default function Dashboard() {
 
   const netWorth = stats.totalAssets - stats.totalLiabilities
   const monthlySavings = stats.monthlyIncome - stats.monthlyExpenses
+  const partitionSplit = (() => {
+    const currentDate = new Date()
+    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+    const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
+    const incomes = getIncomeTransactions().filter(t => {
+      const d = new Date(t.date)
+      return d >= startOfMonth && d <= endOfMonth
+    })
+    const expenses = getExpenseTransactions().filter(t => {
+      const d = new Date(t.date)
+      return d >= startOfMonth && d <= endOfMonth
+    })
+    const bi = incomes.filter(t => t.partition === 'business').reduce((s, t) => s + t.amount, 0)
+    const pi = incomes.filter(t => t.partition !== 'business').reduce((s, t) => s + t.amount, 0)
+    const be = expenses.filter(t => t.partition === 'business').reduce((s, t) => s + t.amount, 0)
+    const pe = expenses.filter(t => t.partition !== 'business').reduce((s, t) => s + t.amount, 0)
+    return { bi, pi, be, pe }
+  })()
+
+  const projection = (() => {
+    const payables = getFuturePayables().filter(p => p.status !== 'paid')
+    const recurringIncome = getIncomeTransactions().filter(t => t.recurring)
+    const recurringExpense = getExpenseTransactions().filter(t => t.recurring)
+    const now = new Date()
+    const months = [0, 1, 2].map(offset => {
+      const start = new Date(now.getFullYear(), now.getMonth() + offset, 1)
+      const end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0)
+      const outflows = payables
+        .filter(p => {
+          const d = new Date(p.dueDate)
+          return d >= start && d <= end
+        })
+        .reduce((sum, p) => sum + p.amount, 0)
+      const recurOut = recurringExpense.reduce((sum, t) => {
+        const d = new Date(t.date)
+        const isMonthly = t.recurring?.frequency === 'monthly'
+        const isQuarter = t.recurring?.frequency === 'quarterly'
+        const include = isMonthly || (isQuarter && ((start.getMonth() - d.getMonth() + 12) % 3 === 0))
+        return include ? sum + t.amount : sum
+      }, 0)
+      const recurIn = recurringIncome.reduce((sum, t) => {
+        const d = new Date(t.date)
+        const isMonthly = t.recurring?.frequency === 'monthly'
+        const isQuarter = t.recurring?.frequency === 'quarterly'
+        const include = isMonthly || (isQuarter && ((start.getMonth() - d.getMonth() + 12) % 3 === 0))
+        return include ? sum + t.amount : sum
+      }, 0)
+      return {
+        label: start.toLocaleString('en-IN', { month: 'short' }),
+        outflows: outflows + recurOut,
+        inflows: recurIn,
+      }
+    })
+    const startLiquidity = getLiquidityData().totalLiquidity
+    const path = months.reduce<{ points: number[] }>((acc, m) => {
+      const last = acc.points[acc.points.length - 1] ?? startLiquidity
+      acc.points.push(Math.max(0, last + (m.inflows || 0) - m.outflows))
+      return acc
+    }, { points: [] })
+    return { months, startLiquidity, path }
+  })()
+
+  const upcoming = (() => {
+    const payables = getFuturePayables().filter(p => p.status !== 'paid')
+    const now = new Date()
+    const in30 = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30)
+    const upcomingList = payables.filter(p => {
+      const d = new Date(p.dueDate)
+      return d >= now && d <= in30
+    })
+    const amount = upcomingList.reduce((sum, p) => sum + p.amount, 0)
+    return { count: upcomingList.length, amount }
+  })()
+
+  const ratios = (() => {
+    const loans = getLoans()
+    const monthlyEmi = loans.reduce((sum, l) => sum + l.monthlyAmount, 0)
+    const savingsRate = stats.monthlyIncome > 0 ? Math.round((monthlySavings / stats.monthlyIncome) * 100) : 0
+    const debtService = stats.monthlyIncome > 0 ? Math.round((monthlyEmi / stats.monthlyIncome) * 100) : 0
+    const liquidityRatio = stats.totalAssets > 0 ? Math.round(((stats.totalAssets - stats.totalLiabilities) / stats.totalAssets) * 100) : 0
+    return { monthlyEmi, savingsRate, debtService, liquidityRatio }
+  })()
+
+  const csvStats = (() => {
+    if (typeof window === 'undefined') return { loanInr: 0, annualExpenseInr: 0 }
+    try {
+      const loan = JSON.parse(localStorage.getItem('dashboard_total_loan') || '{"inr":0}')
+      const annual = JSON.parse(localStorage.getItem('dashboard_annual_expense') || '{"inr":0}')
+      return { loanInr: loan.inr || 0, annualExpenseInr: annual.inr || 0 }
+    } catch {
+      return { loanInr: 0, annualExpenseInr: 0 }
+    }
+  })()
+
+  const reminders = (() => {
+    const now = new Date()
+    const soon = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 14)
+    const emis = getFuturePayables()
+      .filter(p => p.type === 'emi' && p.status !== 'paid')
+      .filter(p => {
+        const d = new Date(p.dueDate)
+        return d >= now && d <= soon
+      })
+      .map(p => ({ kind: 'EMI', label: p.description, due: p.dueDate, amount: p.amount }))
+    const fds = getFDs()
+      .filter(fd => {
+        const d = new Date(fd.maturityDate)
+        return d >= now && d <= new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30)
+      })
+      .map(fd => ({ kind: 'FD', label: fd.name, due: fd.maturityDate, amount: fd.amount }))
+    const cards = getCreditCards()
+      .filter(c => c.isActive)
+      .filter(c => {
+        const due = new Date(now.getFullYear(), now.getMonth(), c.dueDate || 1)
+        const diff = (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        return diff >= 0 && diff <= 14
+      })
+      .map(c => ({ kind: 'Card', label: c.name, due: new Date(now.getFullYear(), now.getMonth(), c.dueDate || 1).toISOString().split('T')[0], amount: c.currentBalance }))
+    return [...emis, ...fds, ...cards].sort((a, b) => new Date(a.due).getTime() - new Date(b.due).getTime())
+  })()
 
   // Show auth loading screen if authenticating or redirecting
   if (LoadingComponent) {
@@ -183,75 +283,198 @@ export default function Dashboard() {
         </div>
         {/* Professional Financial Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <GlassCard>
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="icon-golden-card">
-                  <BanknotesIcon className="h-8 w-8 icon-white" />
-                </div>
+                <BanknotesIcon className="h-8 w-8 text-indigo-600" />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Net Worth</p>
                 <p className={`text-2xl font-bold ${netWorth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  ₹{Math.abs(netWorth).toLocaleString()}
+                  {locked ? '₹••••••' : `₹${Math.abs(netWorth).toLocaleString()}`}
                 </p>
-                <p className="text-sm text-gray-500">Total Assets - Liabilities</p>
+                <p className="text-sm text-gray-500">Assets minus liabilities</p>
               </div>
             </div>
-          </div>
+          </GlassCard>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <GlassCard>
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="icon-golden-card">
-                  <ArrowTrendingUpIcon className="h-8 w-8 icon-white" />
-                </div>
+                <ArrowTrendingUpIcon className="h-8 w-8 text-green-600" />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Monthly Income</p>
-                <p className="text-2xl font-bold text-blue-600">₹{stats.monthlyIncome.toLocaleString()}</p>
-                <p className="text-sm text-gray-500">Current Month Earnings</p>
+                <p className="text-2xl font-bold text-gray-900">{locked ? '₹••••••' : `₹${stats.monthlyIncome.toLocaleString()}`}</p>
+                <p className="text-sm text-gray-500">Current month</p>
               </div>
             </div>
-          </div>
+          </GlassCard>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <GlassCard>
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="icon-golden-card">
-                  <ArrowTrendingDownIcon className="h-8 w-8 icon-white" />
-                </div>
+                <ArrowTrendingDownIcon className="h-8 w-8 text-rose-600" />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Monthly Expenses</p>
-                <p className="text-2xl font-bold text-red-600">₹{stats.monthlyExpenses.toLocaleString()}</p>
-                <p className="text-sm text-gray-500">Current Month Spending</p>
+                <p className="text-2xl font-bold text-gray-900">{locked ? '₹••••••' : `₹${stats.monthlyExpenses.toLocaleString()}`}</p>
+                <p className="text-sm text-gray-500">Current month</p>
               </div>
             </div>
-          </div>
+          </GlassCard>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <GlassCard>
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="icon-golden-card">
-                  <ChartBarIcon className="h-8 w-8 icon-white" />
-                </div>
+                <ChartBarIcon className="h-8 w-8 text-purple-600" />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Monthly Savings</p>
                 <p className={`text-2xl font-bold ${monthlySavings >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  ₹{Math.abs(monthlySavings).toLocaleString()}
+                  {locked ? '₹••••••' : `₹${Math.abs(monthlySavings).toLocaleString()}`}
                 </p>
                 <p className="text-sm text-gray-500">Income - Expenses</p>
               </div>
             </div>
+          </GlassCard>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <GlassCard>
+            <div className="flex items-center">
+              <BuildingLibraryIcon className="h-8 w-8 text-indigo-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">CSV Total Loan</p>
+                <p className="text-2xl font-bold text-gray-900">₹{csvStats.loanInr.toLocaleString()}</p>
+              </div>
+            </div>
+          </GlassCard>
+          <GlassCard>
+            <div className="flex items-center">
+              <ChartBarIcon className="h-8 w-8 text-purple-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">CSV Annual Expense</p>
+                <p className="text-2xl font-bold text-gray-900">₹{csvStats.annualExpenseInr.toLocaleString()}</p>
+              </div>
+            </div>
+          </GlassCard>
+        </div>
+
+        <GlassCard className="mb-8">
+          <h3 className="text-xl font-semibold text-gray-900 mb-4">Reminders</h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Label</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {reminders.map((r, idx) => (
+                  <tr key={idx}>
+                    <td className="px-6 py-3 text-sm text-gray-900">{r.kind}</td>
+                    <td className="px-6 py-3 text-sm text-gray-900">{r.label}</td>
+                    <td className="px-6 py-3 text-sm text-gray-900">{new Date(r.due).toLocaleDateString('en-IN')}</td>
+                    <td className="px-6 py-3 text-sm font-semibold text-right text-gray-900">₹{Number(r.amount || 0).toLocaleString()}</td>
+                  </tr>
+                ))}
+                {reminders.length === 0 && (
+                  <tr>
+                    <td className="px-6 py-4 text-sm text-gray-500" colSpan={4}>No upcoming reminders</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
+        </GlassCard>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <GlassCard>
+            <div className="flex items-center">
+              <ArrowTrendingUpIcon className="h-8 w-8 text-green-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Business Income</p>
+                <p className="text-2xl font-bold text-gray-900">₹{partitionSplit.bi.toLocaleString()}</p>
+              </div>
+            </div>
+          </GlassCard>
+          <GlassCard>
+            <div className="flex items-center">
+              <ArrowTrendingUpIcon className="h-8 w-8 text-blue-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Personal Income</p>
+                <p className="text-2xl font-bold text-gray-900">₹{partitionSplit.pi.toLocaleString()}</p>
+              </div>
+            </div>
+          </GlassCard>
+          <GlassCard>
+            <div className="flex items-center">
+              <ArrowTrendingDownIcon className="h-8 w-8 text-rose-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Business Expenses</p>
+                <p className="text-2xl font-bold text-gray-900">₹{partitionSplit.be.toLocaleString()}</p>
+              </div>
+            </div>
+          </GlassCard>
+          <GlassCard>
+            <div className="flex items-center">
+              <ArrowTrendingDownIcon className="h-8 w-8 text-indigo-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Personal Expenses</p>
+                <p className="text-2xl font-bold text-gray-900">₹{partitionSplit.pe.toLocaleString()}</p>
+              </div>
+            </div>
+          </GlassCard>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <GlassCard>
+            <div className="flex items-center">
+              <ArrowTrendingDownIcon className="h-8 w-8 text-orange-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Upcoming in 30 days</p>
+                <p className="text-2xl font-bold text-gray-900">₹{upcoming.amount.toLocaleString()}</p>
+                <p className="text-sm text-gray-500">{upcoming.count} items</p>
+              </div>
+            </div>
+          </GlassCard>
+          <GlassCard>
+            <div className="flex items-center">
+              <ChartBarIcon className="h-8 w-8 text-indigo-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Savings Rate</p>
+                <p className="text-2xl font-bold text-gray-900">{ratios.savingsRate}%</p>
+              </div>
+            </div>
+          </GlassCard>
+          <GlassCard>
+            <div className="flex items-center">
+              <BuildingLibraryIcon className="h-8 w-8 text-purple-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Debt Service</p>
+                <p className="text-2xl font-bold text-gray-900">{ratios.debtService}%</p>
+              </div>
+            </div>
+          </GlassCard>
+          <GlassCard>
+            <div className="flex items-center">
+              <BanknotesIcon className="h-8 w-8 text-green-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Liquidity Ratio</p>
+                <p className="text-2xl font-bold text-gray-900">{ratios.liquidityRatio}%</p>
+              </div>
+            </div>
+          </GlassCard>
         </div>
 
         {/* Financial Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Asset vs Liability Pie Chart */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <GlassCard>
             <h3 className="text-xl font-semibold text-gray-900 mb-6">Asset vs Liability Breakdown</h3>
             <div className="h-64 sm:h-72 lg:h-80">
               <ResponsiveContainer width="100%" height="100%">
@@ -276,10 +499,10 @@ export default function Dashboard() {
                 </PieChart>
               </ResponsiveContainer>
             </div>
-          </div>
+          </GlassCard>
 
           {/* Monthly Income vs Expenses Bar Chart */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <GlassCard>
             <h3 className="text-xl font-semibold text-gray-900 mb-6">Monthly Financial Overview</h3>
             <div className="h-64 sm:h-72 lg:h-80">
               <ResponsiveContainer width="100%" height="100%">
@@ -305,12 +528,31 @@ export default function Dashboard() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </div>
+          </GlassCard>
         </div>
+
+        {/* 3-Month Projection */}
+        <GlassCard className="mb-8">
+          <h3 className="text-xl font-semibold text-gray-900 mb-6">3-Month Projection</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {projection.months.map((m, idx) => (
+              <div key={m.label} className="rounded-lg border p-4">
+                <p className="text-sm text-gray-600">{m.label}</p>
+                <p className="text-lg font-bold text-rose-600">₹{m.outflows.toLocaleString()}</p>
+                <p className="text-xs text-gray-500">Projected outflows</p>
+                {m.inflows ? (
+                  <p className="text-sm mt-1 text-green-700">Inflows: <span className="font-semibold">₹{m.inflows.toLocaleString()}</span></p>
+                ) : null}
+                <p className="text-sm mt-2">Liquidity: <span className="font-semibold">₹{projection.path.points[idx].toLocaleString()}</span></p>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-4">Start Liquidity: ₹{projection.startLiquidity.toLocaleString()}</p>
+        </GlassCard>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
           {/* Clean Quick Actions */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+          <GlassCard>
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-semibold text-gray-900">
@@ -376,10 +618,10 @@ export default function Dashboard() {
                 </Link>
               </div>
             </div>
-          </div>
+          </GlassCard>
 
           {/* Recent Transactions */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+          <GlassCard>
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-semibold text-gray-900 flex items-center">
@@ -421,7 +663,7 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
-          </div>
+          </GlassCard>
         </div>
       </div>
     </div>

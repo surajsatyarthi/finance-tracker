@@ -17,6 +17,7 @@ import {
   ClockIcon,
   UserIcon
 } from '@heroicons/react/24/outline'
+import { usePrivacy } from '@/contexts/PrivacyContext'
 
 export default function Header() {
   const { user, signOut } = useAuth()
@@ -33,7 +34,9 @@ export default function Header() {
     { name: 'Expenses', href: '/expenses/add', icon: ArrowTrendingDownIcon },
     { name: 'Budget', href: '/budget', icon: ChartBarIcon },
     { name: 'Goals', href: '/goals', icon: FlagIcon },
-    { name: 'Credit Cards', href: '/credit-cards', icon: CreditCardIcon },
+    { name: 'Loans', href: '/loans', icon: ArrowTrendingDownIcon },
+    { name: 'Savings & FDs', href: '/savings-fds', icon: FlagIcon },
+    { name: 'Credit Cards', href: '/cards', icon: CreditCardIcon },
     { name: 'CC Liability', href: '/credit-card-liability', icon: ArrowTrendingDownIcon },
   ]
 
@@ -56,6 +59,10 @@ export default function Header() {
     setIsUserMenuOpen(false)
     setIsMobileMenuOpen(false)
   }, [pathname])
+
+  const { locked, lock, unlock, setPassword } = usePrivacy()
+  const [showLockPanel, setShowLockPanel] = useState(false)
+  const [pwd, setPwd] = useState('')
 
   // Don't show header on login/signup pages
   if (pathname === '/login' || pathname === '/signup') {
@@ -138,6 +145,14 @@ export default function Header() {
               <span className="absolute -top-1 -right-1 w-3 h-3 bg-success-500 rounded-full"></span>
             </Link>
 
+            {/* Privacy Lock */}
+            <button
+              onClick={() => setShowLockPanel(true)}
+              className={`px-2 py-2 rounded-md text-sm font-medium ${locked ? 'text-red-600' : 'text-neutral-700'} hover:bg-neutral-50`}
+            >
+              {locked ? 'Unlock' : 'Lock'}
+            </button>
+
             {/* User Profile Dropdown */}
             {user ? (
               <div className="relative" ref={userMenuRef}>
@@ -182,8 +197,8 @@ export default function Header() {
                         <ArrowRightOnRectangleIcon className="h-4 w-4 mr-2" />
                         Sign Out
                       </button>
-                    </div>
-                  </div>
+        </div>
+      </div>
                 )}
               </div>
             ) : (
@@ -274,6 +289,40 @@ export default function Header() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {showLockPanel && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-sm glass-card">
+              <div className="px-6 py-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">{locked ? 'Unlock' : 'Set/Lock'}</h3>
+                <input
+                  type="password"
+                  className="w-full glass-input px-3 py-2 rounded-md"
+                  placeholder="Enter password"
+                  value={pwd}
+                  onChange={(e) => setPwd(e.target.value)}
+                />
+                <div className="mt-4 flex items-center justify-end gap-2">
+                  <button className="px-3 py-2 rounded-md border" onClick={() => { setShowLockPanel(false); setPwd('') }}>Cancel</button>
+                  <button
+                    className="btn-primary px-3 py-2 rounded-md"
+                    onClick={async () => {
+                      if (!locked) {
+                        const ok = await setPassword(pwd)
+                        if (ok) { lock(); setShowLockPanel(false); setPwd('') }
+                        return
+                      }
+                      const ok = unlock(pwd)
+                      if (ok) { setShowLockPanel(false); setPwd('') }
+                    }}
+                  >
+                    {locked ? 'Unlock' : 'Lock'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}

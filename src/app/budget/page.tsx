@@ -27,6 +27,7 @@ import {
   Pie,
   Cell
 } from 'recharts'
+import { ExpenseData } from '@/lib/budgetAnalysis'
 import {
   monthlyBudgets,
   budgetCategories,
@@ -34,6 +35,7 @@ import {
   getCurrentMonthBudget,
   formatCurrency
 } from '@/lib/budgetData'
+import { setLocalBudgetCategory, copyBudgetFromPrevious } from '@/lib/dataManager'
 import {
   getCurrentMonthAnalysis,
   type MonthlyAnalysis,
@@ -42,12 +44,22 @@ import {
 
 export default function BudgetPage() {
   const { user, loading: authLoading, LoadingComponent } = useRequireAuth()
+  const { locked } = usePrivacy()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedQuarter, setSelectedQuarter] = useState('all')
   const [analysis, setAnalysis] = useState<MonthlyAnalysis | null>(null)
   const [analysisLoading, setAnalysisLoading] = useState(true)
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth())
+  const [drillCategory, setDrillCategory] = useState<string | null>(null)
+  const drillTransactions = useMemo(() => {
+    if (!analysis || !drillCategory) return []
+    const cat = analysis.categories.find(c => c.category === drillCategory)
+    return cat ? cat.transactions : []
+  }, [analysis, drillCategory])
+  const [editorMonthIndex, setEditorMonthIndex] = useState(new Date().getMonth())
+  const [editorYear, setEditorYear] = useState(new Date().getFullYear())
+  const currentBudget = getCurrentMonthBudget()
 
   // Filter budget data based on search and filters
   const filteredBudgetData = useMemo(() => {
@@ -231,33 +243,33 @@ export default function BudgetPage() {
 
         {/* Summary Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="glass-card p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <CurrencyRupeeIcon className="h-8 w-8 text-indigo-600" />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Annual Budget</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(annualBudgetSummary.totalBudget)}</p>
+                <p className="text-2xl font-bold text-gray-900">{locked ? '₹••••••' : formatCurrency(annualBudgetSummary.totalBudget)}</p>
                 <p className="text-sm text-gray-500">₹12.3 Lakhs total</p>
               </div>
             </div>
           </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          
+          <div className="glass-card p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <CalendarIcon className="h-8 w-8 text-green-600" />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Monthly Average</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(annualBudgetSummary.averageMonthly)}</p>
+                <p className="text-2xl font-bold text-gray-900">{locked ? '₹••••••' : formatCurrency(annualBudgetSummary.averageMonthly)}</p>
                 <p className="text-sm text-gray-500">Planned spending</p>
               </div>
             </div>
           </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          
+          <div className="glass-card p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <ArrowTrendingUpIcon className={`h-8 w-8 ${
@@ -279,8 +291,8 @@ export default function BudgetPage() {
               </div>
             </div>
           </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          
+          <div className="glass-card p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <ChartBarIcon className="h-8 w-8 text-purple-600" />
@@ -296,7 +308,7 @@ export default function BudgetPage() {
 
         {/* Monthly Progress Visualization */}
         {analysis && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 p-6">
+          <div className="glass-card mb-8 p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-6">Budget vs Actual Progress</h2>
             <div className="space-y-6">
               {analysis.categories
@@ -317,7 +329,7 @@ export default function BudgetPage() {
 
         {/* Budget vs Actual Chart */}
         {analysis && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 p-6">
+          <div className="glass-card mb-8 p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-6">Category Comparison</h2>
             <div className="h-96">
               <ResponsiveContainer width="100%" height="100%">
@@ -355,11 +367,24 @@ export default function BudgetPage() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {analysis.categories
+                .filter(cat => cat.budgeted > 0)
+                .slice(0, 12)
+                .map((cat) => (
+                  <button key={cat.category} className="px-3 py-2 rounded-lg border text-left hover:bg-gray-50" onClick={() => setDrillCategory(cat.category)}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-700">{budgetCategories[cat.category as keyof typeof budgetCategories]?.name || cat.category}</span>
+                      <span className="text-xs text-gray-500">{(cat.percentage || 0).toFixed(0)}%</span>
+                    </div>
+                  </button>
+                ))}
+            </div>
           </div>
         )}
 
         {/* Annual Category Breakdown */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 p-6">
+        <div className="glass-card mb-8 p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">Annual Category Breakdown</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {Object.entries(annualBudgetSummary.categoryTotals).map(([category, total]) => {
@@ -380,8 +405,46 @@ export default function BudgetPage() {
           </div>
         </div>
 
+        {drillCategory && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-3xl glass-card">
+              <div className="px-6 py-4 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">Transactions — {budgetCategories[drillCategory as keyof typeof budgetCategories]?.name || drillCategory}</h3>
+                <button className="px-3 py-1 rounded border" onClick={() => setDrillCategory(null)}>Close</button>
+              </div>
+              <div className="px-6 pb-6 overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {drillTransactions.map((t: ExpenseData) => (
+                      <tr key={t.id}>
+                        <td className="px-6 py-3 text-sm text-gray-900">{new Date(t.date).toLocaleDateString('en-IN')}</td>
+                        <td className="px-6 py-3 text-sm text-gray-900">{t.description || '-'}</td>
+                        <td className="px-6 py-3 text-sm text-gray-900">{t.payment_method}</td>
+                        <td className="px-6 py-3 text-sm font-semibold text-right text-gray-900">{formatCurrency(t.amount)}</td>
+                      </tr>
+                    ))}
+                    {drillTransactions.length === 0 && (
+                      <tr>
+                        <td className="px-6 py-4 text-sm text-gray-500" colSpan={4}>No transactions</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Search and Filters */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="glass-card p-6 mb-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="flex-1 max-w-md">
               <div className="relative">
@@ -431,7 +494,7 @@ export default function BudgetPage() {
         </div>
 
         {/* Monthly Budget Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="glass-card overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">Monthly Budget Details</h2>
             <p className="text-sm text-gray-600 mt-1">
@@ -508,7 +571,54 @@ export default function BudgetPage() {
             </table>
           </div>
         </div>
+
+        <div className="glass-card p-6 mt-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Edit This Month Budget</h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Year</label>
+              <input type="number" className="border rounded-lg px-3 py-2 w-full" value={editorYear} onChange={(e) => setEditorYear(parseInt(e.target.value || '2025'))} />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Month</label>
+              <select className="border rounded-lg px-3 py-2 w-full" value={editorMonthIndex} onChange={(e) => setEditorMonthIndex(parseInt(e.target.value))}>
+                {monthlyBudgets.map(m => (
+                  <option key={m.monthIndex} value={m.monthIndex}>{m.month}</option>
+                ))}
+              </select>
+            </div>
+            <div className="md:col-span-2 flex items-end">
+              <button
+                className="btn-primary px-4 py-2 rounded-md"
+                onClick={() => {
+                  const base = monthlyBudgets.find(m => m.monthIndex === editorMonthIndex)
+                  const categories = base?.categories || {}
+                  copyBudgetFromPrevious(editorMonthIndex, editorYear, categories)
+                }}
+              >
+                Copy Previous Month
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {Object.keys(budgetCategories).map(cat => (
+              <div key={cat} className="rounded-lg border p-4">
+                <div className="text-sm font-medium mb-2">{budgetCategories[cat as keyof typeof budgetCategories].name}</div>
+                <input
+                  type="number"
+                  className="border rounded-lg px-3 py-2 w-full"
+                  placeholder="₹"
+                  onBlur={(e) => {
+                    const amt = parseFloat(e.target.value || '0')
+                    setLocalBudgetCategory(editorMonthIndex, editorYear, cat, amt)
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )
 }
+import { usePrivacy } from '@/contexts/PrivacyContext'

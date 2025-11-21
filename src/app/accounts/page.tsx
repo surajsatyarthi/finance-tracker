@@ -3,9 +3,13 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRequireAuth } from '@/contexts/AuthContext'
 import { useNotification } from '@/contexts/NotificationContext'
-import { getAccounts } from '@/lib/simpleSupabaseManager'
-import { getAccountBalanceWithTransfers } from '@/lib/transferManager'
-import { supabase } from '@/lib/supabase'
+import { 
+  getBankAccounts,
+  getCashBalance,
+  setBankAccountBalance,
+  updateCashBalance
+} from '@/lib/dataManager'
+import { usePrivacy } from '@/contexts/PrivacyContext'
 import { 
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -49,6 +53,7 @@ const accountTypeIcons = {
 export default function AccountsPage() {
   const { user: authUser } = useRequireAuth() // Ensure we have the authenticated user
   const { showNotification } = useNotification()
+  const { locked } = usePrivacy()
 
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
@@ -67,19 +72,31 @@ export default function AccountsPage() {
 
   const loadAccounts = useCallback(async () => {
     try {
-      const baseAccounts = await getAccounts()
-      // Enrich with computed balances via RPC
-      const enriched = await Promise.all(
-        baseAccounts.map(async (acc: Account) => {
-          try {
-            const computed = await getAccountBalanceWithTransfers(acc.id)
-            return { ...acc, computed_balance: computed }
-          } catch {
-            return acc
-          }
-        })
-      )
-      setAccounts(enriched)
+      const banks = getBankAccounts()
+      const cash = getCashBalance()
+      const mapped: Account[] = [
+        {
+          id: 'cash',
+          name: 'Cash',
+          type: 'cash',
+          balance: cash,
+          currency: 'INR',
+          is_active: true,
+          created_at: new Date().toISOString(),
+          computed_balance: cash,
+        },
+        ...banks.map((b) => ({
+          id: b.id,
+          name: b.name,
+          type: b.type,
+          balance: b.balance,
+          currency: 'INR',
+          is_active: true,
+          created_at: b.lastUpdated,
+          computed_balance: b.balance,
+        })),
+      ]
+      setAccounts(mapped)
     } catch (error) {
       console.error('Error loading accounts:', error)
     } finally {
@@ -211,7 +228,7 @@ export default function AccountsPage() {
 
         {/* Summary Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="glass-card p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <CurrencyRupeeIcon className="h-8 w-8 text-green-600" />
@@ -219,13 +236,13 @@ export default function AccountsPage() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Total Assets</p>
                 <p className="text-2xl font-bold text-green-600">
-                  {showBalances ? formatCurrency(summaryStats.totalBalance) : '₹••••••'}
+                  {locked ? '₹••••••' : (showBalances ? formatCurrency(summaryStats.totalBalance) : '₹••••••')}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="glass-card p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <ArrowTrendingUpIcon className="h-8 w-8 text-blue-600" />
@@ -233,13 +250,13 @@ export default function AccountsPage() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Active Balance</p>
                 <p className="text-2xl font-bold text-blue-600">
-                  {showBalances ? formatCurrency(summaryStats.totalActiveBalance) : '₹••••••'}
+                  {locked ? '₹••••••' : (showBalances ? formatCurrency(summaryStats.totalActiveBalance) : '₹••••••')}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="glass-card p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <BuildingLibraryIcon className="h-8 w-8 text-indigo-600" />
@@ -252,7 +269,7 @@ export default function AccountsPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="glass-card p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <ChartPieIcon className="h-8 w-8 text-purple-600" />
@@ -263,9 +280,9 @@ export default function AccountsPage() {
                   {summaryStats.highestBalanceAccount ? summaryStats.highestBalanceAccount.name : 'N/A'}
                 </p>
                 <p className="text-sm text-gray-500">
-                  {summaryStats.highestBalanceAccount && showBalances 
-                    ? formatCurrency(summaryStats.highestBalanceAccount.balance) 
-                    : summaryStats.highestBalanceAccount ? '₹••••••' : 'No data'}
+                    {summaryStats.highestBalanceAccount && !locked && showBalances
+                      ? formatCurrency(summaryStats.highestBalanceAccount.balance)
+                      : summaryStats.highestBalanceAccount ? '₹••••••' : 'No data'}
                 </p>
               </div>
             </div>
@@ -273,7 +290,7 @@ export default function AccountsPage() {
         </div>
 
         {/* Account Type Breakdown */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 p-6">
+        <div className="glass-card mb-8 p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">Account Type Breakdown</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {Object.entries(summaryStats.typeBreakdown).map(([type, data]) => {
@@ -296,7 +313,7 @@ export default function AccountsPage() {
         </div>
 
         {/* Search and Filters */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="glass-card p-6 mb-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="flex-1 max-w-md">
               <div className="relative">
@@ -346,7 +363,7 @@ export default function AccountsPage() {
         </div>
 
         {/* Accounts Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="glass-card overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">Account Details</h2>
             <p className="text-sm text-gray-600 mt-1">
@@ -400,7 +417,7 @@ export default function AccountsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`text-sm font-bold ${(account.computed_balance ?? account.balance) > 0 ? 'text-green-600' : 'text-gray-400'}`}>
-                        {showBalances ? formatCurrency(account.computed_balance ?? account.balance) : '₹••••••'}
+                        {locked ? '₹••••••' : (showBalances ? formatCurrency(account.computed_balance ?? account.balance) : '₹••••••')}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -438,8 +455,8 @@ export default function AccountsPage() {
       {/* Edit Balance Modal */}
       {editOpen && editingAccount && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md bg-white rounded-xl shadow-xl border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <div className="w-full max-w-md glass-card">
+            <div className="px-6 py-4 glass-panel flex items-center justify-between rounded-t-xl">
               <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                 <LockClosedIcon className="h-5 w-5 text-gray-600 mr-2" />
                 Edit Balance (Sensitive)
@@ -510,7 +527,7 @@ export default function AccountsPage() {
                 )
               })()}
             </div>
-            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3 bg-gray-50 rounded-b-xl">
+            <div className="px-6 py-4 glass-panel flex items-center justify-end gap-3 rounded-b-xl">
               <button
                 onClick={() => setEditOpen(false)}
                 className="px-4 py-2 rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
@@ -569,16 +586,12 @@ export default function AccountsPage() {
                     }
 
                     // Update account balance
-                    const { error } = await supabase
-                      .from('accounts')
-                      .update({ balance: Math.round(amount * 100) / 100, updated_at: new Date().toISOString() })
-                      .eq('id', editingAccount!.id)
-                      .eq('user_id', authUser!.id)
-
-                    if (error) {
-                      showNotification(`Failed to update balance: ${error.message}`, 'error')
-                      setSaving(false)
-                      return
+                    const current = editingAccount!.computed_balance ?? editingAccount!.balance
+                    if (editingAccount!.id === 'cash') {
+                      const delta = amount - current
+                      updateCashBalance(Math.abs(delta), delta >= 0)
+                    } else {
+                      setBankAccountBalance(editingAccount!.id, Math.round(amount * 100) / 100)
                     }
 
                     showNotification('Balance updated successfully', 'success')

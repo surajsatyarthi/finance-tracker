@@ -1,0 +1,17 @@
+name: Deploy
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trigger Vercel Deploy Hook
+        if: ${{ env.VERCEL_DEPLOY_HOOK_URL != '' }}
+        run: curl -X POST -H "Content-Type: application/json" -d '{}' "$VERCEL_DEPLOY_HOOK_URL"
+        env:
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+      - name: Auto-deploy via connected repo
+        run: echo "If repo is connected to Vercel, push to main auto-deploys."

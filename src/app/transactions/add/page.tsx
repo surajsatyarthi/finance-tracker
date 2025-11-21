@@ -18,9 +18,15 @@ import {
 } from '@heroicons/react/24/outline'
 import Link from 'next/link'
 import { sanitizeFinancialInput } from '@/lib/security'
-import { processTransfer, validateTransferData, type TransferData } from '@/lib/transferManager'
-import { supabase } from '@/lib/supabase'
-import { getBusinessCategories, calculateGST, GST_RATES, type BusinessCategory, type GSTCalculation } from '@/lib/businessManager'
+import { 
+  getBankAccounts,
+  updateBankAccountBalance,
+  updateCashBalance,
+  processIncomeEntry,
+  processExpenseEntry,
+  type BankAccount
+} from '@/lib/dataManager'
+import { GST_RATES } from '@/lib/businessManager'
 
 interface TransactionForm {
   type: 'income' | 'expense' | 'transfer'
@@ -44,6 +50,9 @@ interface TransactionForm {
   invoiceNumber: string
   vendorGstNumber: string
   hsnSacCode: string
+  // Recurring
+  isRecurring: boolean
+  recurringFrequency: 'monthly' | 'quarterly'
 }
 
 export default function AddTransactionPage() {
@@ -53,8 +62,7 @@ export default function AddTransactionPage() {
   const [errorMessage, setErrorMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [accounts, setAccounts] = useState<Array<{id: string, name: string, type: string, account_type: string}>>([])
-  const [businessCategories, setBusinessCategories] = useState<BusinessCategory[]>([])
-  const [gstCalculation, setGstCalculation] = useState<GSTCalculation | null>(null)
+  const [gstCalculation, setGstCalculation] = useState<{taxable_amount: number, gst_amount: number, total_amount: number} | null>(null)
   const [showBusinessFields, setShowBusinessFields] = useState(false)
   
   const [formData, setFormData] = useState<TransactionForm>({
@@ -78,67 +86,24 @@ export default function AddTransactionPage() {
     isGstInclusive: false,
     invoiceNumber: '',
     vendorGstNumber: '',
-    hsnSacCode: ''
+    hsnSacCode: '',
+    // Recurring
+    isRecurring: false,
+    recurringFrequency: 'monthly'
   })
 
-  // Load accounts and business categories on component mount
+  // Load accounts on component mount (local-only)
   useEffect(() => {
     const loadData = async () => {
-      // Load accounts
-      const { data: accountsData, error: accountsError } = await supabase
-        .from('accounts')
-        .select('id, name, type')
-        .eq('user_id', '00000000-0000-0000-0000-000000000001')
-        .order('name')
-      
-      if (!accountsError && accountsData) {
-        setAccounts(accountsData.map(account => ({
-          id: account.id,
-          name: account.name,
-          type: account.type,
-          account_type: 'personal' // Default until migration is applied
-        })))
-      }
-
-      // Load business categories - disabled until migration is applied
-      // try {
-      //   const categories = await getBusinessCategories()
-      //   setBusinessCategories(categories)
-      // } catch (error) {
-      //   console.error('Error loading business categories:', error)
-      // }
+      const localAccounts = getBankAccounts()
+      const mapped = localAccounts.map(a => ({ id: a.id, name: a.name, type: a.type, account_type: 'personal' }))
+      const withCash = [{ id: 'cash', name: 'Cash', type: 'cash', account_type: 'personal' }, ...mapped]
+      setAccounts(withCash)
     }
     loadData()
   }, [])
 
-  // Calculate GST when amount or GST rate changes
-  useEffect(() => {
-    const calculateGSTAmount = async () => {
-      if (formData.amount && formData.gstRate > 0 && formData.isBusinessExpense) {
-        try {
-          const calculation = await calculateGST(
-            parseFloat(formData.amount),
-            formData.gstRate,
-            formData.isGstInclusive
-          )
-          if (calculation) {
-            setGstCalculation(calculation)
-            setFormData(prev => ({
-              ...prev,
-              gstAmount: calculation.gst_amount
-            }))
-          }
-        } catch (error) {
-          console.error('Error calculating GST:', error)
-        }
-      } else {
-        setGstCalculation(null)
-        setFormData(prev => ({ ...prev, gstAmount: 0 }))
-      }
-    }
-    
-    calculateGSTAmount()
-  }, [formData.amount, formData.gstRate, formData.isGstInclusive, formData.isBusinessExpense])
+  // GST disabled in manual-only MVP
 
   // Income sources array
   const incomeSources = [
@@ -257,30 +222,47 @@ export default function AddTransactionPage() {
         if (!formData.fromAccount || !formData.toAccount) {
           throw new Error('Please select both source and destination accounts')
         }
-        
-        const transferData: TransferData = {
-          fromAccountId: formData.fromAccount,
-          toAccountId: formData.toAccount,
-          amount: parseFloat(formData.amount),
-          description: formData.item,
-          date: formData.date
+        if (formData.fromAccount === formData.toAccount) {
+          throw new Error('Source and destination must differ')
         }
-        
-        const validationErrors = validateTransferData(transferData)
-        if (validationErrors.length > 0) {
-          throw new Error(validationErrors[0])
+        const amt = parseFloat(formData.amount)
+        if (formData.fromAccount === 'cash') {
+          updateCashBalance(amt, false)
+        } else {
+          updateBankAccountBalance(formData.fromAccount, amt, false)
         }
-        
-        const result = await processTransfer(transferData)
-        if (!result.success) {
-          throw new Error(result.error || 'Transfer failed')
+        if (formData.toAccount === 'cash') {
+          updateCashBalance(amt, true)
+        } else {
+          updateBankAccountBalance(formData.toAccount, amt, true)
         }
-        
         setSuccessMessage('Transfer completed successfully!')
-      } else {
-        // Simulate API call for income/expense – replace with actual Supabase call
-        await new Promise(resolve => setTimeout(resolve, 800))
-        setSuccessMessage(`${activeTab === 'income' ? 'Income' : 'Expense'} added successfully!`)
+      } else if (activeTab === 'income') {
+        await processIncomeEntry({
+          amount,
+          description: formData.item,
+          date: dateIso,
+          type: formData.paidVia?.toLowerCase() === 'cash' ? 'cash' : 'non-cash',
+          bankAccount: formData.paidVia?.toLowerCase() === 'cash' ? undefined : formData.paidVia,
+          category: formData.source || 'Income',
+          recurring: formData.isRecurring ? { frequency: formData.recurringFrequency } : undefined
+        })
+        setSuccessMessage('Income added successfully!')
+      } else if (activeTab === 'expense') {
+        await processExpenseEntry({
+          amount,
+          description: formData.item,
+          date: dateIso,
+          paymentMethod: formData.paymentType.toLowerCase() === 'credit' ? 'credit_card' : 
+                     formData.paymentType.toLowerCase() === 'debit' ? 'credit_card' : 
+                     formData.paymentType.toLowerCase() as 'upi' | 'cash' | 'bnpl',
+          bankAccount: formData.paymentType.toLowerCase() === 'upi' ? formData.paidVia : undefined,
+          creditCard: formData.paymentType.toLowerCase().includes('credit') ? formData.paidVia : undefined,
+          bnplProvider: formData.paymentType.toLowerCase() === 'bnpl' ? formData.paidVia : undefined,
+          category: formData.subcategory || formData.category,
+          recurring: formData.isRecurring ? { frequency: formData.recurringFrequency } : undefined
+        })
+        setSuccessMessage('Expense added successfully!')
       }
 
       // Reset form
@@ -304,7 +286,9 @@ export default function AddTransactionPage() {
         isGstInclusive: false,
         invoiceNumber: '',
         vendorGstNumber: '',
-        hsnSacCode: ''
+        hsnSacCode: '',
+        isRecurring: false,
+        recurringFrequency: 'monthly'
       })
       setShowBusinessFields(false)
       setGstCalculation(null)
@@ -689,6 +673,31 @@ export default function AddTransactionPage() {
                   </div>
                 </div>
 
+                {/* Recurring Toggle */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={formData.isRecurring}
+                      onChange={(e) => handleInputChange('isRecurring', e.target.checked)}
+                    />
+                    <span className="text-sm text-black">Recurring</span>
+                  </div>
+                  {formData.isRecurring && (
+                    <div>
+                      <label className="block text-sm font-semibold text-black mb-2">Frequency</label>
+                      <select
+                        value={formData.recurringFrequency}
+                        onChange={(e) => handleInputChange('recurringFrequency', e.target.value as 'monthly' | 'quarterly')}
+                        className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-black"
+                      >
+                        <option value="monthly">Monthly</option>
+                        <option value="quarterly">Quarterly</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+
                 {/* Business Expense Toggle */}
                 <div className="border rounded-lg p-4 bg-blue-50">
                   <div className="flex items-center justify-between mb-4">
@@ -725,26 +734,23 @@ export default function AddTransactionPage() {
                       Business & GST Details
                     </h3>
 
-                    {/* Business Categories */}
-                    {businessCategories.length > 0 && (
-                      <div>
-                        <label className="block text-sm font-medium text-orange-700 mb-1">
-                          Business Category
-                        </label>
-                        <select
-                          value={formData.category}
-                          onChange={(e) => handleInputChange('category', e.target.value)}
-                          className="w-full px-3 py-2 border border-orange-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
-                        >
-                          <option value="">Select business category...</option>
-                          {businessCategories.map(category => (
-                            <option key={category.id} value={category.name}>
-                              {category.name} {category.is_deductible ? '(Tax Deductible)' : ''}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
+                    {/* Business Categories - Feature not yet implemented */}
+                    <div>
+                      <label className="block text-sm font-medium text-orange-700 mb-1">
+                        Business Category
+                      </label>
+                      <select
+                        value={formData.category}
+                        onChange={(e) => handleInputChange('category', e.target.value)}
+                        className="w-full px-3 py-2 border border-orange-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
+                      >
+                        <option value="">Select business category...</option>
+                        <option value="general">General Business</option>
+                        <option value="marketing">Marketing</option>
+                        <option value="office">Office Supplies</option>
+                        <option value="travel">Travel & Transport</option>
+                      </select>
+                    </div>
 
                     {/* GST Rate */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

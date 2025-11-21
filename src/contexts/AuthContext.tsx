@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 
 interface AuthContextType {
   user: User | null
@@ -21,64 +22,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Check localStorage for login state (single-user mode)
-    const isLoggedIn = localStorage.getItem('finance-tracker-logged-in')
-    const userEmail = localStorage.getItem('finance-tracker-user-email')
-    const sessionExpiry = localStorage.getItem('finance-tracker-session-expiry')
-    const rememberMe = localStorage.getItem('finance-tracker-remember')
-    
-    if (isLoggedIn === 'true' && userEmail) {
-      // Check if session is still valid
-      let sessionValid = true
-      
-      if (rememberMe === 'true' && sessionExpiry) {
-        // Long-term session with remember me
-        const expiryDate = new Date(sessionExpiry)
-        if (new Date() > expiryDate) {
-          sessionValid = false
-        }
-      } else {
-        // Short-term session without remember me (24 hours)
-        const loginTime = localStorage.getItem('finance-tracker-login-time')
-        if (loginTime) {
-          const loginDate = new Date(loginTime)
-          const now = new Date()
-          const hoursSinceLogin = (now.getTime() - loginDate.getTime()) / (1000 * 60 * 60)
-          if (hoursSinceLogin > 24) {
-            sessionValid = false
-          }
-        }
-      }
-      
-      if (sessionValid) {
-        // Create a mock user object for single-user mode
-        const mockUser = {
-          id: '00000000-0000-0000-0000-000000000001',
-          email: userEmail,
-          app_metadata: {},
-          aud: 'authenticated',
-          created_at: new Date().toISOString(),
-          user_metadata: {
-            name: userEmail.split('@')[0]
-          }
-        } as User
-        
-        setUser(mockUser)
-        setSession({ user: mockUser } as Session)
-      } else {
-        // Session expired, clear storage
-        localStorage.removeItem('finance-tracker-logged-in')
-        localStorage.removeItem('finance-tracker-user-email')
-        localStorage.removeItem('finance-tracker-login-time')
-        setUser(null)
-        setSession(null)
-      }
-    } else {
-      setUser(null)
-      setSession(null)
+    const localMode = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_LOCAL_MODE === 'true'
+    if (localMode) {
+      setLoading(false)
+      return
     }
-    
-    setLoading(false)
+    const init = async () => {
+      try {
+        const { data } = await supabase.auth.getSession()
+        setSession(data.session ?? null)
+        setUser(data.session?.user ?? null)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    init()
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession)
+      setUser(newSession?.user ?? null)
+    })
+
+    return () => {
+      authListener.subscription.unsubscribe()
+    }
   }, [])
 
 
@@ -86,51 +54,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string, rememberMe: boolean = false) => {
     try {
       setLoading(true)
-      
-      // Simple validation for single-user mode
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailRegex.test(email)) {
-        return { error: 'Please enter a valid email address' }
+      const localMode = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_LOCAL_MODE === 'true'
+      if (localMode) {
+        setSession(null)
+        setUser(null)
+        return { error: null }
       }
-      
-      if (!password) {
-        return { error: 'Please enter a password' }
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        return { error: error.message }
       }
-      
-      // Store login state
-      localStorage.setItem('finance-tracker-logged-in', 'true')
-      localStorage.setItem('finance-tracker-user-email', email)
-      localStorage.setItem('finance-tracker-login-time', new Date().toISOString())
-      
-      // Store remember me preference with timestamp
-      if (rememberMe) {
-        const expiryTime = new Date()
-        expiryTime.setDate(expiryTime.getDate() + 30) // 30 days persistence
-        localStorage.setItem('finance-tracker-remember', 'true')
-        localStorage.setItem('finance-tracker-email', email)
-        localStorage.setItem('finance-tracker-session-expiry', expiryTime.toISOString())
-      } else {
-        localStorage.removeItem('finance-tracker-remember')
-        localStorage.removeItem('finance-tracker-email')
-        localStorage.removeItem('finance-tracker-session-expiry')
-      }
-      
-      // Create mock user and update state
-      const mockUser = {
-        id: '00000000-0000-0000-0000-000000000001',
-        email: email,
-        app_metadata: {},
-        aud: 'authenticated',
-        created_at: new Date().toISOString(),
-        user_metadata: {
-          name: email.split('@')[0]
-        }
-      } as User
-      
-      setUser(mockUser)
-      setSession({ user: mockUser } as Session)
+      setSession(data.session ?? null)
+      setUser(data.user ?? data.session?.user ?? null)
 
-      // Attempt data migration from localStorage to Supabase (non-blocking)
+      // Best-effort data migration from localStorage (if any remnants)
       try {
         const { FinanceDataManager } = await import('../lib/supabaseDataManager')
         const mgr = FinanceDataManager.getInstance()
@@ -139,7 +76,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await mgr.migrateFromLocalStorage()
         }
       } catch (e) {
-        // Silent fail; migration is best-effort
         console.warn('Migration skipped or failed:', e)
       }
 
@@ -155,19 +91,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     try {
       setLoading(true)
-      
-      // Clear all login data
-      localStorage.removeItem('finance-tracker-logged-in')
-      localStorage.removeItem('finance-tracker-user-email')
-      localStorage.removeItem('finance-tracker-remember')
-      localStorage.removeItem('finance-tracker-email')
-      localStorage.removeItem('finance-tracker-session-expiry')
-      localStorage.removeItem('finance-tracker-login-time')
-      
-      // Clear user state
+      const localMode = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_LOCAL_MODE === 'true'
+      if (localMode) {
+        setUser(null)
+        setSession(null)
+        return { error: null }
+      }
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        return { error: error.message }
+      }
       setUser(null)
       setSession(null)
-
       return { error: null }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred during sign out'
@@ -179,6 +114,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resetPassword = async (email: string) => {
     try {
+      const localMode = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_LOCAL_MODE === 'true'
+      if (localMode) {
+        return { error: null }
+      }
       const { supabase } = await import('../lib/supabase')
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`
@@ -224,8 +163,13 @@ export function useRequireAuth() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const [shouldRedirect, setShouldRedirect] = useState(false)
+  const localMode = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_LOCAL_MODE === 'true'
 
   useEffect(() => {
+    if (localMode) {
+      setShouldRedirect(false)
+      return
+    }
     if (!loading) {
       if (!user) {
         setShouldRedirect(true)
@@ -234,9 +178,12 @@ export function useRequireAuth() {
         setShouldRedirect(false)
       }
     }
-  }, [user, loading, router])
+  }, [user, loading, router, localMode])
 
-  // Show loading screen while checking authentication or redirecting
+  if (localMode) {
+    return { user: null, loading: false, LoadingComponent: null }
+  }
+
   if (loading || shouldRedirect) {
     return { 
       user: null, 

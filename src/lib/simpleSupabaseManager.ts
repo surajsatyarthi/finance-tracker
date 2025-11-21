@@ -1,14 +1,12 @@
 import { supabase } from './supabase'
 
-const USER_ID = '00000000-0000-0000-0000-000000000001'
-
 // Simple account operations
-export const getAccounts = async () => {
+export const getAccounts = async (userId: string) => {
   try {
     const { data, error } = await supabase
       .from('accounts')
       .select('*')
-      .eq('user_id', USER_ID)
+      .eq('user_id', userId)
       .eq('is_active', true)
 
     if (error) {
@@ -23,7 +21,7 @@ export const getAccounts = async () => {
   }
 }
 
-export const createAccount = async (accountData: {
+export const createAccount = async (userId: string, accountData: {
   name: string
   type: string
   balance: number
@@ -32,7 +30,7 @@ export const createAccount = async (accountData: {
     const { data, error } = await supabase
       .from('accounts')
       .insert({
-        user_id: USER_ID,
+        user_id: userId,
         name: accountData.name,
         type: accountData.type,
         balance: accountData.balance,
@@ -54,9 +52,9 @@ export const createAccount = async (accountData: {
   }
 }
 
-export const getCashBalance = async () => {
+export const getCashBalance = async (userId: string) => {
   try {
-    const accounts = await getAccounts()
+    const accounts = await getAccounts(userId)
     const cashAccount = accounts.find(acc => acc.type === 'cash')
     return cashAccount ? cashAccount.balance : 0
   } catch (error) {
@@ -65,9 +63,9 @@ export const getCashBalance = async () => {
   }
 }
 
-export const getTotalLiquidity = async () => {
+export const getTotalLiquidity = async (userId: string) => {
   try {
-    const accounts = await getAccounts()
+    const accounts = await getAccounts(userId)
     return accounts.reduce((total, account) => total + account.balance, 0)
   } catch (error) {
     console.error('Error getting total liquidity:', error)
@@ -76,12 +74,12 @@ export const getTotalLiquidity = async () => {
 }
 
 // Simple transaction operations
-export const getTransactions = async (type?: 'income' | 'expense') => {
+export const getTransactions = async (userId: string, type?: 'income' | 'expense') => {
   try {
     let query = supabase
       .from('transactions')
       .select('*')
-      .eq('user_id', USER_ID)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false })
 
     if (type) {
@@ -102,7 +100,7 @@ export const getTransactions = async (type?: 'income' | 'expense') => {
   }
 }
 
-export const createTransaction = async (transactionData: {
+export const createTransaction = async (userId: string, transactionData: {
   amount: number
   type: 'income' | 'expense'
   description: string
@@ -114,7 +112,7 @@ export const createTransaction = async (transactionData: {
     const { data, error } = await supabase
       .from('transactions')
       .insert({
-        user_id: USER_ID,
+        user_id: userId,
         amount: transactionData.amount,
         type: transactionData.type,
         description: transactionData.description,
@@ -138,14 +136,14 @@ export const createTransaction = async (transactionData: {
 }
 
 // Initialize with basic cash account
-export const initializeSupabaseData = async () => {
+export const initializeSupabaseData = async (userId: string) => {
   try {
-    const accounts = await getAccounts()
+    const accounts = await getAccounts(userId)
     
     // If no accounts exist, create a basic cash account
     if (accounts.length === 0) {
       console.log('No accounts found, creating cash account...')
-      await createAccount({
+      await createAccount(userId, {
         name: 'Cash',
         type: 'cash',
         balance: 1005 // Your current cash balance

@@ -27,41 +27,68 @@ export default function CreditCardsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch credit cards from Supabase
+  // Fetch credit cards from Supabase or localStorage
   useEffect(() => {
     if (!user) return
-    
+
     const fetchCreditCards = async () => {
       try {
         setLoading(true)
         setError(null)
-        
+
+        // Try Supabase first
         const { data, error: fetchError } = await supabase
           .from('credit_cards')
           .select('*')
           .eq('user_id', user.id)
           .eq('is_active', true)
           .order('name')
-        
+
         if (fetchError) {
           throw fetchError
         }
-        
+
         setCreditCards(data || [])
       } catch (err) {
-        console.error('Error fetching credit cards:', err)
-        setError('Failed to load credit cards')
+        console.error('Error fetching from Supabase, falling back to localStorage:', err)
+        // Fallback to localStorage
+        if (typeof window !== 'undefined') {
+          const { getCreditCards: getLocalCards } = await import('@/lib/dataManager')
+          const localCards = getLocalCards()
+          // Convert to Supabase format
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setCreditCards(localCards.map(card => ({
+            id: card.id,
+            user_id: user?.id || '',
+            name: card.name,
+            card_type: 'Credit Card',
+            bank: null,
+            last_four_digits: card.lastFourDigits,
+            credit_limit: card.creditLimit,
+            current_balance: card.currentBalance,
+            due_date: card.dueDate,
+            statement_date: parseInt(card.statementDate) || null,
+            annual_fee: card.annualFee,
+            cashback_rate: null,
+            partner_merchants: null,
+            benefits: null,
+            is_active: card.isActive,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          })) as any)
+        }
       } finally {
         setLoading(false)
       }
     }
-    
+
     fetchCreditCards()
   }, [user])
 
   // Filtered credit cards based on search
   const filteredCards = useMemo(() => {
-    return creditCards.filter(card => 
+    return creditCards.filter(card =>
       card.name.toLowerCase().includes(searchTerm.toLowerCase())
     )
   }, [creditCards, searchTerm])
@@ -72,7 +99,7 @@ export default function CreditCardsPage() {
     const totalBalance = creditCards.reduce((sum, card) => sum + (card.current_balance || 0), 0)
     const availableCredit = totalLimit - totalBalance
     const utilization = totalLimit > 0 ? (totalBalance / totalLimit) * 100 : 0
-    
+
     return {
       totalCards: creditCards.length,
       activeCards: creditCards.filter(card => card.is_active).length,
@@ -101,12 +128,12 @@ export default function CreditCardsPage() {
     if (!dueDate || dueDate === 0) return 'N/A'
     return `${dueDate}${getDaySuffix(dueDate)} of month`
   }
-  
+
   const getDaySuffix = (day: number) => {
     if (day >= 11 && day <= 13) return 'th'
     switch (day % 10) {
       case 1: return 'st'
-      case 2: return 'nd' 
+      case 2: return 'nd'
       case 3: return 'rd'
       default: return 'th'
     }
@@ -115,14 +142,14 @@ export default function CreditCardsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Credit Cards</h1>
             <p className="text-gray-600 mt-2">Manage your credit cards and track usage</p>
           </div>
-          
+
           <div className="flex items-center space-x-3">
             {/* Toggle Balance Visibility */}
             <button
@@ -136,7 +163,7 @@ export default function CreditCardsPage() {
               )}
               {showBalances ? 'Hide' : 'Show'} Balances
             </button>
-            
+
             {/* Toggle Card Details Visibility */}
             <button
               onClick={() => setShowCardDetails(!showCardDetails)}
@@ -196,21 +223,19 @@ export default function CreditCardsPage() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
-                  summaryStats.utilization > 70 ? 'bg-red-100 text-red-600' :
+                <div className={`h-8 w-8 rounded-full flex items-center justify-center ${summaryStats.utilization > 70 ? 'bg-red-100 text-red-600' :
                   summaryStats.utilization > 30 ? 'bg-yellow-100 text-yellow-600' :
-                  'bg-green-100 text-green-600'
-                }`}>
+                    'bg-green-100 text-green-600'
+                  }`}>
                   <span className="text-sm font-bold">{Math.round(summaryStats.utilization)}%</span>
                 </div>
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Utilization</p>
-                <p className={`text-2xl font-bold ${
-                  summaryStats.utilization > 70 ? 'text-red-600' :
+                <p className={`text-2xl font-bold ${summaryStats.utilization > 70 ? 'text-red-600' :
                   summaryStats.utilization > 30 ? 'text-yellow-600' :
-                  'text-green-600'
-                }`}>
+                    'text-green-600'
+                  }`}>
                   {Math.round(summaryStats.utilization)}%
                 </p>
                 <p className="text-sm text-gray-500">Credit usage</p>
@@ -242,7 +267,7 @@ export default function CreditCardsPage() {
             <p className="text-gray-600">Loading credit cards...</p>
           </div>
         )}
-        
+
         {/* Error State */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-6">
@@ -266,148 +291,152 @@ export default function CreditCardsPage() {
             <div className="px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">Credit Cards ({filteredCards.length})</h3>
             </div>
-          
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Card Details
-                  </th>
-                  {showCardDetails && (
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Benefits & Partners
+                      Card Details
                     </th>
-                  )}
-                  {showCardDetails && (
+                    {showCardDetails && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Benefits & Partners
+                      </th>
+                    )}
+                    {showCardDetails && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Bank Details
+                      </th>
+                    )}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Bank Details
+                      Credit Limit
                     </th>
-                  )}
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Credit Limit
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Current Balance
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Available Credit
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Due Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Statement Date
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredCards.map((card) => {
-                  const availableCredit = (card.credit_limit || 0) - (card.current_balance || 0)
-                  const utilization = (card.credit_limit || 0) > 0 ? ((card.current_balance || 0) / (card.credit_limit || 0)) * 100 : 0
-                  
-                  return (
-                    <tr key={card.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <CreditCardIcon className="h-5 w-5 text-gray-400 mr-3" />
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">{card.name}</div>
-                            <div className="text-sm text-gray-500">{card.card_type} • {maskCardNumber(card.last_four_digits)}</div>
-                            {(card.annual_fee || 0) > 0 && (
-                              <div className="text-xs text-orange-600 mt-1">
-                                Annual Fee: ₹{card.annual_fee}
-                              </div>
-                            )}
-                            {card.cashback_rate && (
-                              <div className="text-xs text-green-600 mt-1">
-                                {card.cashback_rate}% cashback
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      
-                      {/* Benefits & Partners - Only show when toggled */}
-                      {showCardDetails && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Current Balance
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Available Credit
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Due Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Statement Date
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredCards.map((card) => {
+                    const availableCredit = (card.credit_limit || 0) - (card.current_balance || 0)
+                    const utilization = (card.credit_limit || 0) > 0 ? ((card.current_balance || 0) / (card.credit_limit || 0)) * 100 : 0
+
+                    return (
+                      <tr
+                        key={card.id}
+                        onClick={() => window.location.href = `/credit-cards/${card.id}`}
+                        className="hover:bg-gray-50 cursor-pointer transition-colors"
+                      >
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="space-y-2">
-                            {card.partner_merchants && card.partner_merchants.length > 0 && (
-                              <div>
-                                <div className="text-xs font-medium text-gray-700 mb-1">Partners:</div>
-                                <div className="flex flex-wrap gap-1">
-                                  {card.partner_merchants.map((partner, idx) => (
-                                    <span key={idx} className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                                      {partner}
-                                    </span>
-                                  ))}
+                          <div className="flex items-center">
+                            <CreditCardIcon className="h-5 w-5 text-gray-400 mr-3" />
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">{card.name}</div>
+                              <div className="text-sm text-gray-500">{card.card_type} • {maskCardNumber(card.last_four_digits)}</div>
+                              {(card.annual_fee || 0) > 0 && (
+                                <div className="text-xs text-orange-600 mt-1">
+                                  Annual Fee: ₹{card.annual_fee}
                                 </div>
-                              </div>
-                            )}
-                            
-                            {card.benefits && (
-                              <div>
-                                <div className="text-xs font-medium text-gray-700 mb-1">Benefits:</div>
-                                <div className="text-xs text-gray-600">
-                                  {JSON.stringify(card.benefits).length > 50 
-                                    ? 'Multiple benefits available' 
-                                    : Object.keys(card.benefits as object).join(', ')}
+                              )}
+                              {card.cashback_rate && (
+                                <div className="text-xs text-green-600 mt-1">
+                                  {card.cashback_rate}% cashback
                                 </div>
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </div>
                         </td>
-                      )}
-                      
-                      {/* Bank Details - Only show when toggled */}
-                      {showCardDetails && (
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            <div className="font-medium">{card.bank || 'N/A'}</div>
-                            <div className="text-xs text-gray-500 mt-1">{card.card_type}</div>
-                          </div>
-                        </td>
-                      )}
-                      
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {showBalances ? `₹${(card.credit_limit || 0).toLocaleString()}` : '₹***,***'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {showBalances ? `₹${(card.current_balance || 0).toLocaleString()}` : '₹***,***'}
-                        </div>
-                        {showBalances && (card.credit_limit || 0) > 0 && (
-                          <div className="text-xs text-gray-500">
-                            {Math.round(utilization)}% utilization
-                          </div>
+
+                        {/* Benefits & Partners - Only show when toggled */}
+                        {showCardDetails && (
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="space-y-2">
+                              {card.partner_merchants && card.partner_merchants.length > 0 && (
+                                <div>
+                                  <div className="text-xs font-medium text-gray-700 mb-1">Partners:</div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {card.partner_merchants.map((partner, idx) => (
+                                      <span key={idx} className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                                        {partner}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {card.benefits && (
+                                <div>
+                                  <div className="text-xs font-medium text-gray-700 mb-1">Benefits:</div>
+                                  <div className="text-xs text-gray-600">
+                                    {JSON.stringify(card.benefits).length > 50
+                                      ? 'Multiple benefits available'
+                                      : Object.keys(card.benefits as object).join(', ')}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </td>
                         )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-green-600">
-                          {showBalances ? `₹${availableCredit.toLocaleString()}` : '₹***,***'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center text-sm text-gray-900">
-                          <CalendarDaysIcon className="h-4 w-4 text-gray-400 mr-1" />
-                          {formatDueDate(card.due_date)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center text-sm text-gray-900">
-                          <CalendarDaysIcon className="h-4 w-4 text-gray-400 mr-1" />
-                          {card.statement_date ? `${card.statement_date}${getDaySuffix(card.statement_date)} of month` : 'N/A'}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+
+                        {/* Bank Details - Only show when toggled */}
+                        {showCardDetails && (
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              <div className="font-medium">{card.bank || 'N/A'}</div>
+                              <div className="text-xs text-gray-500 mt-1">{card.card_type}</div>
+                            </div>
+                          </td>
+                        )}
+
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {showBalances ? `₹${(card.credit_limit || 0).toLocaleString()}` : '₹***,***'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {showBalances ? `₹${(card.current_balance || 0).toLocaleString()}` : '₹***,***'}
+                          </div>
+                          {showBalances && (card.credit_limit || 0) > 0 && (
+                            <div className="text-xs text-gray-500">
+                              {Math.round(utilization)}% utilization
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-green-600">
+                            {showBalances ? `₹${availableCredit.toLocaleString()}` : '₹***,***'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center text-sm text-gray-900">
+                            <CalendarDaysIcon className="h-4 w-4 text-gray-400 mr-1" />
+                            {formatDueDate(card.due_date)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center text-sm text-gray-900">
+                            <CalendarDaysIcon className="h-4 w-4 text-gray-400 mr-1" />
+                            {card.statement_date ? `${card.statement_date}${getDaySuffix(card.statement_date)} of month` : 'N/A'}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
-            
+
             {filteredCards.length === 0 && (
               <div className="text-center py-12">
                 <CreditCardIcon className="mx-auto h-12 w-12 text-gray-400" />

@@ -9,7 +9,12 @@ export default function Home() {
   const router = useRouter()
 
   useEffect(() => {
+    const localMode = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_LOCAL_MODE === 'true'
     if (!loading) {
+      if (localMode) {
+        router.push('/dashboard')
+        return
+      }
       if (user) {
         router.push('/dashboard')
       } else {

@@ -14,6 +14,8 @@ import {
   ExclamationTriangleIcon,
   PlusIcon
 } from '@heroicons/react/24/outline'
+import { getFuturePayables, updateFuturePayableStatus } from '@/lib/dataManager'
+import GlassCard from '@/components/GlassCard'
 
 interface EMIData {
   id: string
@@ -222,7 +224,7 @@ export default function EMITracker() {
                 Track your credit card EMIs and installment payments
               </p>
             </div>
-            <button className="inline-flex items-center px-6 py-3 rounded-xl font-medium text-white bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105">
+            <button className="btn-primary inline-flex items-center px-6 py-3 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 ring-1 ring-primary-300/40">
               <PlusIcon className="h-4 w-4 mr-2" />
               Add EMI
             </button>
@@ -447,6 +449,56 @@ export default function EMITracker() {
             )
           })}
         </div>
+
+        {/* Local EMIs (Future Payables) */}
+        <GlassCard>
+          <div className="px-6 py-4">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Local EMIs</h2>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {getFuturePayables().filter(p => p.type === 'emi').map((p) => (
+                    <tr key={p.id}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{p.source}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-900 font-medium">{p.description}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm font-bold text-indigo-600">{new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format(p.amount)}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-900 font-medium">{new Date(p.dueDate).toLocaleDateString('en-IN')}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${p.status==='paid'?'bg-green-100 text-green-800 border-green-200':'bg-blue-100 text-blue-800 border-blue-200'}`}>{p.status}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <button
+                          className="px-3 py-1 rounded border"
+                          onClick={() => updateFuturePayableStatus(p.id, p.status==='paid'?'pending':'paid')}
+                        >
+                          {p.status==='paid'?'Mark Pending':'Mark Paid'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </GlassCard>
 
         {/* No EMIs Found */}
         {filteredAndSortedEmis.length === 0 && (

@@ -51,62 +51,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden" style={{ backgroundColor: '#fafafa' }}>
-      {/* Diagonal Watermark Pattern */}
-      <div className="absolute inset-0 pointer-events-none z-0" style={{ width: '100vw', height: '100vh' }}>
-        <div className="absolute" style={{ 
-          top: '-50vh', 
-          left: '-50vw', 
-          width: '200vw', 
-          height: '200vh',
-          transform: 'rotate(-15deg)',
-          transformOrigin: 'center'
-        }}>
-          {/* Generate multiple rows of watermark text */}
-          {Array.from({ length: 60 }, (_, rowIndex) => (
-            <div
-              key={rowIndex}
-              className="flex whitespace-nowrap"
-              style={{
-                transform: `translateY(${rowIndex * 80}px)`,
-                opacity: 0.25
-              }}
-            >
-              {Array.from({ length: 30 }, (_, colIndex) => {
-                const colors = [
-                  'text-gray-800',
-                  'text-gray-700', 
-                  'text-gray-600',
-                  'text-slate-800',
-                  'text-slate-700',
-                  'text-zinc-800',
-                  'text-zinc-700',
-                  'text-neutral-800',
-                  'text-neutral-700',
-                  'text-stone-800'
-                ]
-                const colorClass = colors[(rowIndex + colIndex) % colors.length]
-                return (
-                  <span
-                    key={colIndex}
-                    className={`font-semibold ${colorClass}`}
-                    style={{ 
-                      userSelect: 'none', 
-                      pointerEvents: 'none',
-                      fontSize: '18px',
-                      letterSpacing: '3px',
-                      marginRight: '60px',
-                      display: 'inline-block'
-                    }}
-                  >
-                    Suraj Satyarthi
-                  </span>
-                )
-              })}
-            </div>
-          ))}
-        </div>
-      </div>
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden watermark-bg">
       <div className="max-w-md w-full space-y-8 relative z-10">
         <div className="text-center">
           <div className="flex justify-center mb-4">

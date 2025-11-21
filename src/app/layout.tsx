@@ -4,6 +4,9 @@ import "./globals.css";
 import { AuthProvider } from '../contexts/AuthContext';
 import { NotificationProvider } from '../contexts/NotificationContext';
 import Header from '../components/Header';
+import BottomNav from '../components/BottomNav';
+import { PrivacyProvider } from '../contexts/PrivacyContext';
+import PWARegister from '../components/PWARegister';
 
 const lato = Lato({
   variable: "--font-lato",
@@ -30,18 +33,26 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#4f46e5" />
+      </head>
       <body
-        className={`${lato.variable} ${jetbrainsMono.variable} font-sans antialiased bg-gradient-to-br from-slate-50 to-gray-100`}
+        className={`${lato.variable} ${jetbrainsMono.variable} font-sans antialiased`}
         style={{ fontFamily: 'var(--font-lato), sans-serif' }}
       >
         <AuthProvider>
           <NotificationProvider>
-            <div className="min-h-screen">
-              <Header />
-              <main>
-                {children}
-              </main>
-            </div>
+            <PrivacyProvider>
+              <div className="min-h-screen app-shell">
+                <PWARegister />
+                <Header />
+                <main>
+                  {children}
+                </main>
+                <BottomNav />
+              </div>
+            </PrivacyProvider>
           </NotificationProvider>
         </AuthProvider>
       </body>

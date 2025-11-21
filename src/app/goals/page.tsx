@@ -17,7 +17,6 @@ import {
 
 interface Goal {
   id: string
-  user_id: string
   name: string
   target_amount: number
   current_amount: number
@@ -39,39 +38,36 @@ export default function GoalsPage() {
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [showAmounts, setShowAmounts] = useState(true)
 
-  // Load goals from Supabase
+  // Load goals from local storage
   useEffect(() => {
     const loadGoals = async () => {
       try {
-        const { supabase } = await import('@/lib/supabase')
-        const { data, error } = await supabase
-          .from('goals')
-          .select('*')
-          .eq('user_id', '00000000-0000-0000-0000-000000000001')
-          .order('created_at', { ascending: false })
-        
-        if (error) {
-          console.error('Error loading goals:', error)
-        } else {
-          // Calculate progress percentage for each goal
-          const goalsWithProgress = (data || []).map(goal => ({
-            ...goal,
-            progress_percentage: goal.target_amount > 0 
-              ? (goal.current_amount / goal.target_amount) * 100 
-              : 0
-          }))
-          setGoals(goalsWithProgress)
-          console.log('🎯 Loaded goals from Supabase:', goalsWithProgress?.length || 0)
-        }
+        const { getGoals } = await import('@/lib/dataManager')
+        const data = getGoals()
+        const goalsWithProgress = data.map(goal => ({
+          ...goal,
+          progress_percentage: goal.target_amount > 0
+            ? (goal.current_amount / goal.target_amount) * 100
+            : 0
+        }))
+        setGoals(goalsWithProgress)
       } catch (error) {
         console.error('Error loading goals:', error)
       } finally {
         setLoading(false)
       }
     }
-
     loadGoals()
   }, [])
+
+  const suggestMonthly = (g: Goal) => {
+    if (!g.target_date) return 0
+    const end = new Date(g.target_date as string)
+    const now = new Date()
+    const months = Math.max(1, (end.getFullYear() - now.getFullYear()) * 12 + (end.getMonth() - now.getMonth()))
+    const remaining = Math.max(0, g.target_amount - g.current_amount)
+    return Math.ceil(remaining / months)
+  }
 
   // Summary statistics
   const summaryStats = useMemo(() => {
@@ -195,7 +191,24 @@ export default function GoalsPage() {
                   </>
                 )}
               </button>
-              <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+              <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
+                onClick={async () => {
+                  const { storeGoal } = await import('@/lib/dataManager')
+                  const sample = storeGoal({
+                    name: 'New Goal',
+                    target_amount: 50000,
+                    current_amount: 0,
+                    target_date: new Date(new Date().getFullYear(), new Date().getMonth() + 6, 1).toISOString().split('T')[0],
+                    category: 'savings',
+                    priority: 'medium',
+                    is_completed: false,
+                  })
+                  setGoals((prev) => ([
+                    ...prev,
+                    { ...sample, progress_percentage: 0 }
+                  ]))
+                }}
+              >
                 <PlusIcon className="h-4 w-4 mr-2" />
                 Add Goal
               </button>
@@ -378,6 +391,29 @@ export default function GoalsPage() {
                     </span>
                   </div>
                 )}
+                <div className="mt-3 p-3 rounded-lg border bg-gray-50">
+                  <p className="text-sm text-gray-700">Suggested Monthly Contribution</p>
+                  <p className="text-lg font-bold text-indigo-600">₹{suggestMonthly(goal).toLocaleString()}</p>
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  <input
+                    type="number"
+                    placeholder="Add amount (₹)"
+                    className="border rounded px-3 py-2 w-32"
+                    onKeyDown={async (e) => {
+                      if (e.key === 'Enter') {
+                        const amt = Number((e.target as HTMLInputElement).value || '0')
+                        if (amt > 0) {
+                          const { updateGoalAmount } = await import('@/lib/dataManager')
+                          updateGoalAmount(goal.id, goal.current_amount + amt)
+                          setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, current_amount: g.current_amount + amt, progress_percentage: ((g.current_amount + amt) / g.target_amount) * 100 } : g))
+                          ;(e.target as HTMLInputElement).value = ''
+                        }
+                      }
+                    }}
+                  />
+                  <span className="text-xs text-gray-500">Press Enter</span>
+                </div>
               </div>
             </div>
           ))}

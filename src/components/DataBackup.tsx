@@ -1,40 +1,39 @@
 'use client'
 
 import { useState } from 'react'
-import { 
-  ArrowDownTrayIcon, 
+import {
+  ArrowDownTrayIcon,
   ArrowUpTrayIcon,
   ShieldCheckIcon,
-  ExclamationTriangleIcon 
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
+import { encryptBackup, decryptBackup } from '@/lib/cryptoVault'
 
 export default function DataBackup() {
   const [importing, setImporting] = useState(false)
-  const [message, setMessage] = useState<{type: 'success' | 'error' | 'info', text: string} | null>(null)
+  const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info', text: string } | null>(null)
 
   const exportData = () => {
     try {
       const data: Record<string, string | null> = {}
-      
-      // Export all finance tracker data from localStorage
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i)
-        if (key && key.startsWith('finance-tracker-')) {
+        if (key) {
           data[key] = localStorage.getItem(key)
         }
       }
-      
+
       // Create backup file
       const backup = {
         exportDate: new Date().toISOString(),
         version: '1.0',
         data: data
       }
-      
+
       const blob = new Blob([JSON.stringify(backup, null, 2)], {
         type: 'application/json'
       })
-      
+
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
@@ -43,12 +42,12 @@ export default function DataBackup() {
       link.click()
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
-      
+
       setMessage({
         type: 'success',
         text: `Backup exported successfully! File saved as: finance-tracker-backup-${new Date().toISOString().split('T')[0]}.json`
       })
-      
+
       setTimeout(() => setMessage(null), 5000)
     } catch (error) {
       setMessage({
@@ -65,18 +64,18 @@ export default function DataBackup() {
 
     setImporting(true)
     const reader = new FileReader()
-    
+
     reader.onload = (e) => {
       try {
         const content = e.target?.result as string
         const backup = JSON.parse(content)
-        
+
         // Validate backup format
         if (!backup.data || !backup.exportDate) {
           throw new Error('Invalid backup file format')
         }
-        
-        // Clear existing data (optional - you might want to merge instead)
+
+        // Clear existing data
         const keysToRemove: string[] = []
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i)
@@ -85,24 +84,24 @@ export default function DataBackup() {
           }
         }
         keysToRemove.forEach(key => localStorage.removeItem(key))
-        
+
         // Import new data
         Object.entries(backup.data).forEach(([key, value]) => {
           if (typeof value === 'string') {
             localStorage.setItem(key, value)
           }
         })
-        
+
         setMessage({
           type: 'success',
           text: `Data imported successfully from backup created on ${new Date(backup.exportDate).toLocaleDateString()}`
         })
-        
+
         // Reload page to reflect imported data
         setTimeout(() => {
           window.location.reload()
         }, 2000)
-        
+
       } catch (error) {
         setMessage({
           type: 'error',
@@ -114,7 +113,71 @@ export default function DataBackup() {
         event.target.value = ''
       }
     }
-    
+
+    reader.readAsText(file)
+  }
+
+  const exportEncrypted = async () => {
+    try {
+      const data: Record<string, string | null> = {}
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key) data[key] = localStorage.getItem(key)
+      }
+      const backup = { exportDate: new Date().toISOString(), version: '1.0', data }
+      const pass = prompt('Enter passphrase to encrypt backup') || ''
+      if (!pass || pass.length < 6) {
+        setMessage({ type: 'error', text: 'Passphrase must be at least 6 characters' })
+        setTimeout(() => setMessage(null), 5000)
+        return
+      }
+      const enc = await encryptBackup(backup, pass)
+      const blob = new Blob([enc], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `finance-tracker-encrypted-backup-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      setMessage({ type: 'success', text: 'Encrypted backup exported successfully' })
+      setTimeout(() => setMessage(null), 5000)
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to export encrypted backup' })
+      setTimeout(() => setMessage(null), 5000)
+    }
+  }
+
+  const importEncrypted = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const content = e.target?.result as string
+        const pass = prompt('Enter passphrase to decrypt') || ''
+        const backup = await decryptBackup(content, pass)
+        if (!backup.data || !backup.exportDate) throw new Error('Invalid encrypted backup')
+        const keysToRemove: string[] = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key) keysToRemove.push(key)
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key))
+        Object.entries(backup.data).forEach(([key, value]) => {
+          if (typeof value === 'string') localStorage.setItem(key, value)
+        })
+        setMessage({ type: 'success', text: 'Encrypted backup imported successfully' })
+        setTimeout(() => window.location.reload(), 1500)
+      } catch {
+        setMessage({ type: 'error', text: 'Failed to import encrypted backup' })
+      } finally {
+        setImporting(false)
+        event.target.value = ''
+      }
+    }
     reader.readAsText(file)
   }
 
@@ -124,7 +187,7 @@ export default function DataBackup() {
         <ShieldCheckIcon className="h-6 w-6 text-blue-600 mr-3" />
         <h3 className="text-lg font-semibold text-gray-900">Data Backup & Security</h3>
       </div>
-      
+
       {/* Warning */}
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
         <div className="flex">
@@ -148,6 +211,13 @@ export default function DataBackup() {
             <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
             Export Backup
           </button>
+          <button
+            onClick={exportEncrypted}
+            className="ml-3 flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
+            Export Encrypted
+          </button>
           <p className="text-sm text-gray-600 mt-2">
             Download all your financial data as a JSON file. Store it safely in cloud storage.
           </p>
@@ -166,6 +236,17 @@ export default function DataBackup() {
               className="hidden"
             />
           </label>
+          <label className="mt-2 flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors cursor-pointer">
+            <ArrowUpTrayIcon className="h-5 w-5 mr-2" />
+            {importing ? 'Importing...' : 'Import Encrypted'}
+            <input
+              type="file"
+              accept=".json"
+              onChange={importEncrypted}
+              disabled={importing}
+              className="hidden"
+            />
+          </label>
           <p className="text-sm text-gray-600 mt-2">
             Restore data from a previously exported backup file.
           </p>
@@ -174,11 +255,10 @@ export default function DataBackup() {
 
       {/* Message */}
       {message && (
-        <div className={`mt-4 p-3 rounded-lg ${
-          message.type === 'success' ? 'bg-green-50 text-green-800' :
-          message.type === 'error' ? 'bg-red-50 text-red-800' :
-          'bg-blue-50 text-blue-800'
-        }`}>
+        <div className={`mt-4 p-3 rounded-lg ${message.type === 'success' ? 'bg-green-50 text-green-800' :
+            message.type === 'error' ? 'bg-red-50 text-red-800' :
+              'bg-blue-50 text-blue-800'
+          }`}>
           <p className="text-sm">{message.text}</p>
         </div>
       )}
