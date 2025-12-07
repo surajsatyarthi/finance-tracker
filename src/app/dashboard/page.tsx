@@ -151,7 +151,7 @@ export default function Dashboard() {
         if (promises.length > 0) {
           await Promise.all(promises)
           setRefreshTrigger(prev => prev + 1)
-          showNotification('Financial data hydrated successfully.', 'success')
+
         }
 
       } catch (e) {
