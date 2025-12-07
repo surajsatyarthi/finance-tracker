@@ -422,6 +422,32 @@ export default function AccountsPage() {
             </table>
           </div>
         </div>
+
+        {/* Empty State / Initialize Data */}
+        {accounts.length === 0 && !loading && (
+          <div className="glass-card p-8 text-center mb-6 mt-6">
+            <BuildingLibraryIcon className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+            <h3 className="text-lg font-medium text-gray-900">No accounts found</h3>
+            <p className="text-gray-500 mb-4">It looks like your financial data hasn't been set up yet.</p>
+            <button
+              onClick={async () => {
+                setLoading(true)
+                try {
+                  await financeManager.seedLiquidity(initialLiquidity)
+                  await loadAccounts()
+                  showNotification('Data initialized successfully', 'success')
+                } catch (e) {
+                  showNotification('Failed to initialize data', 'error')
+                } finally {
+                  setLoading(false)
+                }
+              }}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
+            >
+              Initialize Default Accounts
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Edit Balance Modal */}
