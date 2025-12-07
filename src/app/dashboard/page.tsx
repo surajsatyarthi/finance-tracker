@@ -11,7 +11,16 @@ import {
   ArrowTrendingDownIcon,
   BuildingLibraryIcon
 } from '@heroicons/react/24/outline'
-import Link from 'next/link'
+import Link from 'next/link' // Existing
+
+
+import { initialLiquidity } from '@/lib/liquidityData'
+import { initialGoals } from '@/lib/goalsData'
+import { initialCards } from '@/lib/cardsData'
+import { budgetProjections2025 } from '@/lib/budgetData'
+import { useNotification } from '@/contexts/NotificationContext'
+// ... imports
+
 import {
   BarChart,
   Bar,
@@ -25,15 +34,7 @@ import {
   Cell,
   ResponsiveContainer
 } from 'recharts'
-import {
-  getLiquidityData,
-  getIncomeTransactions,
-  getExpenseTransactions,
-  getCreditCardLiabilitySummary,
-  getFuturePayables,
-  getLoans
-} from '@/lib/dataManager'
-import { getFDs, getCreditCards } from '@/lib/dataManager'
+import { financeManager } from '@/lib/supabaseDataManager'
 import { usePrivacy } from '@/contexts/PrivacyContext'
 import GlassCard from '@/components/GlassCard'
 
@@ -52,77 +53,279 @@ interface DashboardStats {
   monthlyIncome: number
   monthlyExpenses: number
   activeLoans: number
+  totalLoanOutstanding: number // Added
+  projectedAnnualExpense: number // Added
   activeGoals: number
   totalCreditCardBalance: number
   recentTransactions: Transaction[]
+  partitionSplit: { bi: number; pi: number; be: number; pe: number }
+  projection: { months: any[]; startLiquidity: number; path: { points: number[] } }
+  upcoming: { count: number; amount: number }
+  ratios: { monthlyEmi: number; savingsRate: number; debtService: number; liquidityRatio: number }
+  reminders: any[]
 }
 
 export default function Dashboard() {
   const { user, loading, LoadingComponent } = useRequireAuth()
+  const { showNotification } = useNotification()
   const { locked } = usePrivacy()
+  const [dataLoading, setDataLoading] = useState(true)
   const [stats, setStats] = useState<DashboardStats>({
     totalAssets: 0,
     totalLiabilities: 0,
     monthlyIncome: 0,
     monthlyExpenses: 0,
     activeLoans: 0,
+    totalLoanOutstanding: 0,
+    projectedAnnualExpense: 0,
     activeGoals: 0,
     totalCreditCardBalance: 0,
-    recentTransactions: []
+    recentTransactions: [],
+    partitionSplit: { bi: 0, pi: 0, be: 0, pe: 0 },
+    projection: { months: [], startLiquidity: 0, path: { points: [] } },
+    upcoming: { count: 0, amount: 0 },
+    ratios: { monthlyEmi: 0, savingsRate: 0, debtService: 0, liquidityRatio: 0 },
+    reminders: []
   })
-  const [dataLoading, setDataLoading] = useState(true)
+
+  // Helper
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(amount)
+  }
+
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
+
+
+  // Auto-seed data on mount (User Request for direct persistence)
+  useEffect(() => {
+    const seedData = async () => {
+      if (!user) return
+
+      try {
+        // Fetch current counts to decide what to seed
+        const [existingAccounts, existingGoals, existingCards] = await Promise.all([
+          financeManager.getAccounts(),
+          financeManager.getGoals(),
+          financeManager.getCreditCards()
+        ])
+
+        const promises = []
+        let seeded = false
+
+        // 1. Seed Accounts if empty
+        if (existingAccounts.length === 0) {
+          console.log('Seeding Accounts...')
+          promises.push(financeManager.seedLiquidity(initialLiquidity))
+          seeded = true
+        }
+
+        // 2. Seed Goals if empty
+        if (existingGoals.length === 0) {
+          console.log('Seeding Goals...')
+          promises.push(financeManager.seedGoals(initialGoals))
+          seeded = true
+        }
+
+        // 3. Seed Credit Cards if empty, OR if data looks incomplete (Smart Repair)
+        // Check first card for 'benefits' column data presence
+        const needsRestock = existingCards.length === 0 || (existingCards.length > 0 && !existingCards[0].benefits)
+
+        if (needsRestock) {
+          console.log('Seeding/Updating Credit Cards with rich data...')
+          // This will upsert (update) existing cards with new rich data
+          promises.push(financeManager.seedCreditCards(initialCards))
+          seeded = true
+        }
+
+        // 4. Seed Budget (always try idempotent upsert if we seeded anything else, or just check?)
+        // Let's seed budget if we seeded accounts, or just for safety.
+        // It's low cost upsert.
+        if (seeded) {
+          promises.push(financeManager.importYearlyBudget(2026, budgetProjections2025))
+        }
+
+        if (promises.length > 0) {
+          await Promise.all(promises)
+          setRefreshTrigger(prev => prev + 1)
+          showNotification('Financial data hydrated successfully.', 'success')
+        }
+
+      } catch (e) {
+        console.error('Auto-seed failed', e)
+      }
+    }
+
+    // Slight delay to ensure auth is stable
+    const timer = setTimeout(() => {
+      seedData()
+    }, 1500)
+
+    return () => clearTimeout(timer)
+  }, [user, showNotification])
 
   const loadDashboardData = useCallback(async () => {
     try {
-      const liquidity = getLiquidityData()
+      if (!user) return
+
+      // Fetch all data in parallel
+      const [
+        liquidity,
+        incomes,
+        expenses,
+        ccSummary,
+        payables,
+        loans, // Need loans for ratios
+        cards, // Need cards for reminders
+        goals  // Need goals for reminders/stats
+      ] = await Promise.all([
+        financeManager.getLiquidityData(),
+        financeManager.getIncomeTransactions(),
+        financeManager.getExpenseTransactions(),
+        financeManager.getCreditCardLiabilitySummary(),
+        financeManager.getFuturePayables(),
+        financeManager.getLoans(), // Helper needed
+        financeManager.getCreditCards(),
+        financeManager.getGoals()
+      ])
+
       const totalAssets = liquidity.totalLiquidity
-      const ccSummary = getCreditCardLiabilitySummary()
       const totalCreditCardBalance = ccSummary.totalOutstanding
+      const totalLoanOutstanding = loans.reduce((sum: number, l: any) => sum + (l.currentBalance || 0), 0)
+
+      // Auto-save Daily Snapshot (Idempotent)
+      await financeManager.saveDailySnapshot({
+        totalAssets,
+        totalLiabilities: totalCreditCardBalance + totalLoanOutstanding
+      })
 
       const currentDate = new Date()
       const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
       const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
 
-      const incomes = getIncomeTransactions().filter(t => {
+      const monthlyIncomes = incomes.filter(t => {
         const d = new Date(t.date)
         return d >= startOfMonth && d <= endOfMonth
       })
-      const expenses = getExpenseTransactions().filter(t => {
+      const monthlyExpensesList = expenses.filter(t => {
         const d = new Date(t.date)
         return d >= startOfMonth && d <= endOfMonth
       })
 
-      const monthlyIncome = incomes.reduce((sum, t) => sum + t.amount, 0)
-      const monthlyExpenses = expenses.reduce((sum, t) => sum + t.amount, 0)
+      const monthlyIncome = monthlyIncomes.reduce((sum: number, t: any) => sum + t.amount, 0)
+      const monthlyExpenses = monthlyExpensesList.reduce((sum: number, t: any) => sum + t.amount, 0)
+      const monthlySavings = monthlyIncome - monthlyExpenses
 
       const recentTransactions: Transaction[] = [...incomes, ...expenses]
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .slice(0, 5)
-        .map(t => ({
+        .map((t: any) => ({
           id: t.id,
           amount: t.amount,
-          type: (t as { type?: string; paymentMethod?: string }).type || (t as { paymentMethod?: string }).paymentMethod ? 'expense' : 'income',
-          description: (t as { description?: string }).description || '',
+          type: t.type,
+          description: t.description || '',
           date: t.date,
           categories: null
         }))
+
+      // Partition Split
+      const bi = monthlyIncomes.filter((t: any) => t.category === 'Business').reduce((s: number, t: any) => s + t.amount, 0)
+      const pi = monthlyIncome - bi
+      const be = monthlyExpensesList.filter((t: any) => t.category === 'Business').reduce((s: number, t: any) => s + t.amount, 0)
+      const pe = monthlyExpenses - be
+
+      // Projection (Simplified for Cloud MVP - mostly reusing payable logic)
+      const now = new Date()
+      const months = [0, 1, 2].map(offset => {
+        const start = new Date(now.getFullYear(), now.getMonth() + offset, 1)
+        const end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0)
+
+        // Sum payables in this month
+        const outflows = payables
+          .filter(p => {
+            const d = new Date(p.dueDate)
+            return d >= start && d <= end && p.status !== 'paid'
+          })
+          .reduce((sum, p) => sum + p.amount, 0)
+
+        return {
+          label: start.toLocaleString('en-IN', { month: 'short' }),
+          outflows,
+          inflows: 0 // Placeholder
+        }
+      })
+
+      // Calculate 2026 Projection from budgetData
+      const projectedAnnualExpense = budgetProjections2025.reduce((total: number, item: { limits: number[] }) => {
+        return total + item.limits.reduce((sum: number, limit: number) => sum + limit, 0)
+      }, 0)
+
+      const path = months.reduce<{ points: number[] }>((acc, m) => {
+        const last = acc.points[acc.points.length - 1] ?? totalAssets
+        acc.points.push(Math.max(0, last + m.inflows - m.outflows))
+        return acc
+      }, { points: [] })
+
+      // Upcoming
+      const in30 = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30)
+      const upcomingList = payables.filter(p => {
+        const d = new Date(p.dueDate)
+        return d >= now && d <= in30 && p.status !== 'paid'
+      })
+      const upcomingAmount = upcomingList.reduce((sum, p) => sum + p.amount, 0)
+
+      // Ratios
+      const monthlyEmi = loans.reduce((sum: number, l: any) => sum + (l.monthlyAmount || 0), 0)
+      const savingsRate = monthlyIncome > 0 ? Math.round((monthlySavings / monthlyIncome) * 100) : 0
+      const debtService = monthlyIncome > 0 ? Math.round((monthlyEmi / monthlyIncome) * 100) : 0
+      const liquidityRatio = totalAssets > 0 ? Math.round(((totalAssets - totalCreditCardBalance) / totalAssets) * 100) : 0
+
+      // Reminders
+      const soon = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 14)
+      const emiReminders = payables
+        .filter(p => p.type === 'emi' && p.status !== 'paid')
+        .filter(p => {
+          const d = new Date(p.dueDate)
+          return d >= now && d <= soon
+        })
+        .map(p => ({ kind: 'EMI', label: p.description, due: p.dueDate, amount: p.amount }))
+
+      const cardReminders = payables
+        .filter(p => p.type === 'credit_card' && p.status !== 'paid')
+        .filter(p => {
+          const d = new Date(p.dueDate)
+          return d >= now && d <= soon
+        })
+        .map(p => ({ kind: 'Card', label: p.source, due: p.dueDate, amount: p.amount }))
+
+      const reminders = [...emiReminders, ...cardReminders].sort((a, b) => new Date(a.due).getTime() - new Date(b.due).getTime())
 
       setStats({
         totalAssets,
         totalLiabilities: totalCreditCardBalance,
         monthlyIncome,
         monthlyExpenses,
-        activeLoans: 0,
-        activeGoals: 0,
+        activeLoans: loans.length,
+        totalLoanOutstanding,
+        projectedAnnualExpense,
+        activeGoals: goals.length,
         totalCreditCardBalance,
-        recentTransactions
+        recentTransactions,
+        partitionSplit: { bi, pi, pe, be },
+        projection: { months, startLiquidity: totalAssets, path },
+        upcoming: { count: upcomingList.length, amount: upcomingAmount },
+        ratios: { monthlyEmi, savingsRate, debtService, liquidityRatio },
+        reminders
       })
     } catch (error) {
       console.error('Error loading dashboard data:', error)
     } finally {
       setDataLoading(false)
     }
-  }, [])
+  }, [user])
 
   useEffect(() => {
     loadDashboardData()
@@ -130,126 +333,6 @@ export default function Dashboard() {
 
   const netWorth = stats.totalAssets - stats.totalLiabilities
   const monthlySavings = stats.monthlyIncome - stats.monthlyExpenses
-  const partitionSplit = (() => {
-    const currentDate = new Date()
-    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
-    const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
-    const incomes = getIncomeTransactions().filter(t => {
-      const d = new Date(t.date)
-      return d >= startOfMonth && d <= endOfMonth
-    })
-    const expenses = getExpenseTransactions().filter(t => {
-      const d = new Date(t.date)
-      return d >= startOfMonth && d <= endOfMonth
-    })
-    const bi = incomes.filter(t => t.partition === 'business').reduce((s, t) => s + t.amount, 0)
-    const pi = incomes.filter(t => t.partition !== 'business').reduce((s, t) => s + t.amount, 0)
-    const be = expenses.filter(t => t.partition === 'business').reduce((s, t) => s + t.amount, 0)
-    const pe = expenses.filter(t => t.partition !== 'business').reduce((s, t) => s + t.amount, 0)
-    return { bi, pi, be, pe }
-  })()
-
-  const projection = (() => {
-    const payables = getFuturePayables().filter(p => p.status !== 'paid')
-    const recurringIncome = getIncomeTransactions().filter(t => t.recurring)
-    const recurringExpense = getExpenseTransactions().filter(t => t.recurring)
-    const now = new Date()
-    const months = [0, 1, 2].map(offset => {
-      const start = new Date(now.getFullYear(), now.getMonth() + offset, 1)
-      const end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0)
-      const outflows = payables
-        .filter(p => {
-          const d = new Date(p.dueDate)
-          return d >= start && d <= end
-        })
-        .reduce((sum, p) => sum + p.amount, 0)
-      const recurOut = recurringExpense.reduce((sum, t) => {
-        const d = new Date(t.date)
-        const isMonthly = t.recurring?.frequency === 'monthly'
-        const isQuarter = t.recurring?.frequency === 'quarterly'
-        const include = isMonthly || (isQuarter && ((start.getMonth() - d.getMonth() + 12) % 3 === 0))
-        return include ? sum + t.amount : sum
-      }, 0)
-      const recurIn = recurringIncome.reduce((sum, t) => {
-        const d = new Date(t.date)
-        const isMonthly = t.recurring?.frequency === 'monthly'
-        const isQuarter = t.recurring?.frequency === 'quarterly'
-        const include = isMonthly || (isQuarter && ((start.getMonth() - d.getMonth() + 12) % 3 === 0))
-        return include ? sum + t.amount : sum
-      }, 0)
-      return {
-        label: start.toLocaleString('en-IN', { month: 'short' }),
-        outflows: outflows + recurOut,
-        inflows: recurIn,
-      }
-    })
-    const startLiquidity = getLiquidityData().totalLiquidity
-    const path = months.reduce<{ points: number[] }>((acc, m) => {
-      const last = acc.points[acc.points.length - 1] ?? startLiquidity
-      acc.points.push(Math.max(0, last + (m.inflows || 0) - m.outflows))
-      return acc
-    }, { points: [] })
-    return { months, startLiquidity, path }
-  })()
-
-  const upcoming = (() => {
-    const payables = getFuturePayables().filter(p => p.status !== 'paid')
-    const now = new Date()
-    const in30 = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30)
-    const upcomingList = payables.filter(p => {
-      const d = new Date(p.dueDate)
-      return d >= now && d <= in30
-    })
-    const amount = upcomingList.reduce((sum, p) => sum + p.amount, 0)
-    return { count: upcomingList.length, amount }
-  })()
-
-  const ratios = (() => {
-    const loans = getLoans()
-    const monthlyEmi = loans.reduce((sum, l) => sum + l.monthlyAmount, 0)
-    const savingsRate = stats.monthlyIncome > 0 ? Math.round((monthlySavings / stats.monthlyIncome) * 100) : 0
-    const debtService = stats.monthlyIncome > 0 ? Math.round((monthlyEmi / stats.monthlyIncome) * 100) : 0
-    const liquidityRatio = stats.totalAssets > 0 ? Math.round(((stats.totalAssets - stats.totalLiabilities) / stats.totalAssets) * 100) : 0
-    return { monthlyEmi, savingsRate, debtService, liquidityRatio }
-  })()
-
-  const csvStats = (() => {
-    if (typeof window === 'undefined') return { loanInr: 0, annualExpenseInr: 0 }
-    try {
-      const loan = JSON.parse(localStorage.getItem('dashboard_total_loan') || '{"inr":0}')
-      const annual = JSON.parse(localStorage.getItem('dashboard_annual_expense') || '{"inr":0}')
-      return { loanInr: loan.inr || 0, annualExpenseInr: annual.inr || 0 }
-    } catch {
-      return { loanInr: 0, annualExpenseInr: 0 }
-    }
-  })()
-
-  const reminders = (() => {
-    const now = new Date()
-    const soon = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 14)
-    const emis = getFuturePayables()
-      .filter(p => p.type === 'emi' && p.status !== 'paid')
-      .filter(p => {
-        const d = new Date(p.dueDate)
-        return d >= now && d <= soon
-      })
-      .map(p => ({ kind: 'EMI', label: p.description, due: p.dueDate, amount: p.amount }))
-    const fds = getFDs()
-      .filter(fd => {
-        const d = new Date(fd.maturityDate)
-        return d >= now && d <= new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30)
-      })
-      .map(fd => ({ kind: 'FD', label: fd.name, due: fd.maturityDate, amount: fd.amount }))
-    const cards = getCreditCards()
-      .filter(c => c.isActive)
-      .filter(c => {
-        const due = new Date(now.getFullYear(), now.getMonth(), c.dueDate || 1)
-        const diff = (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-        return diff >= 0 && diff <= 14
-      })
-      .map(c => ({ kind: 'Card', label: c.name, due: new Date(now.getFullYear(), now.getMonth(), c.dueDate || 1).toISOString().split('T')[0], amount: c.currentBalance }))
-    return [...emis, ...fds, ...cards].sort((a, b) => new Date(a.due).getTime() - new Date(b.due).getTime())
-  })()
 
   // Show auth loading screen if authenticating or redirecting
   if (LoadingComponent) {
@@ -274,6 +357,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-neutral-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
         {/* Clean Welcome Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-semibold text-neutral-900 mb-2">
@@ -345,17 +429,22 @@ export default function Dashboard() {
             <div className="flex items-center">
               <BuildingLibraryIcon className="h-8 w-8 text-indigo-600" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">CSV Total Loan</p>
-                <p className="text-2xl font-bold text-gray-900">₹{csvStats.loanInr.toLocaleString()}</p>
+                <p className="text-sm font-medium text-gray-600">Total Outstanding Loans</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {formatCurrency(stats.totalLoanOutstanding)}
+                </p>
               </div>
             </div>
           </GlassCard>
+
           <GlassCard>
             <div className="flex items-center">
               <ChartBarIcon className="h-8 w-8 text-purple-600" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">CSV Annual Expense</p>
-                <p className="text-2xl font-bold text-gray-900">₹{csvStats.annualExpenseInr.toLocaleString()}</p>
+                <p className="text-sm font-medium text-gray-600">Projected Expenses (2026)</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {formatCurrency(stats.projectedAnnualExpense)}
+                </p>
               </div>
             </div>
           </GlassCard>
@@ -374,7 +463,7 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {reminders.map((r, idx) => (
+                {stats.reminders.map((r, idx) => (
                   <tr key={idx}>
                     <td className="px-6 py-3 text-sm text-gray-900">{r.kind}</td>
                     <td className="px-6 py-3 text-sm text-gray-900">{r.label}</td>
@@ -382,7 +471,7 @@ export default function Dashboard() {
                     <td className="px-6 py-3 text-sm font-semibold text-right text-gray-900">₹{Number(r.amount || 0).toLocaleString()}</td>
                   </tr>
                 ))}
-                {reminders.length === 0 && (
+                {stats.reminders.length === 0 && (
                   <tr>
                     <td className="px-6 py-4 text-sm text-gray-500" colSpan={4}>No upcoming reminders</td>
                   </tr>
@@ -398,7 +487,7 @@ export default function Dashboard() {
               <ArrowTrendingUpIcon className="h-8 w-8 text-green-600" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Business Income</p>
-                <p className="text-2xl font-bold text-gray-900">₹{partitionSplit.bi.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-gray-900">₹{stats.partitionSplit.bi.toLocaleString()}</p>
               </div>
             </div>
           </GlassCard>
@@ -407,7 +496,7 @@ export default function Dashboard() {
               <ArrowTrendingUpIcon className="h-8 w-8 text-blue-600" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Personal Income</p>
-                <p className="text-2xl font-bold text-gray-900">₹{partitionSplit.pi.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-gray-900">₹{stats.partitionSplit.pi.toLocaleString()}</p>
               </div>
             </div>
           </GlassCard>
@@ -416,7 +505,7 @@ export default function Dashboard() {
               <ArrowTrendingDownIcon className="h-8 w-8 text-rose-600" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Business Expenses</p>
-                <p className="text-2xl font-bold text-gray-900">₹{partitionSplit.be.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-gray-900">₹{stats.partitionSplit.be.toLocaleString()}</p>
               </div>
             </div>
           </GlassCard>
@@ -425,7 +514,7 @@ export default function Dashboard() {
               <ArrowTrendingDownIcon className="h-8 w-8 text-indigo-600" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Personal Expenses</p>
-                <p className="text-2xl font-bold text-gray-900">₹{partitionSplit.pe.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-gray-900">₹{stats.partitionSplit.pe.toLocaleString()}</p>
               </div>
             </div>
           </GlassCard>
@@ -437,8 +526,8 @@ export default function Dashboard() {
               <ArrowTrendingDownIcon className="h-8 w-8 text-orange-600" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Upcoming in 30 days</p>
-                <p className="text-2xl font-bold text-gray-900">₹{upcoming.amount.toLocaleString()}</p>
-                <p className="text-sm text-gray-500">{upcoming.count} items</p>
+                <p className="text-2xl font-bold text-gray-900">₹{stats.upcoming.amount.toLocaleString()}</p>
+                <p className="text-sm text-gray-500">{stats.upcoming.count} items</p>
               </div>
             </div>
           </GlassCard>
@@ -447,7 +536,7 @@ export default function Dashboard() {
               <ChartBarIcon className="h-8 w-8 text-indigo-600" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Savings Rate</p>
-                <p className="text-2xl font-bold text-gray-900">{ratios.savingsRate}%</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.ratios.savingsRate}%</p>
               </div>
             </div>
           </GlassCard>
@@ -456,7 +545,7 @@ export default function Dashboard() {
               <BuildingLibraryIcon className="h-8 w-8 text-purple-600" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Debt Service</p>
-                <p className="text-2xl font-bold text-gray-900">{ratios.debtService}%</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.ratios.debtService}%</p>
               </div>
             </div>
           </GlassCard>
@@ -465,7 +554,7 @@ export default function Dashboard() {
               <BanknotesIcon className="h-8 w-8 text-green-600" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Liquidity Ratio</p>
-                <p className="text-2xl font-bold text-gray-900">{ratios.liquidityRatio}%</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.ratios.liquidityRatio}%</p>
               </div>
             </div>
           </GlassCard>
@@ -535,7 +624,7 @@ export default function Dashboard() {
         <GlassCard className="mb-8">
           <h3 className="text-xl font-semibold text-gray-900 mb-6">3-Month Projection</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {projection.months.map((m, idx) => (
+            {stats.projection.months.map((m, idx) => (
               <div key={m.label} className="rounded-lg border p-4">
                 <p className="text-sm text-gray-600">{m.label}</p>
                 <p className="text-lg font-bold text-rose-600">₹{m.outflows.toLocaleString()}</p>
@@ -543,11 +632,11 @@ export default function Dashboard() {
                 {m.inflows ? (
                   <p className="text-sm mt-1 text-green-700">Inflows: <span className="font-semibold">₹{m.inflows.toLocaleString()}</span></p>
                 ) : null}
-                <p className="text-sm mt-2">Liquidity: <span className="font-semibold">₹{projection.path.points[idx].toLocaleString()}</span></p>
+                <p className="text-sm mt-2">Liquidity: <span className="font-semibold">₹{stats.projection.path.points[idx]?.toLocaleString() ?? '...'}</span></p>
               </div>
             ))}
           </div>
-          <p className="text-xs text-gray-500 mt-4">Start Liquidity: ₹{projection.startLiquidity.toLocaleString()}</p>
+          <p className="text-xs text-gray-500 mt-4">Start Liquidity: ₹{stats.projection.startLiquidity.toLocaleString()}</p>
         </GlassCard>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
@@ -656,7 +745,7 @@ export default function Dashboard() {
                   ))
                 ) : (
                   <div className="text-center py-8">
-                    <ChartBarIcon className="h-12 w-12 text-golden-500 icon-golden-shine mx-auto mb-4" />
+                    <ChartBarIcon className="h-12 w-12 text-indigo-500 icon-indigo-shine mx-auto mb-4" />
                     <p className="text-gray-600">No transactions yet</p>
                     <p className="text-sm text-gray-500 mt-2">Start by adding your first transaction!</p>
                   </div>
@@ -665,6 +754,7 @@ export default function Dashboard() {
             </div>
           </GlassCard>
         </div>
+
       </div>
     </div>
   )

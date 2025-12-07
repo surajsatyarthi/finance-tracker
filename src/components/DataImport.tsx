@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { ArrowUpTrayIcon, CheckCircleIcon, XCircleIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline'
 import { parseCSV, validateImportData, type ImportResult, type ImportRow } from '@/lib/importParser'
-import { storeIncomeTransaction, storeExpenseTransaction } from '@/lib/dataManager'
+import { financeManager } from '@/lib/supabaseDataManager'
 
 export default function DataImport() {
     const [importing, setImporting] = useState(false)
@@ -51,46 +51,32 @@ export default function DataImport() {
         }
     }
 
-    const confirmImport = () => {
+    const confirmImport = async () => {
         setImporting(true)
         let imported = 0
         let failed = 0
         const errors: string[] = []
 
-        preview.forEach((row, index) => {
+        // Process sequentially to avoid rate limits or race conditions
+        for (let i = 0; i < preview.length; i++) {
+            const row = preview[i]
             try {
-                if (row.type === 'income') {
-                    storeIncomeTransaction({
-                        date: row.date,
-                        amount: row.amount,
-                        description: row.description,
-                        category: row.category,
-                        type: 'cash',
-                        bankAccount: row.bankAccount || ''
-                    })
-                } else {
-                    const paymentMethod = row.paymentMethod || 'cash'
-                    const validMethod: 'cash' | 'upi' | 'credit_card' | 'credit_card_emi' | 'bnpl' =
-                        ['cash', 'upi', 'credit_card', 'credit_card_emi', 'bnpl'].includes(paymentMethod)
-                            ? paymentMethod as 'cash' | 'upi' | 'credit_card' | 'credit_card_emi' | 'bnpl'
-                            : 'cash'
-
-                    storeExpenseTransaction({
-                        date: row.date,
-                        amount: row.amount,
-                        description: row.description,
-                        category: row.category,
-                        paymentMethod: validMethod,
-                        bankAccount: row.bankAccount,
-                        status: 'paid'
-                    })
-                }
+                await financeManager.createTransaction({
+                    amount: row.amount,
+                    type: row.type, // 'income' or 'expense'
+                    description: row.description,
+                    date: row.date,
+                    category: row.category,
+                    payment_method: row.paymentMethod || 'cash',
+                    // Note: We are not interacting with account_id here as we'd need to lookup IDs by name. 
+                    // Future enhancement: Fetch accounts and map row.bankAccount to account_id.
+                })
                 imported++
             } catch (error) {
                 failed++
-                errors.push(`Row ${index + 1}: ${error instanceof Error ? error.message : 'Failed to import'}`)
+                errors.push(`Row ${i + 1}: ${error instanceof Error ? error.message : 'Failed to import'}`)
             }
-        })
+        }
 
         setResult({
             success: failed === 0,

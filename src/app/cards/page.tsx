@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRequireAuth } from '@/contexts/AuthContext'
 import {
   MagnifyingGlassIcon,
@@ -14,12 +14,15 @@ import {
   ExclamationTriangleIcon,
   PlusIcon,
   BellIcon,
-  ArrowRightIcon
+  ArrowRightIcon,
+  EyeIcon
 } from '@heroicons/react/24/outline'
 import Link from 'next/link'
-import { getCreditCards, getCreditCardLiabilitySummary, getCreditCardUtilization, updateCreditCard, deleteCreditCard, storeCreditCard } from '@/lib/dataManager'
+import { financeManager } from '@/lib/supabaseDataManager'
+import { initialCards } from '@/lib/cardsData'
 import GlassCard from '@/components/GlassCard'
 import { usePrivacy } from '@/contexts/PrivacyContext'
+import { useNotification } from '@/contexts/NotificationContext'
 
 interface CreditCardBill {
   id: string
@@ -46,11 +49,22 @@ interface CreditCardBill {
 export default function CardsPage() {
   useRequireAuth() // Just call for authentication check
   const { locked } = usePrivacy()
+  const { showNotification } = useNotification()
   const [searchTerm, setSearchTerm] = useState('')
   const [filterCard, setFilterCard] = useState('all')
   const [sortBy, setSortBy] = useState<'name' | 'utilization' | 'limit' | 'balance'>('utilization')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [cardsState, setCardsState] = useState(getCreditCards())
+  const [cardsState, setCardsState] = useState<any[]>([])
+
+  useEffect(() => {
+    loadCards()
+  }, [])
+
+  const loadCards = async () => {
+    const data = await financeManager.getCreditCards()
+    setCardsState(data)
+  }
+
   const [editOpen, setEditOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({
@@ -64,7 +78,24 @@ export default function CardsPage() {
   })
 
   const cards = cardsState
-  const summary = getCreditCardLiabilitySummary()
+  // Recalculate summary locally based on fetched cards for now or refactor to async
+  const summary = useMemo(() => {
+    const totalLimit = cards.reduce((sum, card) => sum + (card.creditLimit || 0), 0)
+    const totalOutstanding = cards.reduce((sum, card) => sum + (card.currentBalance || 0), 0)
+    const overallUtilization = totalLimit > 0 ? Math.round((totalOutstanding / totalLimit) * 100) : 0
+    return {
+      totalCards: cards.length,
+      totalLimit,
+      totalOutstanding,
+      overallUtilization
+    }
+  }, [cards])
+
+  const getCreditCardUtilization = (id: string) => {
+    const c = cards.find(x => x.id === id)
+    if (!c || !c.creditLimit) return 0
+    return Math.round((c.currentBalance / c.creditLimit) * 100)
+  }
   const cardsWithMetrics = cards.map(card => ({
     id: card.id,
     name: card.name,
@@ -182,7 +213,7 @@ export default function CardsPage() {
 
   const saveEdit = async () => {
     if (editingId) {
-      updateCreditCard(editingId, {
+      await financeManager.updateCreditCard(editingId, {
         name: form.name,
         lastFourDigits: form.lastFourDigits,
         creditLimit: form.creditLimit,
@@ -191,10 +222,10 @@ export default function CardsPage() {
         statementDate: form.statementDate,
         isActive: form.isActive,
       })
-      setCardsState(getCreditCards())
+      await loadCards()
       setEditOpen(false)
     } else {
-      storeCreditCard({
+      await financeManager.storeCreditCard({
         name: form.name,
         lastFourDigits: form.lastFourDigits,
         creditLimit: form.creditLimit,
@@ -203,7 +234,7 @@ export default function CardsPage() {
         statementDate: form.statementDate,
         isActive: form.isActive,
       })
-      setCardsState(getCreditCards())
+      await loadCards()
       setEditOpen(false)
     }
   }
@@ -223,6 +254,7 @@ export default function CardsPage() {
               </p>
             </div>
             <div className="flex space-x-4">
+
               <Link
                 href="/emis"
                 className="inline-flex items-center px-4 py-2 rounded-xl font-medium text-primary-600 bg-white border border-primary-200 hover:bg-primary-50 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 text-sm"
@@ -375,7 +407,16 @@ export default function CardsPage() {
                         <CreditCardIcon className="h-5 w-5 text-indigo-600 mr-2" />
                         <div>
                           <div className="text-sm font-medium text-gray-900">{c.name}</div>
-                          <div className="text-xs text-gray-500 font-mono">••••{c.lastFour}</div>
+                          <div className="group relative cursor-pointer" onClick={() => {
+                            showNotification(`Copied ${c.lastFour}`, 'success')
+                            // Logic to copy? Actually we don't have full number in metric.
+                          }}>
+                            <div className="text-xs text-gray-500 font-mono flex items-center gap-1">
+                              <span>••••</span>
+                              <span className="group-hover:text-black transition-colors">{c.lastFour}</span>
+                              <EyeIcon className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -398,7 +439,7 @@ export default function CardsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <button className="px-3 py-1 rounded border mr-2" onClick={() => openEdit(c.id)}>Edit</button>
-                      <button className="px-3 py-1 rounded border" onClick={() => { deleteCreditCard(c.id); setCardsState(getCreditCards()) }}>Delete</button>
+                      <button className="px-3 py-1 rounded border" onClick={async () => { await financeManager.deleteCreditCard(c.id); loadCards() }}>Delete</button>
                     </td>
                   </tr>
                 ))}

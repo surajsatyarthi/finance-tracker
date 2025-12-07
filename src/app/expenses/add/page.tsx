@@ -47,13 +47,13 @@ export default function AddExpensePage() {
     paymentMethod: 'cash',
     category: 'Food - Groceries'
   })
-  
+
   const [loading, setLoading] = useState(false)
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
   const [creditCards, setCreditCards] = useState<CreditCard[]>([])
-  
+
   // EMI calculation state
-  const [emiPreview, setEmiPreview] = useState<{monthlyAmount: number, totalAmount: number} | null>(null)
+  const [emiPreview, setEmiPreview] = useState<{ monthlyAmount: number, totalAmount: number } | null>(null)
 
   // Initialize data and load accounts/cards on component mount
   useEffect(() => {
@@ -84,23 +84,23 @@ export default function AddExpensePage() {
   const expenseCategories = [
     // Main Categories with Subcategories
     'Loan - Education loan',
-    
+
     // Transport
     'Transport - Travel',
     'Transport - Petrol',
     'Transport - Bike Insurance',
     'Transport - Bike Pollution Certificate',
-    'Transport - Car Insurance', 
+    'Transport - Car Insurance',
     'Transport - Car Pollution Certificate',
-    
+
     // Data
     'Data - Jio',
     'Data - Airtel',
     'Data - WiFi',
-    
+
     // Self Growth
     'Self Growth - Books',
-    
+
     // Food
     'Food - Eating out',
     'Food - Swiggy',
@@ -109,38 +109,37 @@ export default function AddExpensePage() {
     'Food - Vegetables',
     'Food - Fruits',
     'Food - Snacks',
-    
+
     // Grooming
     'Grooming - Haircut',
     'Grooming - Toiletries',
-    
+
     // Health
     'Health - Fitness bootcamp',
     'Health - Chef',
     'Health - Yoga instructor',
     'Health - Supplements + Vitamins',
     'Health - Medicine',
-    
+
     // Clothing
     'Clothing',
-    
+
     // Insurance
     'Insurance - Medical Insurance',
     'Insurance - Life Insurance',
-    
+
     // Subscriptions
     'Subscriptions - Donation',
     'Subscriptions - Youtube',
     'Subscriptions - Google one',
     'Subscriptions - Grok',
     'Subscriptions - LinkedIn Premium',
-    
+
     // Credit Card Monthly Payments
     'Credit Card Monthly - SBI BPCL MP',
     'Credit Card Monthly - SBI Paytm MP',
     'Credit Card Monthly - SBI Simply save MP',
     'Credit Card Monthly - SC EaseMyTrip MP',
-    'Credit Card Monthly - Axis Rewards MP',
     'Credit Card Monthly - Axis My Zone MP',
     'Credit Card Monthly - Axis Neo MP',
     'Credit Card Monthly - RBL Platinum Delight MP',
@@ -150,16 +149,14 @@ export default function AddExpensePage() {
     'Credit Card Monthly - Indusind Platinum Aura Edge MP',
     'Credit Card Monthly - Indusind Rupay (SC) MP',
     'Credit Card Monthly - ICICI Amazon MP',
-    'Credit Card Monthly - ICICI Coral Rupay MP',
     'Credit Card Monthly - ICICI Adani One MP',
     'Credit Card Monthly - Pop YES Bank MP',
-    
+
     // Credit Card EMI
     'Credit Card EMI - SBI BPCL EMI',
     'Credit Card EMI - SBI Paytm EMI',
     'Credit Card EMI - SBI Simply save EMI',
     'Credit Card EMI - SC EaseMyTrip EMI',
-    'Credit Card EMI - Axis Rewards EMI',
     'Credit Card EMI - Axis My Zone EMI',
     'Credit Card EMI - Axis Neo EMI',
     'Credit Card EMI - RBL Platinum Delight EMI',
@@ -169,15 +166,14 @@ export default function AddExpensePage() {
     'Credit Card EMI - Indusind Platinum Aura Edge EMI',
     'Credit Card EMI - Indusind Rupay EMI',
     'Credit Card EMI - ICICI Amazon EMI',
-    'Credit Card EMI - ICICI Coral Rupay EMI',
     'Credit Card EMI - ICICI Adani One EMI',
     'Credit Card EMI - Pop YES Bank EMI',
-    
+
     // Pay Later
     'Pay Later - Simpl',
     'Pay Later - Lazypay',
     'Pay Later - Amazon Pay',
-    
+
     // Misc
     'Misc - Amazon Pay Recharge',
     'Misc - Supplement',
@@ -241,15 +237,15 @@ export default function AddExpensePage() {
         emiDetails: expense.emiDetails,
         category: expense.category
       })
-      
+
       let successMessage = `₹${expense.amount.toLocaleString()} expense added successfully!`
-      
+
       if (expense.paymentMethod === 'credit_card_emi' && emiPreview) {
         successMessage += ` EMI: ₹${emiPreview.monthlyAmount.toLocaleString()}/month for ${expense.emiDetails!.tenure} months`
       }
-      
+
       showNotification(successMessage, 'success')
-      
+
       // Reset form
       setExpense({
         amount: 0,
@@ -289,7 +285,7 @@ export default function AddExpensePage() {
         {/* Expense Form */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
-            
+
             {/* Payment Method Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -299,76 +295,71 @@ export default function AddExpensePage() {
                 {/* Cash */}
                 <button
                   type="button"
-                  onClick={() => setExpense({...expense, paymentMethod: 'cash', bankAccount: undefined, creditCard: undefined, bnplProvider: undefined, emiDetails: undefined})}
-                  className={`flex flex-col items-center p-4 rounded-lg border-2 transition-all ${
-                    expense.paymentMethod === 'cash'
+                  onClick={() => setExpense({ ...expense, paymentMethod: 'cash', bankAccount: undefined, creditCard: undefined, bnplProvider: undefined, emiDetails: undefined })}
+                  className={`flex flex-col items-center p-4 rounded-lg border-2 transition-all ${expense.paymentMethod === 'cash'
                       ? 'border-red-500 bg-red-50 text-red-700'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <div className="icon-golden-card mb-2">
                     <BanknotesIcon className="h-6 w-6 icon-white" />
                   </div>
                   <span className="text-sm font-medium">Cash</span>
                 </button>
-                
+
                 {/* UPI */}
                 <button
                   type="button"
-                  onClick={() => setExpense({...expense, paymentMethod: 'upi', creditCard: undefined, bnplProvider: undefined, emiDetails: undefined})}
-                  className={`flex flex-col items-center p-4 rounded-lg border-2 transition-all ${
-                    expense.paymentMethod === 'upi'
+                  onClick={() => setExpense({ ...expense, paymentMethod: 'upi', creditCard: undefined, bnplProvider: undefined, emiDetails: undefined })}
+                  className={`flex flex-col items-center p-4 rounded-lg border-2 transition-all ${expense.paymentMethod === 'upi'
                       ? 'border-red-500 bg-red-50 text-red-700'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <div className="icon-golden-card mb-2">
                     <DevicePhoneMobileIcon className="h-6 w-6 icon-white" />
                   </div>
                   <span className="text-sm font-medium">UPI</span>
                 </button>
-                
+
                 {/* Credit Card */}
                 <button
                   type="button"
-                  onClick={() => setExpense({...expense, paymentMethod: 'credit_card', bankAccount: undefined, bnplProvider: undefined, emiDetails: undefined})}
-                  className={`flex flex-col items-center p-4 rounded-lg border-2 transition-all ${
-                    expense.paymentMethod === 'credit_card'
+                  onClick={() => setExpense({ ...expense, paymentMethod: 'credit_card', bankAccount: undefined, bnplProvider: undefined, emiDetails: undefined })}
+                  className={`flex flex-col items-center p-4 rounded-lg border-2 transition-all ${expense.paymentMethod === 'credit_card'
                       ? 'border-red-500 bg-red-50 text-red-700'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <div className="icon-golden-card mb-2">
                     <CreditCardIcon className="h-6 w-6 icon-white" />
                   </div>
                   <span className="text-sm font-medium">Credit Card</span>
                 </button>
-                
+
                 {/* Credit Card EMI */}
                 <button
                   type="button"
-                  onClick={() => setExpense({...expense, paymentMethod: 'credit_card_emi', bankAccount: undefined, bnplProvider: undefined})}
-                  className={`flex flex-col items-center p-4 rounded-lg border-2 transition-all ${
-                    expense.paymentMethod === 'credit_card_emi'
+                  onClick={() => setExpense({ ...expense, paymentMethod: 'credit_card_emi', bankAccount: undefined, bnplProvider: undefined })}
+                  className={`flex flex-col items-center p-4 rounded-lg border-2 transition-all ${expense.paymentMethod === 'credit_card_emi'
                       ? 'border-red-500 bg-red-50 text-red-700'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <div className="icon-golden-card mb-2">
                     <CalendarDaysIcon className="h-6 w-6 icon-white" />
                   </div>
                   <span className="text-sm font-medium">EMI</span>
                 </button>
-                
+
                 {/* BNPL */}
                 <button
                   type="button"
-                  onClick={() => setExpense({...expense, paymentMethod: 'bnpl', bankAccount: undefined, creditCard: undefined, emiDetails: undefined})}
-                  className={`flex flex-col items-center p-4 rounded-lg border-2 transition-all ${
-                    expense.paymentMethod === 'bnpl'
+                  onClick={() => setExpense({ ...expense, paymentMethod: 'bnpl', bankAccount: undefined, creditCard: undefined, emiDetails: undefined })}
+                  className={`flex flex-col items-center p-4 rounded-lg border-2 transition-all ${expense.paymentMethod === 'bnpl'
                       ? 'border-red-500 bg-red-50 text-red-700'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <div className="icon-golden-card mb-2">
                     <ClockIcon className="h-6 w-6 icon-white" />
@@ -386,7 +377,7 @@ export default function AddExpensePage() {
                 </label>
                 <select
                   value={expense.bankAccount || ''}
-                  onChange={(e) => setExpense({...expense, bankAccount: e.target.value})}
+                  onChange={(e) => setExpense({ ...expense, bankAccount: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                   required
                 >
@@ -408,7 +399,7 @@ export default function AddExpensePage() {
                 </label>
                 <select
                   value={expense.creditCard || ''}
-                  onChange={(e) => setExpense({...expense, creditCard: e.target.value})}
+                  onChange={(e) => setExpense({ ...expense, creditCard: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                   required
                 >
@@ -430,7 +421,7 @@ export default function AddExpensePage() {
                 </label>
                 <select
                   value={expense.bnplProvider || ''}
-                  onChange={(e) => setExpense({...expense, bnplProvider: e.target.value})}
+                  onChange={(e) => setExpense({ ...expense, bnplProvider: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                   required
                 >
@@ -452,7 +443,7 @@ export default function AddExpensePage() {
               <input
                 type="number"
                 value={expense.amount || ''}
-                onChange={(e) => setExpense({...expense, amount: parseFloat(e.target.value) || 0})}
+                onChange={(e) => setExpense({ ...expense, amount: parseFloat(e.target.value) || 0 })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                 placeholder="Enter expense amount"
                 required
@@ -469,7 +460,7 @@ export default function AddExpensePage() {
               <input
                 type="date"
                 value={expense.date}
-                onChange={(e) => setExpense({...expense, date: e.target.value})}
+                onChange={(e) => setExpense({ ...expense, date: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                 required
               />
@@ -482,7 +473,7 @@ export default function AddExpensePage() {
               </label>
               <select
                 value={expense.category}
-                onChange={(e) => setExpense({...expense, category: e.target.value})}
+                onChange={(e) => setExpense({ ...expense, category: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
               >
                 {expenseCategories.map((category) => (
@@ -497,7 +488,7 @@ export default function AddExpensePage() {
             {expense.paymentMethod === 'credit_card_emi' && (
               <div className="space-y-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
                 <h3 className="font-medium text-orange-900">EMI Details</h3>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -507,7 +498,7 @@ export default function AddExpensePage() {
                       type="number"
                       value={expense.emiDetails?.tenure || ''}
                       onChange={(e) => setExpense({
-                        ...expense, 
+                        ...expense,
                         emiDetails: {
                           ...expense.emiDetails!,
                           tenure: parseInt(e.target.value) || 0,
@@ -523,7 +514,7 @@ export default function AddExpensePage() {
                       required
                     />
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Interest Rate (%)
@@ -532,7 +523,7 @@ export default function AddExpensePage() {
                       type="number"
                       value={expense.emiDetails?.interestRate || 18}
                       onChange={(e) => setExpense({
-                        ...expense, 
+                        ...expense,
                         emiDetails: {
                           ...expense.emiDetails!,
                           tenure: expense.emiDetails?.tenure || 12,
@@ -550,7 +541,7 @@ export default function AddExpensePage() {
                     />
                   </div>
                 </div>
-                
+
                 {/* EMI Preview */}
                 {emiPreview && (
                   <div className="p-3 bg-white border border-orange-300 rounded-lg">

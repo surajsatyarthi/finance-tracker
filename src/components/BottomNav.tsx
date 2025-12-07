@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { HomeIcon, BuildingLibraryIcon, ChartBarIcon, CreditCardIcon, PlusIcon } from '@heroicons/react/24/outline'
+import { HomeIcon, BuildingLibraryIcon, ChartBarIcon, CreditCardIcon, PlusIcon, Cog6ToothIcon } from '@heroicons/react/24/outline'
 
 const items = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   { name: 'Accounts', href: '/accounts', icon: BuildingLibraryIcon },
   { name: 'Budget', href: '/budget', icon: ChartBarIcon },
   { name: 'Cards', href: '/cards', icon: CreditCardIcon },
+  { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
 ]
 
 export default function BottomNav() {

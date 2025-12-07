@@ -20,7 +20,7 @@ export default function LoginPage() {
   useEffect(() => {
     const rememberedEmail = localStorage.getItem('finance-tracker-email')
     const rememberPreference = localStorage.getItem('finance-tracker-remember')
-    
+
     if (rememberedEmail && rememberPreference === 'true') {
       setEmail(rememberedEmail)
       setRememberMe(true)
@@ -33,7 +33,7 @@ export default function LoginPage() {
 
     try {
       const result = await signIn(email, password, rememberMe)
-      
+
       if (result.error) {
         showNotification(result.error, 'error')
       } else {
@@ -51,27 +51,27 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden watermark-bg">
-      <div className="max-w-md w-full space-y-8 relative z-10">
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-neutral-50">
+      <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="w-12 h-12 bg-success-500 rounded-lg flex items-center justify-center">
-              <span className="text-white font-semibold text-xl">₹</span>
+          <div className="flex justify-center mb-6">
+            <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg transform rotate-3">
+              <span className="text-white font-bold text-2xl">₹</span>
             </div>
           </div>
-          <h2 className="text-3xl font-semibold text-neutral-900">
-            Welcome Back
+          <h2 className="text-3xl font-bold tracking-tight text-gray-900">
+            Welcome back
           </h2>
-          <p className="mt-2 text-neutral-600">
-            Personal Finance Management System
+          <p className="mt-2 text-sm text-gray-600">
+            Please sign in to your account
           </p>
         </div>
-        <form 
-          className="mt-8 bg-white rounded-lg border border-neutral-200 p-8" 
+        <form
+          className="mt-8 bg-white py-8 px-10 shadow-xl rounded-2xl border border-gray-100"
           onSubmit={handleSubmit}
           name="login"
         >
-          
+
           <div className="space-y-6">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-neutral-700 mb-2">
@@ -85,7 +85,7 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 rounded-md border border-neutral-300 bg-white focus:ring-2 focus:ring-success-500 focus:border-success-500 transition-colors text-neutral-900 placeholder-neutral-500"
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-gray-900 placeholder-gray-400"
                 placeholder="Enter your email address"
                 data-lpignore="false"
                 data-form-type="login"
@@ -104,7 +104,7 @@ export default function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-3 py-2 pr-10 rounded-md border border-neutral-300 bg-white focus:ring-2 focus:ring-success-500 focus:border-success-500 transition-colors text-neutral-900 placeholder-neutral-500"
+                  className="w-full px-3 py-2 pr-10 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-gray-900 placeholder-gray-400"
                   placeholder="Enter your password"
                   data-lpignore="false"
                   data-form-type="login"
@@ -132,7 +132,7 @@ export default function LoginPage() {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="h-4 w-4 text-success-600 focus:ring-success-500 border-neutral-300 rounded transition-colors"
+                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded transition-colors"
               />
               <label htmlFor="remember-me" className="ml-2 block text-sm text-neutral-700 font-medium">
                 Remember me for 30 days
@@ -144,8 +144,8 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center items-center py-3 px-4 rounded-md text-base font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[48px]"
-              style={{ backgroundColor: '#16a34a', minHeight: '48px' }}
+              className="w-full flex justify-center items-center py-3 px-4 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg min-h-[48px]"
+              style={{ minHeight: '48px' }}
             >
               {loading ? (
                 <>

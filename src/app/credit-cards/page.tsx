@@ -361,29 +361,59 @@ export default function CreditCardsPage() {
                         {showCardDetails && (
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="space-y-2">
-                              {card.partner_merchants && card.partner_merchants.length > 0 && (
-                                <div>
-                                  <div className="text-xs font-medium text-gray-700 mb-1">Partners:</div>
-                                  <div className="flex flex-wrap gap-1">
-                                    {card.partner_merchants.map((partner, idx) => (
-                                      <span key={idx} className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                                        {partner}
-                                      </span>
-                                    ))}
+                              <div className="space-y-3">
+                                {/* Partners */}
+                                {card.partner_merchants && card.partner_merchants.length > 0 && (
+                                  <div>
+                                    <div className="text-xs font-semibold text-gray-700 mb-1">Partners</div>
+                                    <div className="flex flex-wrap gap-1">
+                                      {card.partner_merchants.map((partner, idx) => (
+                                        <span key={idx} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                                          {partner}
+                                        </span>
+                                      ))}
+                                    </div>
                                   </div>
-                                </div>
-                              )}
+                                )}
 
-                              {card.benefits && (
-                                <div>
-                                  <div className="text-xs font-medium text-gray-700 mb-1">Benefits:</div>
-                                  <div className="text-xs text-gray-600">
-                                    {JSON.stringify(card.benefits).length > 50
-                                      ? 'Multiple benefits available'
-                                      : Object.keys(card.benefits as object).join(', ')}
+                                {/* Benefits JSON Rendering */}
+                                {card.benefits && (
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                                    {/* Rewards & Cashback */}
+                                    {(card.benefits as any).cashback !== 'NA' && (
+                                      <div className="bg-green-50 p-2 rounded-lg border border-green-100">
+                                        <span className="block text-xs font-semibold text-green-800 uppercase tracking-wide">Cashback</span>
+                                        <span className="text-xs text-green-700">{(card.benefits as any).cashback}</span>
+                                      </div>
+                                    )}
+                                    {(card.benefits as any).rewardPoints !== 'NA' && (
+                                      <div className="bg-purple-50 p-2 rounded-lg border border-purple-100">
+                                        <span className="block text-xs font-semibold text-purple-800 uppercase tracking-wide">Rewards</span>
+                                        <span className="text-xs text-purple-700">{(card.benefits as any).rewardPoints}</span>
+                                      </div>
+                                    )}
+
+                                    {/* Lounge Access */}
+                                    <div className="col-span-2 bg-gray-50 p-2 rounded-lg border border-gray-100">
+                                      <span className="block text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1">Lounge Access</span>
+                                      <div className="grid grid-cols-3 gap-2 text-xs">
+                                        <div>
+                                          <span className="text-gray-500">National:</span>
+                                          <span className="ml-1 font-medium text-gray-900">{(card.benefits as any).lounge?.national || 'NA'}</span>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-500">Intl:</span>
+                                          <span className="ml-1 font-medium text-gray-900">{(card.benefits as any).lounge?.international || 'NA'}</span>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-500">Railway:</span>
+                                          <span className="ml-1 font-medium text-gray-900">{(card.benefits as any).lounge?.railway || 'NA'}</span>
+                                        </div>
+                                      </div>
+                                    </div>
                                   </div>
-                                </div>
-                              )}
+                                )}
+                              </div>
                             </div>
                           </td>
                         )}

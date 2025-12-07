@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRequireAuth } from '@/contexts/AuthContext'
+import { financeManager } from '@/lib/supabaseDataManager'
 import {
   MagnifyingGlassIcon,
-  FunnelIcon,
   CreditCardIcon,
   CalendarIcon,
   CurrencyRupeeIcon,
@@ -12,503 +12,331 @@ import {
   ChartBarIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
-  PlusIcon
+  PlusIcon,
+  ArrowRightIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline'
-import { getFuturePayables, updateFuturePayableStatus } from '@/lib/dataManager'
 import GlassCard from '@/components/GlassCard'
+import { useNotification } from '@/contexts/NotificationContext'
 
-interface EMIData {
-  id: string
-  cardName: string
-  cardNumber: string
-  purchaseItem: string
-  emiAmount: number
-  totalAmount: number
-  paidAmount: number
-  remainingAmount: number
-  emisPaid: number
-  totalEmis: number
-  startDate: string
-  nextDueDate: string
-  status: 'active' | 'completed' | 'overdue'
-  interestRate?: number
-  vendor?: string
+// Modal Component for Adding/Editing EMI
+const EMIModal = ({ isOpen, onClose, onSave, loading }: any) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    principal: '',
+    monthlyAmount: '',
+    tenureMonths: '',
+    startDate: new Date().toISOString().slice(0, 10),
+    type: 'EMI'
+  })
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex items-center justify-center min-h-screen px-4">
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={onClose} />
+        <div className="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+          <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">Add New EMI</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Name (Item/Loan)</label>
+              <input
+                type="text"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g. iPhone 15"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Principal Amount</label>
+                <input
+                  type="number"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                  value={formData.principal}
+                  onChange={(e) => setFormData({ ...formData, principal: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Monthly EMI</label>
+                <input
+                  type="number"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                  value={formData.monthlyAmount}
+                  onChange={(e) => setFormData({ ...formData, monthlyAmount: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Tenure (Months)</label>
+                <input
+                  type="number"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                  value={formData.tenureMonths}
+                  onChange={(e) => setFormData({ ...formData, tenureMonths: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Start Date</label>
+                <input
+                  type="date"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                  value={formData.startDate}
+                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Type</label>
+              <select
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+              >
+                <option value="EMI">EMI (Credit Card/Other)</option>
+                <option value="LOAN">Personal/Home Loan</option>
+              </select>
+            </div>
+          </div>
+          <div className="mt-6 flex justify-end space-x-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => onSave(formData)}
+              disabled={loading}
+              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            >
+              {loading ? 'Saving...' : 'Save EMI'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function EMITracker() {
-  useRequireAuth() // Just call for authentication check
+  const { user } = useRequireAuth()
+  const { showNotification } = useNotification()
+  const [loans, setLoans] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterStatus, setFilterStatus] = useState('all')
-  const [filterCard, setFilterCard] = useState('all')
-  const [sortBy, setSortBy] = useState('nextDueDate')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [modalLoading, setModalLoading] = useState(false)
+  const [cards, setCards] = useState<any[]>([])
 
-  // EMI data with your current EMIs
-  const emiData: EMIData[] = [
-    {
-      id: '1',
-      cardName: 'ICICI Amazon',
-      cardNumber: '4315812748438018', // +1 for safety
-      purchaseItem: 'Manyreach',
-      emiAmount: 1320.44,
-      totalAmount: 34957.90,
-      paidAmount: 5281.76,
-      remainingAmount: 29676.14,
-      emisPaid: 4,
-      totalEmis: 24,
-      startDate: '2024-06-01',
-      nextDueDate: '2025-10-18', // Assuming monthly cycle
-      status: 'active',
-      interestRate: 13.5,
-      vendor: 'Manyreach'
-    },
-    {
-      id: '2',
-      cardName: 'ICICI Amazon',
-      cardNumber: '4315812748438018', // +1 for safety
-      purchaseItem: 'Amazon Shopping',
-      emiAmount: 530.67,
-      totalAmount: 6015.42,
-      paidAmount: 5837.37,
-      remainingAmount: 178.05,
-      emisPaid: 11,
-      totalEmis: 12,
-      startDate: '2024-10-01',
-      nextDueDate: '2025-10-18', // Last EMI
-      status: 'active',
-      interestRate: 13.5,
-      vendor: 'Amazon'
-    },
-    {
-      id: '3',
-      cardName: 'Yes Bank',
-      cardNumber: '8238000000008238', // Masked for security
-      purchaseItem: 'Purchase',
-      emiAmount: 311.25,
-      totalAmount: 3735.00, // 12 * 311.25
-      paidAmount: 933.75, // 3 * 311.25
-      remainingAmount: 2801.25, // 9 * 311.25
-      emisPaid: 3,
-      totalEmis: 12,
-      startDate: '2024-09-01', // Estimated based on payment schedule
-      nextDueDate: '2025-06-10', // 4th EMI due date
-      status: 'active',
-      interestRate: 15.0, // Estimated typical Yes Bank rate
-      vendor: 'Yes Bank Purchase'
+  const loadData = async () => {
+    if (!user) return
+    try {
+      setLoading(true)
+      const fetchedLoans = await financeManager.getLoans()
+      setLoans(fetchedLoans)
+      const fetchedCards = await financeManager.getCreditCards() // Needed for mapping if implemented
+      setCards(fetchedCards)
+    } catch (e) {
+      console.error('Error loading EMIs', e)
+      showNotification('Failed to load EMIs', 'error')
+    } finally {
+      setLoading(false)
     }
-  ]
+  }
 
-  // Wrap emiData in useMemo to fix dependency warning
-  const memoizedEmiData = useMemo(() => emiData, [])
+  useEffect(() => {
+    loadData()
+  }, [user])
 
-  // Filter and sort logic
-  const filteredAndSortedEmis = useMemo(() => {
-    const filtered = memoizedEmiData.filter(emi => {
-      const matchesSearch = emi.purchaseItem.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           emi.cardName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           emi.vendor?.toLowerCase().includes(searchTerm.toLowerCase()) || ''
-      
-      const matchesStatus = filterStatus === 'all' || emi.status === filterStatus
-      const matchesCard = filterCard === 'all' || emi.cardName === filterCard
-      
-      return matchesSearch && matchesStatus && matchesCard
-    })
+  const handleAddEMI = async (data: any) => {
+    setModalLoading(true)
+    try {
+      // Calculate next due date approximately based on start date
+      const start = new Date(data.startDate)
+      const nextDue = new Date(start) // Logic to find next future date could be added here
+      // For now, simple start date as next due if future, or next month from now?
+      // Defaulting to user provided start date.
 
-    // Sort logic
-    filtered.sort((a, b) => {
-      let aValue: string | number = a[sortBy as keyof EMIData] as string | number
-      let bValue: string | number = b[sortBy as keyof EMIData] as string | number
-      
-      if (sortBy === 'nextDueDate' || sortBy === 'startDate') {
-        aValue = new Date(aValue as string).getTime()
-        bValue = new Date(bValue as string).getTime()
-      }
-      
-      if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1
-      } else {
-        return aValue < bValue ? 1 : -1
-      }
-    })
-
-    return filtered
-  }, [memoizedEmiData, searchTerm, filterStatus, filterCard, sortBy, sortOrder])
-
-  // Summary calculations
-  const summaryStats = useMemo(() => {
-    const totalEmis = memoizedEmiData.length
-    const activeEmis = memoizedEmiData.filter(emi => emi.status === 'active').length
-    const completedEmis = memoizedEmiData.filter(emi => emi.status === 'completed').length
-    const totalMonthlyPayment = memoizedEmiData
-      .filter(emi => emi.status === 'active')
-      .reduce((sum, emi) => sum + emi.emiAmount, 0)
-    const totalOutstanding = memoizedEmiData
-      .filter(emi => emi.status === 'active')
-      .reduce((sum, emi) => sum + emi.remainingAmount, 0)
-    const totalPaid = memoizedEmiData.reduce((sum, emi) => sum + emi.paidAmount, 0)
-
-    return {
-      totalEmis,
-      activeEmis,
-      completedEmis,
-      totalMonthlyPayment,
-      totalOutstanding,
-      totalPaid
+      await financeManager.createLoan({
+        name: data.name,
+        principal: parseFloat(data.principal),
+        monthlyAmount: parseFloat(data.monthlyAmount),
+        tenureMonths: parseInt(data.tenureMonths),
+        startDate: data.startDate,
+        nextDueDate: data.startDate, // Initial Next Due
+        type: data.type,
+        rate: 0 // Optional
+      })
+      await loadData()
+      setIsModalOpen(false)
+      showNotification('EMI added successfully', 'success')
+    } catch (e) {
+      showNotification('Failed to add EMI', 'error')
+    } finally {
+      setModalLoading(false)
     }
-  }, [memoizedEmiData])
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this EMI tracker?')) return
+    try {
+      await financeManager.deleteLoan(id)
+      await loadData()
+      showNotification('EMI deleted', 'success')
+    } catch (e) {
+      showNotification('Failed to delete', 'error')
+    }
+  }
+
+  const handlePreAdd = async (emi: any) => {
+    // Logic to pre-add transaction
+    if (!confirm(`Post expense of ${formatCurrency(emi.monthlyAmount)} for ${emi.name} to transactions?`)) return
+    try {
+      // Determine if we can link to a card.
+      // Since we don't store card_id in loans table yet (unless we use metadata), we'll Create generic expense.
+      // IF user named it "iPhone (HDFC)", we can't easily parse.
+      // Future improvement: Add 'source_account_id' to loans table.
+
+      await financeManager.createTransaction({
+        amount: emi.monthlyAmount,
+        type: 'expense',
+        category: 'EMI', // Ensure category exists or string
+        description: `EMI: ${emi.name}`,
+        paymentMethod: 'Credit Card', // Default or ask?
+        date: new Date().toISOString(), // Today
+      })
+      showNotification('Example transaction posted', 'success')
+    } catch (e) {
+      showNotification('Failed to post transaction', 'error')
+    }
+  }
+
+
+  const filteredLoans = useMemo(() => {
+    return loans.filter(l =>
+      l.name.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  }, [loans, searchTerm])
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
+      minimumFractionDigits: 0,
     }).format(amount)
   }
 
-  const getProgressPercentage = (paid: number, total: number) => {
-    return Math.round((paid / total) * 100)
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'completed':
-        return 'bg-green-100 text-green-800 border-green-200'
-      case 'overdue':
-        return 'bg-red-100 text-red-800 border-red-200'
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200'
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircleIcon className="h-5 w-5 text-green-600" />
-      case 'overdue':
-        return <ExclamationTriangleIcon className="h-5 w-5 text-red-600" />
-      default:
-        return <ClockIcon className="h-5 w-5 text-blue-600" />
-    }
-  }
-
-  const getDaysUntilDue = (dueDate: string) => {
-    const today = new Date()
-    const due = new Date(dueDate)
-    const diffTime = due.getTime() - today.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays
-  }
-
-  const uniqueCards = [...new Set(memoizedEmiData.map(emi => emi.cardName))].sort()
-  const statuses = [
-    { key: 'all', label: 'All Status' },
-    { key: 'active', label: 'Active' },
-    { key: 'completed', label: 'Completed' },
-    { key: 'overdue', label: 'Overdue' }
-  ]
+  // Calculate stats
+  const stats = useMemo(() => {
+    const active = filteredLoans.length
+    const monthly = filteredLoans.reduce((sum, l) => sum + (l.monthlyAmount || 0), 0)
+    const outstanding = filteredLoans.reduce((sum, l) => sum + (l.currentBalance || 0), 0)
+    return { active, monthly, outstanding }
+  }, [filteredLoans])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent mb-2">
-                EMI Tracker
-              </h1>
-              <p className="text-premium-600 font-medium">
-                Track your credit card EMIs and installment payments
-              </p>
-            </div>
-            <button className="btn-primary inline-flex items-center px-6 py-3 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 ring-1 ring-primary-300/40">
-              <PlusIcon className="h-4 w-4 mr-2" />
-              Add EMI
-            </button>
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent mb-2">
+              EMI Tracker
+            </h1>
+            <p className="text-premium-600 font-medium">
+              Manage your loans and credit card installments
+            </p>
+          </div>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="btn-primary inline-flex items-center px-6 py-3 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+          >
+            <PlusIcon className="h-4 w-4 mr-2" />
+            Add New EMI
+          </button>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-premium border border-white/20 p-6">
+            <p className="text-sm font-medium text-gray-600">Active EMIs</p>
+            <p className="text-2xl font-bold text-indigo-600">{stats.active}</p>
+          </div>
+          <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-premium border border-white/20 p-6">
+            <p className="text-sm font-medium text-gray-600">Total Monthly Liability</p>
+            <p className="text-2xl font-bold text-red-600">{formatCurrency(stats.monthly)}</p>
+          </div>
+          <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-premium border border-white/20 p-6">
+            <p className="text-sm font-medium text-gray-600">Total Outstanding</p>
+            <p className="text-2xl font-bold text-orange-600">{formatCurrency(stats.outstanding)}</p>
           </div>
         </div>
 
-        {/* Summary Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-premium border border-white/20 p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <CreditCardIcon className="h-8 w-8 text-indigo-600" />
+        {/* List */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {filteredLoans.map((emi) => (
+            <div key={emi.id} className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-premium border border-white/20 p-6 hover:shadow-premium-lg transition-all duration-300">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">{emi.name}</h3>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                    {emi.type || 'LOAN'}
+                  </span>
+                </div>
+                <div className="flex space-x-2">
+                  <button onClick={() => handlePreAdd(emi)} className="text-green-600 hover:text-green-800 p-1" title="Post to Expenses">
+                    <ArrowRightIcon className="h-5 w-5" />
+                  </button>
+                  <button onClick={() => handleDelete(emi.id)} className="text-red-500 hover:text-red-700 p-1">
+                    <TrashIcon className="h-5 w-5" />
+                  </button>
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Active EMIs</p>
-                <p className="text-2xl font-bold text-indigo-600">{summaryStats.activeEmis}</p>
-                <p className="text-xs text-gray-500">{summaryStats.totalEmis} total</p>
-              </div>
-            </div>
-          </div>
 
-          <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-premium border border-white/20 p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <CurrencyRupeeIcon className="h-8 w-8 text-red-600" />
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-500">Monthly</p>
+                  <p className="text-lg font-semibold text-gray-900">{formatCurrency(emi.monthlyAmount)}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-500">Remaining</p>
+                  <p className="text-lg font-semibold text-gray-900">{formatCurrency(emi.currentBalance)}</p>
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Monthly Payment</p>
-                <p className="text-2xl font-bold text-red-600">{formatCurrency(summaryStats.totalMonthlyPayment)}</p>
-                <p className="text-xs text-gray-500">Combined EMIs</p>
-              </div>
-            </div>
-          </div>
 
-          <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-premium border border-white/20 p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <ChartBarIcon className="h-8 w-8 text-orange-600" />
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Tenure: {emi.emisPaid || 0} / {emi.tenureMonths} Months</span>
+                <span>Next Due: {emi.nextDueDate ? new Date(emi.nextDueDate).toLocaleDateString() : 'N/A'}</span>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Outstanding</p>
-                <p className="text-2xl font-bold text-orange-600">{formatCurrency(summaryStats.totalOutstanding)}</p>
-                <p className="text-xs text-gray-500">Remaining amount</p>
-              </div>
-            </div>
-          </div>
 
-          <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-premium border border-white/20 p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <CheckCircleIcon className="h-8 w-8 text-green-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Paid</p>
-                <p className="text-2xl font-bold text-green-600">{formatCurrency(summaryStats.totalPaid)}</p>
-                <p className="text-xs text-gray-500">Amount paid so far</p>
+              {/* Progress Bar */}
+              <div className="mt-3 w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-indigo-600 h-2 rounded-full"
+                  style={{ width: `${Math.min(((emi.emisPaid || 0) / (emi.tenureMonths || 1)) * 100, 100)}%` }}
+                ></div>
               </div>
             </div>
-          </div>
+          ))}
         </div>
 
-        {/* Search and Filters */}
-        <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-premium border border-white/20 p-6 mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="flex-1 max-w-md">
-              <div className="relative">
-                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search EMIs..."
-                  className="pl-10 pr-4 py-2 w-full border border-premium-200 rounded-xl bg-white/80 backdrop-blur-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex items-center space-x-2">
-                <FunnelIcon className="h-5 w-5 text-gray-400" />
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="border border-premium-200 rounded-xl px-3 py-2 bg-white/80 backdrop-blur-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
-                >
-                  {statuses.map(status => (
-                    <option key={status.key} value={status.key}>
-                      {status.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <CreditCardIcon className="h-5 w-5 text-gray-400" />
-                <select
-                  value={filterCard}
-                  onChange={(e) => setFilterCard(e.target.value)}
-                  className="border border-premium-200 rounded-xl px-3 py-2 bg-white/80 backdrop-blur-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
-                >
-                  <option value="all">All Cards</option>
-                  {uniqueCards.map(card => (
-                    <option key={card} value={card}>{card}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-gray-600 whitespace-nowrap">Sort:</span>
-                <select
-                  value={`${sortBy}-${sortOrder}`}
-                  onChange={(e) => {
-                    const [by, order] = e.target.value.split('-')
-                    setSortBy(by)
-                    setSortOrder(order as 'asc' | 'desc')
-                  }}
-                  className="border border-premium-200 rounded-xl px-3 py-2 bg-white/80 backdrop-blur-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
-                >
-                  <option value="nextDueDate-asc">Due Date (Earliest)</option>
-                  <option value="nextDueDate-desc">Due Date (Latest)</option>
-                  <option value="emiAmount-desc">EMI Amount (High-Low)</option>
-                  <option value="emiAmount-asc">EMI Amount (Low-High)</option>
-                  <option value="remainingAmount-desc">Outstanding (High-Low)</option>
-                  <option value="remainingAmount-asc">Outstanding (Low-High)</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* EMI Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {filteredAndSortedEmis.map((emi) => {
-            const progressPercent = getProgressPercentage(emi.paidAmount, emi.totalAmount)
-            const daysUntilDue = getDaysUntilDue(emi.nextDueDate)
-            
-            return (
-              <div
-                key={emi.id}
-                className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-premium border border-white/20 p-6 hover:shadow-premium-lg transition-all duration-300 hover:-translate-y-1"
-              >
-                {/* Card Header */}
-                <div className="flex justify-between items-start mb-6">
-                  <div className="flex items-center space-x-4">
-                    <div className="p-3 bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl">
-                      <CreditCardIcon className="h-6 w-6 text-indigo-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{emi.purchaseItem}</h3>
-                      <p className="text-sm text-gray-600">{emi.cardName}</p>
-                      <p className="text-xs text-gray-500 font-mono">••••{emi.cardNumber.slice(-4)}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-3">
-                    {getStatusIcon(emi.status)}
-                    <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full border ${getStatusColor(emi.status)}`}>
-                      {emi.status}
-                    </span>
-                  </div>
-                </div>
-
-                {/* EMI Progress */}
-                <div className="mb-6">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-gray-700">Progress</span>
-                    <span className="text-sm font-semibold text-gray-900">
-                      {emi.emisPaid} / {emi.totalEmis} EMIs ({progressPercent}%)
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
-                    <div 
-                      className="bg-gradient-to-r from-indigo-500 to-blue-500 h-3 rounded-full transition-all duration-300" 
-                      style={{ width: `${progressPercent}%` }}
-                    ></div>
-                  </div>
-                </div>
-
-                {/* Financial Details */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 border border-green-100">
-                    <p className="text-xs font-medium text-gray-600 mb-1">Monthly EMI</p>
-                    <p className="text-lg font-bold text-green-700">{formatCurrency(emi.emiAmount)}</p>
-                  </div>
-                  
-                  <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-4 border border-orange-100">
-                    <p className="text-xs font-medium text-gray-600 mb-1">Outstanding</p>
-                    <p className="text-lg font-bold text-orange-700">{formatCurrency(emi.remainingAmount)}</p>
-                  </div>
-                  
-                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
-                    <p className="text-xs font-medium text-gray-600 mb-1">Total Amount</p>
-                    <p className="text-lg font-bold text-blue-700">{formatCurrency(emi.totalAmount)}</p>
-                  </div>
-                  
-                  <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-4 border border-purple-100">
-                    <p className="text-xs font-medium text-gray-600 mb-1">Amount Paid</p>
-                    <p className="text-lg font-bold text-purple-700">{formatCurrency(emi.paidAmount)}</p>
-                  </div>
-                </div>
-
-                {/* Timeline Info */}
-                <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                  <div className="flex items-center space-x-2">
-                    <CalendarIcon className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm text-gray-600">
-                      Next Due: {new Date(emi.nextDueDate).toLocaleDateString('en-IN')}
-                    </span>
-                  </div>
-                  
-                  <div className={`text-sm font-medium ${
-                    daysUntilDue <= 7 
-                      ? 'text-red-600' 
-                      : daysUntilDue <= 15 
-                        ? 'text-orange-600' 
-                        : 'text-green-600'
-                  }`}>
-                    {daysUntilDue > 0 ? `${daysUntilDue} days left` : 'Due now'}
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Local EMIs (Future Payables) */}
-        <GlassCard>
-          <div className="px-6 py-4">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Local EMIs</h2>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {getFuturePayables().filter(p => p.type === 'emi').map((p) => (
-                    <tr key={p.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{p.source}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-900 font-medium">{p.description}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-bold text-indigo-600">{new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format(p.amount)}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-900 font-medium">{new Date(p.dueDate).toLocaleDateString('en-IN')}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${p.status==='paid'?'bg-green-100 text-green-800 border-green-200':'bg-blue-100 text-blue-800 border-blue-200'}`}>{p.status}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <button
-                          className="px-3 py-1 rounded border"
-                          onClick={() => updateFuturePayableStatus(p.id, p.status==='paid'?'pending':'paid')}
-                        >
-                          {p.status==='paid'?'Mark Pending':'Mark Paid'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </GlassCard>
-
-        {/* No EMIs Found */}
-        {filteredAndSortedEmis.length === 0 && (
-          <div className="text-center py-12">
-            <CreditCardIcon className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-4 text-lg font-medium text-gray-900">No EMIs found</h3>
-            <p className="mt-2 text-gray-500">Try adjusting your search or filter criteria.</p>
+        {filteredLoans.length === 0 && !loading && (
+          <div className="text-center py-12 text-gray-500">
+            No active EMIs or Loans found. Add one to get started.
           </div>
         )}
       </div>
+
+      <EMIModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleAddEMI}
+        loading={modalLoading}
+      />
     </div>
   )
 }

@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRequireAuth } from '@/contexts/AuthContext'
-import { getFDs, storeFD, updateFD, deleteFD } from '@/lib/dataManager'
+import { financeManager } from '@/lib/supabaseDataManager'
 import GlassCard from '@/components/GlassCard'
 import { usePrivacy } from '@/contexts/PrivacyContext'
 import { CurrencyRupeeIcon, CalendarIcon, PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
@@ -20,7 +20,16 @@ type FDForm = {
 export default function SavingsFDsPage() {
   useRequireAuth()
   const { locked } = usePrivacy()
-  const [fds, setFds] = useState(getFDs())
+  const [fds, setFds] = useState<any[]>([])
+
+  useEffect(() => {
+    loadFds()
+  }, [])
+
+  const loadFds = async () => {
+    const data = await financeManager.getFDs()
+    setFds(data)
+  }
   const [form, setForm] = useState<FDForm>({ name: '', amount: '', rate: '', startDate: '', maturityDate: '', autoRenew: false, notes: '' })
   const [editingId, setEditingId] = useState<string | null>(null)
 
@@ -28,7 +37,7 @@ export default function SavingsFDsPage() {
     return [...fds].sort((a, b) => new Date(a.maturityDate).getTime() - new Date(b.maturityDate).getTime())
   }, [fds])
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const payload = {
       name: form.name,
@@ -40,12 +49,12 @@ export default function SavingsFDsPage() {
       notes: form.notes,
     }
     if (editingId) {
-      updateFD(editingId, payload)
-      setFds(getFDs())
+      await financeManager.updateFD(editingId, payload)
+      await loadFds()
       setEditingId(null)
     } else {
-      storeFD(payload)
-      setFds(getFDs())
+      await financeManager.storeFD(payload)
+      await loadFds()
     }
     setForm({ name: '', amount: '', rate: '', startDate: '', maturityDate: '', autoRenew: false, notes: '' })
   }
@@ -118,7 +127,7 @@ export default function SavingsFDsPage() {
                       }}>
                         <PencilIcon className="h-4 w-4" />
                       </button>
-                      <button className="px-3 py-1 rounded border" onClick={() => { deleteFD(fd.id); setFds(getFDs()) }}>
+                      <button className="px-3 py-1 rounded border" onClick={async () => { await financeManager.deleteFD(fd.id); loadFds() }}>
                         <TrashIcon className="h-4 w-4" />
                       </button>
                     </td>
@@ -166,8 +175,8 @@ export default function SavingsFDsPage() {
             </div>
           </GlassCard>
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   )
 }
 
