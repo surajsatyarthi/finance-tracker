@@ -11,14 +11,8 @@ import {
     DocumentTextIcon,
     ClipboardDocumentCheckIcon
 } from '@heroicons/react/24/outline'
+import { financeManager } from '@/lib/supabaseDataManager'
 import {
-    getCreditCards,
-    getCreditCardTransactions,
-    getCreditCardStatements,
-    getCreditCardPayments,
-    getCreditCardBalance,
-    getCreditCardUtilization,
-    getCreditCardAvailableCredit,
     type CreditCard,
     type ExpenseTransaction,
     type CreditCardStatement,
@@ -36,35 +30,56 @@ export default function CreditCardDetailPage() {
     const [payments, setPayments] = useState<CreditCardPayment[]>([])
     const [activeTab, setActiveTab] = useState<'overview' | 'transactions' | 'statements' | 'payments'>('overview')
 
-    useEffect(() => {
-        if (typeof window === 'undefined') return
-
-        const cards = getCreditCards()
-        const foundCard = cards.find(c => c.id === cardId)
-
-        if (!foundCard) {
+    const handleDeactivate = async () => {
+        if (!card) return
+        if (confirm(`Are you sure you want to deactivate ${card.name}? It will be hidden from lists.`)) {
+            await financeManager.deleteCreditCard(card.id)
             router.push('/credit-cards')
-            return
         }
+    }
 
-        setCard(foundCard)
-        setTransactions(getCreditCardTransactions(cardId))
-        setStatements(getCreditCardStatements(cardId))
-        setPayments(getCreditCardPayments(cardId))
+    useEffect(() => {
+        const loadData = async () => {
+            const cards = await financeManager.getCreditCards()
+            const foundCard = cards.find(c => c.id === cardId)
+
+            if (!foundCard) {
+                // Try fetching all including inactive? Current getCreditCards only returns active.
+                // If not found, redirect.
+                router.push('/credit-cards')
+                return
+            }
+
+            setCard(foundCard)
+            // Fetch transactions
+            const txs = await financeManager.getCreditCardTransactions(cardId)
+            setTransactions(txs as unknown as ExpenseTransaction[])
+            // Type assertion needed as legacy ExpenseTransaction differs slightly from Supabase one
+
+            // Statements and Payments - Stubbed for now or fetch if implemented
+            setStatements([])
+            setPayments([])
+        }
+        loadData()
     }, [cardId, router])
 
     const stats = useMemo(() => {
         if (!card) return null
 
+        // Calculate stats locally from loaded data
+        const balance = card.currentBalance
+        const util = card.creditLimit > 0 ? (balance / card.creditLimit) * 100 : 0
+        const available = Math.max(0, card.creditLimit - balance)
+
         return {
-            balance: getCreditCardBalance(cardId),
-            utilization: getCreditCardUtilization(cardId),
-            availableCredit: getCreditCardAvailableCredit(cardId),
+            balance,
+            utilization: util,
+            availableCredit: available,
             totalTransactions: transactions.length,
             totalPayments: payments.reduce((sum, p) => sum + p.amount, 0),
             pendingStatements: statements.filter(s => s.status === 'pending').length
         }
-    }, [card, cardId, transactions, payments, statements])
+    }, [card, transactions, payments, statements])
 
     if (!card || !stats) {
         return (
@@ -83,13 +98,21 @@ export default function CreditCardDetailPage() {
 
                 {/* Header */}
                 <div className="mb-6">
-                    <button
-                        onClick={() => router.push('/credit-cards')}
-                        className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
-                    >
-                        <ArrowLeftIcon className="h-4 w-4 mr-2" />
-                        Back to Credit Cards
-                    </button>
+                    <div className="flex justify-between items-center mb-4">
+                        <button
+                            onClick={() => router.push('/credit-cards')}
+                            className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
+                        >
+                            <ArrowLeftIcon className="h-4 w-4 mr-2" />
+                            Back to Credit Cards
+                        </button>
+                        <button
+                            onClick={handleDeactivate}
+                            className="text-sm text-red-600 hover:text-red-800 font-medium px-3 py-1 rounded-md hover:bg-red-50 transition-colors"
+                        >
+                            Deactivate Card
+                        </button>
+                    </div>
 
                     <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-lg p-8 text-white">
                         <div className="flex items-start justify-between">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
     PlusIcon,
@@ -12,16 +12,8 @@ import {
     TrashIcon,
     XMarkIcon
 } from '@heroicons/react/24/outline'
-import {
-    getIncomeTransactions,
-    getExpenseTransactions,
-    deleteIncomeTransaction,
-    deleteExpenseTransaction,
-    updateIncomeTransaction,
-    updateExpenseTransaction,
-    type IncomeTransaction,
-    type ExpenseTransaction
-} from '@/lib/dataManager'
+import { financeManager } from '@/lib/supabaseDataManager'
+import { useRequireAuth } from '../../contexts/AuthContext'
 import GlassCard from '@/components/GlassCard'
 
 type TransactionItem = {
@@ -36,6 +28,7 @@ type TransactionItem = {
 }
 
 export default function TransactionsPage() {
+    const { user, LoadingComponent } = useRequireAuth()
     const [transactions, setTransactions] = useState<TransactionItem[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState<'all' | 'income' | 'expense'>('all')
@@ -44,39 +37,51 @@ export default function TransactionsPage() {
     const [editModal, setEditModal] = useState<{ show: boolean; transaction: TransactionItem | null }>({ show: false, transaction: null })
     const [editForm, setEditForm] = useState({ amount: 0, description: '', category: '', date: '' })
 
-    const loadTransactions = () => {
-        const incomes = getIncomeTransactions().map(t => ({
-            id: t.id,
-            date: t.date,
-            amount: t.amount,
-            description: t.description,
-            category: t.category,
-            type: 'income' as const,
-            bankAccount: t.bankAccount
-        }))
+    const loadTransactions = useCallback(async () => {
+        if (!user) return
+        setLoading(true)
+        try {
+            const [incomes, expenses] = await Promise.all([
+                financeManager.getIncomeTransactions(),
+                financeManager.getExpenseTransactions()
+            ])
 
-        const expenses = getExpenseTransactions().map(t => ({
-            id: t.id,
-            date: t.date,
-            amount: t.amount,
-            description: t.description,
-            category: t.category,
-            type: 'expense' as const,
-            paymentMethod: t.paymentMethod,
-            bankAccount: t.bankAccount
-        }))
+            const incomeItems = incomes.map(t => ({
+                id: t.id,
+                date: t.date,
+                amount: t.amount,
+                description: t.description || '',
+                category: t.subcategory || 'General',
+                type: 'income' as const,
+                bankAccount: t.account_id || undefined
+            }))
 
-        const all = [...incomes, ...expenses].sort((a, b) =>
-            new Date(b.date).getTime() - new Date(a.date).getTime()
-        )
+            const expenseItems = expenses.map(t => ({
+                id: t.id,
+                date: t.date,
+                amount: t.amount,
+                description: t.description || '',
+                category: t.subcategory || 'General',
+                type: 'expense' as const,
+                paymentMethod: t.payment_method,
+                bankAccount: t.account_id || undefined
+            }))
 
-        setTransactions(all)
-        setLoading(false)
-    }
+            const all = [...incomeItems, ...expenseItems].sort((a, b) =>
+                new Date(b.date).getTime() - new Date(a.date).getTime()
+            )
+
+            setTransactions(all)
+        } catch (error) {
+            console.error('Failed to load transactions:', error)
+        } finally {
+            setLoading(false)
+        }
+    }, [user])
 
     useEffect(() => {
         loadTransactions()
-    }, [])
+    }, [loadTransactions])
 
     const filteredTransactions = transactions.filter(t => {
         const matchesFilter = filter === 'all' || t.type === filter
@@ -85,38 +90,29 @@ export default function TransactionsPage() {
         return matchesFilter && matchesSearch
     })
 
-    const handleDelete = () => {
+    const handleDelete = async () => {
         if (!deleteModal.transaction) return
 
-        const success = deleteModal.transaction.type === 'income'
-            ? deleteIncomeTransaction(deleteModal.transaction.id)
-            : deleteExpenseTransaction(deleteModal.transaction.id)
+        const { success } = await financeManager.deleteTransaction(deleteModal.transaction.id)
 
         if (success) {
-            loadTransactions()
+            await loadTransactions()
             setDeleteModal({ show: false, transaction: null })
         }
     }
 
-    const handleEdit = () => {
+    const handleEdit = async () => {
         if (!editModal.transaction) return
 
-        const success = editModal.transaction.type === 'income'
-            ? updateIncomeTransaction(editModal.transaction.id, {
-                amount: editForm.amount,
-                description: editForm.description,
-                category: editForm.category,
-                date: editForm.date
-            })
-            : updateExpenseTransaction(editModal.transaction.id, {
-                amount: editForm.amount,
-                description: editForm.description,
-                category: editForm.category,
-                date: editForm.date
-            })
+        const { success } = await financeManager.updateTransaction(editModal.transaction.id, {
+            amount: editForm.amount,
+            description: editForm.description,
+            subcategory: editForm.category, // Map category to subcategory as per schema
+            date: editForm.date
+        })
 
         if (success) {
-            loadTransactions()
+            await loadTransactions()
             setEditModal({ show: false, transaction: null })
         }
     }
@@ -130,6 +126,8 @@ export default function TransactionsPage() {
         })
         setEditModal({ show: true, transaction })
     }
+
+    if (LoadingComponent) return LoadingComponent
 
     return (
         <div className="min-h-screen bg-neutral-50">

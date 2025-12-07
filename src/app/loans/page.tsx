@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRequireAuth } from '@/contexts/AuthContext'
-import { getLoans, storeLoan, deleteLoan, markLoanEmiPaid } from '@/lib/dataManager'
+import { financeManager } from '@/lib/supabaseDataManager'
+import { useNotification } from '@/contexts/NotificationContext'
 import GlassCard from '@/components/GlassCard'
 import { usePrivacy } from '@/contexts/PrivacyContext'
 import { CurrencyRupeeIcon, CalendarIcon, PlusIcon, PencilIcon, TrashIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
@@ -16,32 +17,89 @@ type LoanForm = {
 }
 
 export default function LoansPage() {
-  useRequireAuth()
+  const { user } = useRequireAuth()
   const { locked } = usePrivacy()
-  const [loans, setLoans] = useState(getLoans())
+  const { showNotification } = useNotification()
+
+  const [loans, setLoans] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [form, setForm] = useState<LoanForm>({ name: '', principal: '', rate: '', tenureMonths: '', startDate: '' })
+  const [submitting, setSubmitting] = useState(false)
+
+  const loadLoans = useCallback(async () => {
+    if (!user) return
+    try {
+      const data = await financeManager.getLoans()
+      setLoans(data)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }, [user])
+
+  useEffect(() => {
+    loadLoans()
+  }, [loadLoans])
 
   const summary = useMemo(() => {
-    const totalMonthly = loans.reduce((sum, l) => sum + l.monthlyAmount, 0)
-    const totalOutstandingEmis = loans.reduce((sum, l) => sum + Math.max(l.tenureMonths - l.emisPaid, 0), 0)
+    const totalMonthly = loans.reduce((sum, l) => sum + (l.monthlyAmount || 0), 0)
+    const totalOutstandingEmis = loans.reduce((sum, l) => sum + Math.max((l.tenureMonths || 0) - (l.emisPaid || 0), 0), 0)
     return { totalMonthly, totalOutstandingEmis }
   }, [loans])
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const payload = {
-      name: form.name,
-      principal: parseFloat(form.principal || '0'),
-      rate: parseFloat(form.rate || '0'),
-      tenureMonths: parseInt(form.tenureMonths || '0', 10),
-      startDate: form.startDate || new Date().toISOString().split('T')[0],
+    setSubmitting(true)
+    try {
+      await financeManager.createLoan({
+        name: form.name,
+        principal: parseFloat(form.principal || '0'),
+        rate: parseFloat(form.rate || '0'),
+        tenureMonths: parseInt(form.tenureMonths || '0', 10),
+        startDate: form.startDate || new Date().toISOString().split('T')[0],
+      })
+      showNotification('Loan added successfully', 'success')
+      await loadLoans()
+      setForm({ name: '', principal: '', rate: '', tenureMonths: '', startDate: '' })
+    } catch (error) {
+      console.error(error)
+      showNotification('Failed to add loan', 'error')
+    } finally {
+      setSubmitting(false)
     }
-    storeLoan(payload)
-    setLoans(getLoans())
-    setForm({ name: '', principal: '', rate: '', tenureMonths: '', startDate: '' })
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this loan?')) return
+    try {
+      await financeManager.deleteLoan(id)
+      showNotification('Loan deleted', 'success')
+      loadLoans()
+    } catch (e) {
+      showNotification('Failed to delete loan', 'error')
+    }
+  }
+
+  const handleMarkPaid = async (id: string) => {
+    try {
+      await financeManager.markLoanEmiPaid(id)
+      showNotification('EMI marked as paid', 'success')
+      loadLoans()
+    } catch (e) {
+      showNotification('Failed to update EMI', 'error')
+    }
   }
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount)
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -60,9 +118,9 @@ export default function LoansPage() {
             <input className="glass-input px-3 py-2 rounded-md" type="number" placeholder="Tenure (months)" value={form.tenureMonths} onChange={(e) => setForm({ ...form, tenureMonths: e.target.value })} required />
             <input className="glass-input px-3 py-2 rounded-md" type="date" placeholder="Start Date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
             <div className="md:col-span-2">
-              <button type="submit" className="btn-primary inline-flex items-center px-4 py-2 rounded-md">
+              <button type="submit" disabled={submitting} className="btn-primary inline-flex items-center px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">
                 <PlusIcon className="h-4 w-4 mr-2" />
-                Add Loan
+                {submitting ? 'Adding...' : 'Add Loan'}
               </button>
             </div>
           </form>
@@ -119,18 +177,17 @@ export default function LoansPage() {
                 {loans.map(loan => (
                   <tr
                     key={loan.id}
-                    onClick={() => window.location.href = `/loans/${loan.id}`}
                     className="hover:bg-gray-50 cursor-pointer transition-colors"
                   >
-                    <td className="px-6 py-3 text-sm font-medium text-gray-900">{loan.name}</td>
+                    <td className="px-6 py-3 text-sm font-medium text-gray-900" onClick={() => window.location.href = `/loans/${loan.id}`}>{loan.name}</td>
                     <td className="px-6 py-3 text-sm font-semibold text-gray-900">{locked ? '₹••••••' : formatCurrency(loan.principal)}</td>
                     <td className="px-6 py-3 text-sm text-gray-900">{loan.rate}%</td>
                     <td className="px-6 py-3 text-sm font-semibold text-gray-900">{locked ? '₹••••••' : formatCurrency(loan.monthlyAmount)}</td>
                     <td className="px-6 py-3 text-sm text-gray-900">{loan.emisPaid}/{loan.tenureMonths}</td>
                     <td className="px-6 py-3 text-sm text-gray-900">{loan.nextDueDate}</td>
                     <td className="px-6 py-3 text-right text-sm">
-                      <button className="px-3 py-1 rounded border mr-2" onClick={() => { markLoanEmiPaid(loan.id); setLoans(getLoans()) }}>Mark Paid</button>
-                      <button className="px-3 py-1 rounded border" onClick={() => { deleteLoan(loan.id); setLoans(getLoans()) }}>Delete</button>
+                      <button className="px-3 py-1 rounded border mr-2 hover:bg-gray-100" onClick={(e) => { e.stopPropagation(); handleMarkPaid(loan.id); }}>Mark Paid</button>
+                      <button className="px-3 py-1 rounded border text-red-600 hover:bg-red-50" onClick={(e) => { e.stopPropagation(); handleDelete(loan.id); }}>Delete</button>
                     </td>
                   </tr>
                 ))}
@@ -147,4 +204,3 @@ export default function LoansPage() {
     </div>
   )
 }
-

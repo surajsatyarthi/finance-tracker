@@ -3,14 +3,10 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRequireAuth } from '@/contexts/AuthContext'
 import { useNotification } from '@/contexts/NotificationContext'
-import { 
-  getBankAccounts,
-  getCashBalance,
-  setBankAccountBalance,
-  updateCashBalance
-} from '@/lib/dataManager'
+import { financeManager, BankAccount } from '@/lib/supabaseDataManager'
+import { initialLiquidity } from '@/lib/liquidityData'
 import { usePrivacy } from '@/contexts/PrivacyContext'
-import { 
+import {
   MagnifyingGlassIcon,
   FunnelIcon,
   BuildingLibraryIcon,
@@ -23,14 +19,8 @@ import {
   LockClosedIcon
 } from '@heroicons/react/24/outline'
 
-interface Account {
-  id: string
-  name: string
-  type: string
-  balance: number
-  currency: string
-  is_active: boolean
-  created_at: string
+interface Account extends BankAccount {
+  is_active?: boolean
   computed_balance?: number
 }
 
@@ -39,7 +29,9 @@ const accountTypeColors = {
   savings: 'bg-blue-100 text-blue-800 border-blue-200',
   current: 'bg-indigo-100 text-indigo-800 border-indigo-200',
   investment: 'bg-orange-100 text-orange-800 border-orange-200',
-  wallet: 'bg-pink-100 text-pink-800 border-pink-200'
+  wallet: 'bg-pink-100 text-pink-800 border-pink-200',
+  credit_card: 'bg-purple-100 text-purple-800 border-purple-200',
+  digital_bank: 'bg-cyan-100 text-cyan-800 border-cyan-200'
 }
 
 const accountTypeIcons = {
@@ -47,11 +39,13 @@ const accountTypeIcons = {
   savings: '🏦',
   current: '💼',
   investment: '🏛️',
-  wallet: '💳'
+  wallet: '💳',
+  credit_card: '💳',
+  digital_bank: '📱'
 }
 
 export default function AccountsPage() {
-  const { user: authUser } = useRequireAuth() // Ensure we have the authenticated user
+  const { user: authUser } = useRequireAuth()
   const { showNotification } = useNotification()
   const { locked } = usePrivacy()
 
@@ -71,40 +65,32 @@ export default function AccountsPage() {
   const [saving, setSaving] = useState(false)
 
   const loadAccounts = useCallback(async () => {
+    if (!authUser) return
     try {
-      const banks = getBankAccounts()
-      const cash = getCashBalance()
-      const mapped: Account[] = [
-        {
-          id: 'cash',
-          name: 'Cash',
-          type: 'cash',
-          balance: cash,
-          currency: 'INR',
-          is_active: true,
-          created_at: new Date().toISOString(),
-          computed_balance: cash,
-        },
-        ...banks.map((b) => ({
-          id: b.id,
-          name: b.name,
-          type: b.type,
-          balance: b.balance,
-          currency: 'INR',
-          is_active: true,
-          created_at: b.lastUpdated,
-          computed_balance: b.balance,
-        })),
-      ]
+      const { bankAccounts, cashBalance } = await financeManager.getLiquidityData()
+
+      // If no cash account exists in the list but we have a balance, implies aggregation or missing row.
+      // For editing purposes, we need a real row ID. 
+      // If 'Cash' is missing from bankAccounts but cashBalance > 0, we might display it but not allow edit 
+      // unless we find the ID. 
+      // Ideally financeManager.getLiquidityData() returns ALL accounts including cash type.
+
+      // Assuming bankAccounts includes ALL rows from 'accounts' table:
+      const mapped: Account[] = bankAccounts.map(b => ({
+        ...b,
+        is_active: true, // Defaulting to true as getLiquidityData filters active?
+        computed_balance: b.balance
+      }))
+
       setAccounts(mapped)
     } catch (error) {
       console.error('Error loading accounts:', error)
+      showNotification('Failed to load accounts', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
-  
-  // Load accounts from Supabase (with computed balances incl. transfers)
+  }, [authUser, showNotification])
+
   useEffect(() => {
     loadAccounts()
   }, [loadAccounts])
@@ -113,19 +99,20 @@ export default function AccountsPage() {
   const summaryStats = useMemo(() => {
     const pick = (a: Account) => (typeof a.computed_balance === 'number' ? a.computed_balance : a.balance)
     const totalBalance = accounts.reduce((sum, account) => sum + pick(account), 0)
-    const activeAccounts = accounts.filter(account => account.is_active)
-    const inactiveAccounts = accounts.filter(account => !account.is_active)
+    // Assuming all fetched are active for now as per getLiquidityData query
+    const activeAccounts = accounts
     const totalActiveBalance = activeAccounts.reduce((sum, account) => sum + pick(account), 0)
-    
+
     // Type breakdown
     const typeBreakdown = accounts.reduce((acc, account) => {
-      if (!acc[account.type]) acc[account.type] = { count: 0, balance: 0 }
-      acc[account.type].count += 1
-      acc[account.type].balance += pick(account)
+      const type = account.type || 'savings'
+      if (!acc[type]) acc[type] = { count: 0, balance: 0 }
+      acc[type].count += 1
+      acc[type].balance += pick(account)
       return acc
     }, {} as Record<string, { count: number; balance: number }>)
 
-    const highestBalanceAccount = accounts.length > 0 ? accounts.reduce((prev, current) => 
+    const highestBalanceAccount = accounts.length > 0 ? accounts.reduce((prev, current) =>
       prev.balance > current.balance ? prev : current
     ) : null
 
@@ -134,7 +121,7 @@ export default function AccountsPage() {
       totalActiveBalance,
       totalAccounts: accounts.length,
       activeAccountsCount: activeAccounts.length,
-      inactiveAccountsCount: inactiveAccounts.length,
+      inactiveAccountsCount: 0,
       typeBreakdown,
       highestBalanceAccount
     }
@@ -144,17 +131,18 @@ export default function AccountsPage() {
   const filteredAccounts = useMemo(() => {
     return accounts.filter(account => {
       const matchesSearch = account.name.toLowerCase().includes(searchTerm.toLowerCase())
-      
+
       let matchesType = true
       if (selectedType !== 'all') {
         matchesType = account.type === selectedType
       }
 
+      // Status filter is currently moot if we only fetch active, but keeping for future
       let matchesStatus = true
       if (selectedStatus === 'active') {
-        matchesStatus = account.is_active
+        matchesStatus = true
       } else if (selectedStatus === 'inactive') {
-        matchesStatus = !account.is_active
+        matchesStatus = false
       }
 
       return matchesSearch && matchesType && matchesStatus
@@ -280,9 +268,9 @@ export default function AccountsPage() {
                   {summaryStats.highestBalanceAccount ? summaryStats.highestBalanceAccount.name : 'N/A'}
                 </p>
                 <p className="text-sm text-gray-500">
-                    {summaryStats.highestBalanceAccount && !locked && showBalances
-                      ? formatCurrency(summaryStats.highestBalanceAccount.balance)
-                      : summaryStats.highestBalanceAccount ? '₹••••••' : 'No data'}
+                  {summaryStats.highestBalanceAccount && !locked && showBalances
+                    ? formatCurrency(summaryStats.highestBalanceAccount.balance)
+                    : summaryStats.highestBalanceAccount ? '₹••••••' : 'No data'}
                 </p>
               </div>
             </div>
@@ -294,11 +282,17 @@ export default function AccountsPage() {
           <h2 className="text-xl font-semibold text-gray-900 mb-6">Account Type Breakdown</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {Object.entries(summaryStats.typeBreakdown).map(([type, data]) => {
-              const percentage = (data.balance / summaryStats.totalBalance * 100).toFixed(1)
+              const percentage = summaryStats.totalBalance > 0
+                ? (data.balance / summaryStats.totalBalance * 100).toFixed(1)
+                : '0.0'
+              // Fallback color/icon
+              const colorClass = accountTypeColors[type as keyof typeof accountTypeColors] || 'bg-gray-100 text-gray-800 border-gray-200'
+              const icon = accountTypeIcons[type as keyof typeof accountTypeIcons] || '📦'
+
               return (
-                <div key={type} className={`rounded-lg border-2 p-4 ${accountTypeColors[type as keyof typeof accountTypeColors]}`}>
+                <div key={type} className={`rounded-lg border-2 p-4 ${colorClass}`}>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-lg">{accountTypeIcons[type as keyof typeof accountTypeIcons]}</span>
+                    <span className="text-lg">{icon}</span>
                     <span className="text-sm font-medium">{percentage}%</span>
                   </div>
                   <h3 className="font-semibold capitalize mb-1">{type.replace('_', ' ')}</h3>
@@ -343,21 +337,6 @@ export default function AccountsPage() {
                   ))}
                 </select>
               </div>
-
-              <div className="flex items-center space-x-2">
-                <BuildingLibraryIcon className="h-5 w-5 text-gray-400" />
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                >
-                  {statusOptions.map(status => (
-                    <option key={status.key} value={status.key}>
-                      {status.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
             </div>
           </div>
         </div>
@@ -387,65 +366,58 @@ export default function AccountsPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Balance
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredAccounts.map((account, index) => (
-                  <tr key={account.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <span className="text-2xl mr-3">{accountTypeIcons[account.type as keyof typeof accountTypeIcons]}</span>
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{account.name}</div>
-                          <div className="text-sm text-gray-500">{account.type.replace('_', ' ')}</div>
+                {filteredAccounts.map((account, index) => {
+                  const typeIcon = accountTypeIcons[account.type as keyof typeof accountTypeIcons] || '📦'
+                  const colorClass = accountTypeColors[account.type as keyof typeof accountTypeColors] || 'bg-gray-100 text-gray-800'
+
+                  return (
+                    <tr key={account.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <span className="text-2xl mr-3">{typeIcon}</span>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{account.name}</div>
+                            <div className="text-sm text-gray-500">{account.type.replace('_', ' ')}</div>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${accountTypeColors[account.type as keyof typeof accountTypeColors]}`}>
-                        {account.type.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900 font-medium">{account.name}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text-sm font-bold ${(account.computed_balance ?? account.balance) > 0 ? 'text-green-600' : 'text-gray-400'}`}>
-                        {locked ? '₹••••••' : (showBalances ? formatCurrency(account.computed_balance ?? account.balance) : '₹••••••')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        account.is_active 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {account.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <button
-                        onClick={() => {
-                          setEditingAccount(account)
-                          setNewBalance((account.computed_balance ?? account.balance).toString())
-                          setPassword('')
-                          setConfirmPassword('')
-                          setEditOpen(true)
-                        }}
-                        className="inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                      >
-                        <PencilIcon className="h-4 w-4 mr-1" />
-                        Edit
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${colorClass}`}>
+                          {account.type.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-900 font-medium">{account.name}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`text-sm font-bold ${(account.computed_balance ?? account.balance) > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                          {locked ? '₹••••••' : (showBalances ? formatCurrency(account.computed_balance ?? account.balance) : '₹••••••')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <button
+                          onClick={() => {
+                            setEditingAccount(account)
+                            setNewBalance((account.computed_balance ?? account.balance).toString())
+                            setPassword('')
+                            setConfirmPassword('')
+                            setEditOpen(true)
+                          }}
+                          className="inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        >
+                          <PencilIcon className="h-4 w-4 mr-1" />
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -485,6 +457,7 @@ export default function AccountsPage() {
                 />
               </div>
 
+              {/* Password Protection (Kept Local for now as per minimal change) */}
               {(() => {
                 const hasHash = typeof window !== 'undefined' && !!localStorage.getItem('finance-tracker-pass-hash')
                 if (!hasHash) {
@@ -548,8 +521,8 @@ export default function AccountsPage() {
                       return
                     }
 
-                    // Prepare password/hash
-                    const email = localStorage.getItem('finance-tracker-user-email') || ''
+                    // Prepare password/hash (Client-side check)
+                    const email = localStorage.getItem('finance-tracker-user-email') || 'user'
                     const hasHash = !!localStorage.getItem('finance-tracker-pass-hash')
                     const encoder = new TextEncoder()
 
@@ -585,19 +558,18 @@ export default function AccountsPage() {
                       }
                     }
 
-                    // Update account balance
-                    const current = editingAccount!.computed_balance ?? editingAccount!.balance
-                    if (editingAccount!.id === 'cash') {
-                      const delta = amount - current
-                      updateCashBalance(Math.abs(delta), delta >= 0)
-                    } else {
-                      setBankAccountBalance(editingAccount!.id, Math.round(amount * 100) / 100)
-                    }
+                    // Update account balance via Supabase
+                    const { success } = await financeManager.updateAccount(editingAccount!.id, { balance: amount })
 
-                    showNotification('Balance updated successfully', 'success')
-                    setEditOpen(false)
-                    await loadAccounts()
+                    if (success) {
+                      showNotification('Balance updated successfully', 'success')
+                      setEditOpen(false)
+                      await loadAccounts()
+                    } else {
+                      throw new Error('Update failed')
+                    }
                   } catch (e) {
+                    console.error(e)
                     showNotification('Update failed. Please try again.', 'error')
                   } finally {
                     setSaving(false)

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
+// Removed seeding imports as per user request (Auto-seeded in Dashboard now)
 type ServiceRecord = {
   id: string
   name: string
@@ -89,13 +90,22 @@ export default function InfraRecordsPage() {
     if (editingId === id) resetForm()
   }
 
+
+
+  // ... existing imports ...
+
+
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Infra Records</h1>
-          <p className="text-gray-600">Store non-secret metadata for Git, Vercel, Supabase and similar services.</p>
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Infra Records</h1>
+            <p className="text-gray-600">Store non-secret metadata for Git, Vercel, Supabase and similar services.</p>
+          </div>
         </div>
+        {/* ... rest of the component ... */}
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
           <form onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -214,8 +224,8 @@ export default function InfraRecordsPage() {
             </table>
           </div>
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   )
 }
 

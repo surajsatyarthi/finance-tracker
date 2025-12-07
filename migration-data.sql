@@ -8,20 +8,20 @@ ON CONFLICT (email) DO UPDATE SET id = '00000000-0000-0000-0000-000000000001';
 
 -- Insert cash account
 INSERT INTO accounts (user_id, name, type, balance, currency, is_active) VALUES
-('00000000-0000-0000-0000-000000000001', 'Cash', 'cash', 1005, 'INR', true);
+('00000000-0000-0000-0000-000000000001', 'Cash', 'cash', 2843.00, 'INR', true);
 
 -- Insert your bank accounts with real balances
 INSERT INTO accounts (user_id, name, type, balance, currency, is_active) VALUES
-('00000000-0000-0000-0000-000000000001', 'State Bank of India', 'savings', 34.58, 'INR', true),
-('00000000-0000-0000-0000-000000000001', 'Central Bank of India', 'savings', 20.34, 'INR', true),
-('00000000-0000-0000-0000-000000000001', 'Jupiter Bank', 'savings', 156.79, 'INR', true),
-('00000000-0000-0000-0000-000000000001', 'Slice Bank', 'savings', 1.55, 'INR', true),
-('00000000-0000-0000-0000-000000000001', 'Kotak 811', 'savings', 60704, 'INR', true),
-('00000000-0000-0000-0000-000000000001', 'Tide Bank', 'current', 187.80, 'INR', true),
-('00000000-0000-0000-0000-000000000001', 'Indian Postal Bank', 'savings', 1000, 'INR', true),
+('00000000-0000-0000-0000-000000000001', 'State Bank of India', 'savings', 61.98, 'INR', true),
+('00000000-0000-0000-0000-000000000001', 'Central Bank of India', 'savings', 652.28, 'INR', true),
+('00000000-0000-0000-0000-000000000001', 'Jupiter Bank', 'savings', 163.80, 'INR', true),
+('00000000-0000-0000-0000-000000000001', 'Slice Bank', 'savings', 90103.00, 'INR', true),
+('00000000-0000-0000-0000-000000000001', 'Kotak 811', 'savings', 715.00, 'INR', true),
+('00000000-0000-0000-0000-000000000001', 'Tide Bank', 'current', 189.80, 'INR', true),
+('00000000-0000-0000-0000-000000000001', 'Indian Postal Bank', 'savings', 1000.00, 'INR', true),
 ('00000000-0000-0000-0000-000000000001', 'DCB Bank', 'savings', 0, 'INR', true),
 ('00000000-0000-0000-0000-000000000001', 'SBM Bank', 'savings', 0, 'INR', true),
-('00000000-0000-0000-0000-000000000001', 'SBI Fixed Deposit', 'investment', 15000, 'INR', true);
+('00000000-0000-0000-0000-000000000001', 'SBI Fixed Deposit', 'investment', 15000.00, 'INR', true);
 
 -- Insert your credit cards
 INSERT INTO credit_cards (user_id, name, bank, last_four_digits, credit_limit, current_balance, statement_date, due_date, annual_fee, is_active) VALUES

@@ -143,7 +143,9 @@ a:hover {
 }
 
 /* Specific fixes for common patterns */
-p, span, div {
+p,
+span,
+div {
   color: inherit;
 }
 
@@ -166,9 +168,18 @@ p, span, div {
   color: #1f2937 !important;
 }
 
-.text-blue-600 { color: #2563eb !important; }
-.text-blue-700 { color: #1d4ed8 !important; }
-.placeholder-gray-500::placeholder { color: #6b7280 !important; opacity: 1; }
+.text-blue-600 {
+  color: #2563eb !important;
+}
+
+.text-blue-700 {
+  color: #1d4ed8 !important;
+}
+
+.placeholder-gray-500::placeholder {
+  color: #6b7280 !important;
+  opacity: 1;
+}
 
 /* Ensure input text is always visible */
 input[type="email"],
@@ -197,31 +208,32 @@ p {
 
 /* Link colors scoped elsewhere to avoid conflicting with buttons */
 
-/* White Icons on Golden Gradient Cards */
+/* Light Blue Icons on Gradient Cards */
 .icon-golden-card {
-  background: linear-gradient(135deg, #FFD700, #FFA500, #FF8C00) !important;
+  background: linear-gradient(135deg, #60a5fa, #3b82f6, #2563eb) !important;
   color: white !important;
   border: none !important;
-  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3) !important;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3) !important;
   transition: all 0.3s ease !important;
   padding: 0.5rem !important;
   border-radius: 0.5rem !important;
 }
 
 .icon-golden-card:hover {
-  background: linear-gradient(135deg, #FFA500, #FF8C00, #FFD700) !important;
+  background: linear-gradient(135deg, #3b82f6, #2563eb, #1d4ed8) !important;
   transform: translateY(-2px) !important;
-  box-shadow: 0 8px 25px rgba(255, 215, 0, 0.4) !important;
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4) !important;
 }
 
 .icon-white {
   color: white !important;
 }
 
-/* Remove old conflicting classes */
+/* Mapped Legacy Golden Classes to Blue Theme */
 .text-golden-500,
 .icon-golden-shine {
-  color: white !important;
+  color: #60a5fa !important;
+  /* blue-400 */
 }
 
 /* Notification Animations */
@@ -230,6 +242,7 @@ p {
     transform: translateX(100%);
     opacity: 0;
   }
+
   to {
     transform: translateX(0);
     opacity: 1;
@@ -241,6 +254,7 @@ p {
     transform: translateX(0);
     opacity: 1;
   }
+
   to {
     transform: translateX(100%);
     opacity: 0;
@@ -261,16 +275,20 @@ p {
 
 /* Hide scrollbars completely on all elements */
 * {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* Internet Explorer 10+ */
+  scrollbar-width: none;
+  /* Firefox */
+  -ms-overflow-style: none;
+  /* Internet Explorer 10+ */
 }
 
 /* Hide scrollbars on webkit browsers (Chrome, Safari, Edge) */
 *::-webkit-scrollbar {
   width: 0px;
   height: 0px;
-  background: transparent; /* Chrome/Edge/Safari */
-  display: none; /* Completely hide */
+  background: transparent;
+  /* Chrome/Edge/Safari */
+  display: none;
+  /* Completely hide */
 }
 
 *::-webkit-scrollbar-track {
@@ -325,11 +343,13 @@ table::-webkit-scrollbar,
 /* Ensure smooth scrolling without visible scrollbars */
 html {
   scroll-behavior: smooth;
-  overflow-x: hidden; /* Prevent horizontal page scroll */
+  overflow-x: hidden;
+  /* Prevent horizontal page scroll */
 }
 
 body {
-  overflow-x: hidden; /* Prevent horizontal page scroll */
+  overflow-x: hidden;
+  /* Prevent horizontal page scroll */
 }
 
 .glass-surface {
@@ -384,6 +404,8 @@ body {
 
 .app-shell {
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  padding-top: 4rem;
+  /* 64px for fixed header */
 }
 
 .btn-primary {

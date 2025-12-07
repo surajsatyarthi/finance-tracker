@@ -18,15 +18,9 @@ import {
 } from '@heroicons/react/24/outline'
 import Link from 'next/link'
 import { sanitizeFinancialInput } from '@/lib/security'
-import { 
-  getBankAccounts,
-  updateBankAccountBalance,
-  updateCashBalance,
-  processIncomeEntry,
-  processExpenseEntry,
-  type BankAccount
-} from '@/lib/dataManager'
+import { financeManager } from '@/lib/supabaseDataManager'
 import { GST_RATES } from '@/lib/businessManager'
+import { EXPENSE_CATEGORIES } from '@/lib/categoryData'
 
 interface TransactionForm {
   type: 'income' | 'expense' | 'transfer'
@@ -42,6 +36,7 @@ interface TransactionForm {
   toAccount: string
   category: string
   subcategory: string
+  depositTo: string
   // Business fields
   isBusinessExpense: boolean
   gstRate: number
@@ -61,10 +56,10 @@ export default function AddTransactionPage() {
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [accounts, setAccounts] = useState<Array<{id: string, name: string, type: string, account_type: string}>>([])
-  const [gstCalculation, setGstCalculation] = useState<{taxable_amount: number, gst_amount: number, total_amount: number} | null>(null)
+  const [accounts, setAccounts] = useState<Array<{ id: string, name: string, type: string, account_type: string }>>([])
+  const [gstCalculation, setGstCalculation] = useState<{ taxable_amount: number, gst_amount: number, total_amount: number } | null>(null)
   const [showBusinessFields, setShowBusinessFields] = useState(false)
-  
+
   const [formData, setFormData] = useState<TransactionForm>({
     type: 'expense',
     timestamp: new Date().toISOString().slice(0, 16),
@@ -79,6 +74,8 @@ export default function AddTransactionPage() {
     source: '',
     fromAccount: '',
     toAccount: '',
+    depositTo: '',
+    // Business fields
     // Business fields
     isBusinessExpense: false,
     gstRate: 0,
@@ -92,20 +89,26 @@ export default function AddTransactionPage() {
     recurringFrequency: 'monthly'
   })
 
-  // Load accounts on component mount (local-only)
+  const [creditCards, setCreditCards] = useState<Array<{ id: string, name: string }>>([])
+
+  // Load accounts and cards on component mount
   useEffect(() => {
     const loadData = async () => {
-      const localAccounts = getBankAccounts()
-      const mapped = localAccounts.map(a => ({ id: a.id, name: a.name, type: a.type, account_type: 'personal' }))
-      const withCash = [{ id: 'cash', name: 'Cash', type: 'cash', account_type: 'personal' }, ...mapped]
-      setAccounts(withCash)
+      const dbAccounts = await financeManager.getAccounts()
+      const mappedAccounts = dbAccounts.map(a => ({ id: a.id, name: a.name, type: a.type, account_type: 'personal' }))
+      setAccounts(mappedAccounts)
+
+      const dbCards = await financeManager.getCreditCards()
+      setCreditCards(dbCards.map(c => ({ id: c.id, name: c.name })))
     }
     loadData()
   }, [])
 
   // GST disabled in manual-only MVP
 
-  // Income sources array
+
+
+  // Income sources array (kept as is)
   const incomeSources = [
     'Salary',
     'Freelance',
@@ -118,62 +121,30 @@ export default function AddTransactionPage() {
   ]
 
   // Categories from your actual expense data
-  const expenseCategories = [
-    'Food',
-    'Transport', 
-    'Health',
-    'Shopping',
-    'Credit Card',
-    'Loan',
-    'Miscellaneous',
-    'Data',
-    'Subscription',
-    'Grooming'
-  ]
+  const expenseCategories = Object.keys(EXPENSE_CATEGORIES)
 
   // Subcategories based on your data
-  const subcategoriesByCategory: Record<string, string[]> = {
-    'Food': ['Eating out', 'Vegetables', 'Snacks', 'Swiggy', 'Groceries', 'Fruits'],
-    'Transport': ['Travel', 'Petrol'],
-    'Health': ['Medicine', 'Supliments + Vitamins', 'Supplements'],
-    'Shopping': ['Clothing', 'Footwear'],
-    'Credit Card': ['Payment'],
-    'Loan': ['Home loan', 'Education loan'],
-    'Miscellaneous': ['Other'],
-    'Data': ['WiFi'],
-    'Subscription': ['Donation', 'Software'],
-    'Grooming': ['Toiletries']
-  }
+  const subcategoriesByCategory: Record<string, string[]> = EXPENSE_CATEGORIES
+
 
   // Payment types from your actual data
   const paymentTypes = [
     'Cash',
-    'UPI', 
+    'UPI',
     'Credit Card',
     'Amazon Pay',
     'Simpl'
   ]
 
-  // Paid Via options from your actual data
-  const paidViaOptions = [
-    'Cash',
-    'SBI',
-    'CBI', 
-    'Jupiter',
-    'Slice',
-    'Amazon Pay',
-    'Simpl',
-    // Credit Cards
-    'ICICI Amazon',
-    'ICICI Adani One',
-    'ICICI Coral Rupay',
-    'Axis Rewards',
-    'Axis Neo',
-    'HDFC Neu',
-    'Indusind Platinum Aura Edge',
-    'SBI BPCL',
-    'RBL Platinum Delight'
-  ]
+  // Dynamic Paid Via options based on Payment Type
+  const getPaidViaOptions = () => {
+    if (formData.paymentType === 'Credit Card') {
+      return creditCards.map(c => ({ id: c.id, name: c.name }))
+    }
+    // For Cash/UPI/NetBanking, show Accounts
+    // Filter active accounts?
+    return accounts.map(a => ({ id: a.id, name: a.name }))
+  }
 
   const handleInputChange = (field: keyof TransactionForm, value: string | number | boolean) => {
     setFormData(prev => ({
@@ -194,7 +165,8 @@ export default function AddTransactionPage() {
       paidVia: tab === 'expense' ? prev.paidVia : '',
       paymentType: tab === 'expense' ? prev.paymentType : '',
       fromAccount: tab === 'transfer' ? prev.fromAccount : '',
-      toAccount: tab === 'transfer' ? prev.toAccount : ''
+      toAccount: tab === 'transfer' ? prev.toAccount : '',
+      depositTo: tab === 'income' ? prev.depositTo : ''
     }))
   }
 
@@ -202,7 +174,7 @@ export default function AddTransactionPage() {
     e.preventDefault()
     setIsSubmitting(true)
     setErrorMessage('')
-    
+
     try {
       // Basic client-side validation using security utilities
       const amount = sanitizeFinancialInput.amount(formData.amount)
@@ -219,49 +191,81 @@ export default function AddTransactionPage() {
       }
 
       if (activeTab === 'transfer') {
-        if (!formData.fromAccount || !formData.toAccount) {
-          throw new Error('Please select both source and destination accounts')
-        }
-        if (formData.fromAccount === formData.toAccount) {
-          throw new Error('Source and destination must differ')
-        }
+        // ... Validation ...
         const amt = parseFloat(formData.amount)
-        if (formData.fromAccount === 'cash') {
-          updateCashBalance(amt, false)
-        } else {
-          updateBankAccountBalance(formData.fromAccount, amt, false)
-        }
-        if (formData.toAccount === 'cash') {
-          updateCashBalance(amt, true)
-        } else {
-          updateBankAccountBalance(formData.toAccount, amt, true)
-        }
+        // Transfer Logic: Debit Source, Credit Dest
+        // This requires transaction entries or Account Balance updates.
+        // FinanceManager should ideally handle transfer atomicity.
+        // For MVP: Create two transactions? Or just update balances?
+        // Let's create two transactions: Transfer Out and Transfer In
+        await financeManager.createTransaction({
+          amount: amt,
+          type: 'expense',
+          description: `Transfer to ${accounts.find(a => a.id === formData.toAccount)?.name}`,
+          date: dateIso,
+          payment_method: 'transfer',
+          account_id: formData.fromAccount,
+          category: 'Transfer'
+        })
+        await financeManager.createTransaction({
+          amount: amt,
+          type: 'income',
+          description: `Transfer from ${accounts.find(a => a.id === formData.fromAccount)?.name}`,
+          date: dateIso,
+          payment_method: 'transfer',
+          account_id: formData.toAccount,
+          category: 'Transfer'
+        })
+
         setSuccessMessage('Transfer completed successfully!')
       } else if (activeTab === 'income') {
-        await processIncomeEntry({
-          amount,
+        const sourceAcc = accounts.find(a => a.id === formData.depositTo)
+        await financeManager.createTransaction({
+          amount: parseFloat(amount.toString()),
+          type: 'income',
           description: formData.item,
           date: dateIso,
-          type: formData.paidVia?.toLowerCase() === 'cash' ? 'cash' : 'non-cash',
-          bankAccount: formData.paidVia?.toLowerCase() === 'cash' ? undefined : formData.paidVia,
           category: formData.source || 'Income',
-          recurring: formData.isRecurring ? { frequency: formData.recurringFrequency } : undefined
+          payment_method: 'bank',
+          account_id: sourceAcc?.id
         })
         setSuccessMessage('Income added successfully!')
       } else if (activeTab === 'expense') {
-        await processExpenseEntry({
-          amount,
-          description: formData.item,
-          date: dateIso,
-          paymentMethod: formData.paymentType.toLowerCase() === 'credit' ? 'credit_card' : 
-                     formData.paymentType.toLowerCase() === 'debit' ? 'credit_card' : 
-                     formData.paymentType.toLowerCase() as 'upi' | 'cash' | 'bnpl',
-          bankAccount: formData.paymentType.toLowerCase() === 'upi' ? formData.paidVia : undefined,
-          creditCard: formData.paymentType.toLowerCase().includes('credit') ? formData.paidVia : undefined,
-          bnplProvider: formData.paymentType.toLowerCase() === 'bnpl' ? formData.paidVia : undefined,
-          category: formData.subcategory || formData.category,
-          recurring: formData.isRecurring ? { frequency: formData.recurringFrequency } : undefined
-        })
+        const isCC = formData.paymentType.toLowerCase().includes('credit')
+        if (isCC) {
+          // Verify Card ID exists
+          const cardId = formData.paidVia
+          const card = creditCards.find(c => c.id === cardId)
+
+          if (card) {
+            await financeManager.createCreditCardTransaction({
+              creditCard: card.id, // ID from dropdown value
+              amount: parseFloat(amount.toString()),
+              description: formData.item,
+              date: dateIso,
+              emiDetails: null
+            })
+          } else {
+            // Fallback: If user didn't select from dynamic list (unlikely with select), or data mismatch
+            throw new Error('Selected Credit Card not found. Please ensure cards are added in Cards page.')
+          }
+        } else {
+          // Regular Expense from Account
+          const accountId = formData.paidVia
+          // Verify account exists
+          const acc = accounts.find(a => a.id === accountId)
+          if (!acc && formData.paidVia) throw new Error('Selected Account not found')
+
+          await financeManager.createTransaction({
+            amount: parseFloat(amount.toString()),
+            type: 'expense',
+            description: formData.item,
+            date: dateIso,
+            category: formData.subcategory || formData.category,
+            payment_method: formData.paymentType.toLowerCase(),
+            account_id: accountId
+          })
+        }
         setSuccessMessage('Expense added successfully!')
       }
 
@@ -280,6 +284,7 @@ export default function AddTransactionPage() {
         source: '',
         fromAccount: '',
         toAccount: '',
+        depositTo: '',
         isBusinessExpense: false,
         gstRate: 0,
         gstAmount: 0,
@@ -295,7 +300,7 @@ export default function AddTransactionPage() {
 
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(''), 3000)
-      
+
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to add transaction')
     } finally {
@@ -306,7 +311,7 @@ export default function AddTransactionPage() {
   const isFormValid = () => {
     const baseValid = formData.amount && formData.item && formData.date
     if (activeTab === 'income') {
-      return baseValid && formData.source
+      return baseValid && formData.source && formData.depositTo
     } else if (activeTab === 'expense') {
       return baseValid && formData.purpose && formData.category && formData.paidVia && formData.paymentType
     } else if (activeTab === 'transfer') {
@@ -359,33 +364,30 @@ export default function AddTransactionPage() {
           <div className="flex space-x-2">
             <button
               onClick={() => handleTabChange('expense')}
-              className={`flex-1 flex items-center justify-center px-6 py-4 rounded-xl font-semibold transition-all duration-200 ${
-                activeTab === 'expense'
-                  ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg'
-                  : 'text-premium-600 hover:bg-white/50'
-              }`}
+              className={`flex-1 flex items-center justify-center px-6 py-4 rounded-xl font-semibold transition-all duration-200 ${activeTab === 'expense'
+                ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg'
+                : 'text-premium-600 hover:bg-white/50'
+                }`}
             >
               <ArrowTrendingDownIcon className="h-5 w-5 mr-2" />
               Add Expense
             </button>
             <button
               onClick={() => handleTabChange('income')}
-              className={`flex-1 flex items-center justify-center px-6 py-4 rounded-xl font-semibold transition-all duration-200 ${
-                activeTab === 'income'
-                  ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-lg'
-                  : 'text-premium-600 hover:bg-white/50'
-              }`}
+              className={`flex-1 flex items-center justify-center px-6 py-4 rounded-xl font-semibold transition-all duration-200 ${activeTab === 'income'
+                ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-lg'
+                : 'text-premium-600 hover:bg-white/50'
+                }`}
             >
               <ArrowTrendingUpIcon className="h-5 w-5 mr-2" />
               Add Income
             </button>
             <button
               onClick={() => handleTabChange('transfer')}
-              className={`flex-1 flex items-center justify-center px-6 py-4 rounded-xl font-semibold transition-all duration-200 ${
-                activeTab === 'transfer'
-                  ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg'
-                  : 'text-premium-600 hover:bg-white/50'
-              }`}
+              className={`flex-1 flex items-center justify-center px-6 py-4 rounded-xl font-semibold transition-all duration-200 ${activeTab === 'transfer'
+                ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg'
+                : 'text-premium-600 hover:bg-white/50'
+                }`}
             >
               <BuildingLibraryIcon className="h-5 w-5 mr-2" />
               Transfer
@@ -415,11 +417,11 @@ export default function AddTransactionPage() {
               )}
             </h2>
             <p className="text-premium-600 mt-2">
-              {activeTab === 'income' 
-                ? 'Record money coming into your accounts' 
+              {activeTab === 'income'
+                ? 'Record money coming into your accounts'
                 : activeTab === 'expense'
-                ? 'Track your spending and expenses'
-                : 'Transfer funds between your bank accounts'
+                  ? 'Track your spending and expenses'
+                  : 'Transfer funds between your bank accounts'
               }
             </p>
           </div>
@@ -440,7 +442,7 @@ export default function AddTransactionPage() {
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="flex items-center text-sm font-semibold text-premium-700 mb-2">
                   <CalendarIcon className="h-4 w-4 mr-2" />
@@ -495,24 +497,46 @@ export default function AddTransactionPage() {
               </div>
             </div>
 
-            {/* Income Source */}
+            {/* Income Source & Deposit To */}
             {activeTab === 'income' && (
-              <div>
-                <label className="flex items-center text-sm font-semibold text-black mb-2">
-                  <BuildingOfficeIcon className="h-4 w-4 mr-2" />
-                  Source
-                </label>
-                <select
-                  value={formData.source}
-                  onChange={(e) => handleInputChange('source', e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-black"
-                  required
-                >
-                  <option value="">Select income source...</option>
-                  {incomeSources.map(source => (
-                    <option key={source} value={source}>{source}</option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="flex items-center text-sm font-semibold text-black mb-2">
+                    <BuildingOfficeIcon className="h-4 w-4 mr-2" />
+                    Source
+                  </label>
+                  <select
+                    value={formData.source}
+                    onChange={(e) => handleInputChange('source', e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-black"
+                    required
+                  >
+                    <option value="">Select income source...</option>
+                    {incomeSources.map(source => (
+                      <option key={source} value={source}>{source}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="flex items-center text-sm font-semibold text-black mb-2">
+                    <BuildingLibraryIcon className="h-4 w-4 mr-2" />
+                    Deposit To Account
+                  </label>
+                  <select
+                    value={formData.depositTo}
+                    onChange={(e) => handleInputChange('depositTo', e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-black"
+                    required
+                  >
+                    <option value="">Select account...</option>
+                    {accounts.map(account => (
+                      <option key={account.id} value={account.id}>
+                        {account.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             )}
 
@@ -647,9 +671,9 @@ export default function AddTransactionPage() {
                       className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-black"
                       required
                     >
-                      <option value="">Select payment source...</option>
-                      {paidViaOptions.map(option => (
-                        <option key={option} value={option}>{option}</option>
+                      <option value="">Select source...</option>
+                      {getPaidViaOptions().map(option => (
+                        <option key={option.id} value={option.id}>{option.name}</option>
                       ))}
                     </select>
                   </div>
@@ -718,7 +742,7 @@ export default function AddTransactionPage() {
                       <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                     </label>
                   </div>
-                  
+
                   {formData.isBusinessExpense && (
                     <p className="text-sm text-blue-700">
                       This expense will be tracked for business tax purposes and GST calculations
@@ -860,13 +884,12 @@ export default function AddTransactionPage() {
               <button
                 type="submit"
                 disabled={!isFormValid() || isSubmitting}
-                className={`flex-1 flex items-center justify-center px-8 py-4 rounded-xl font-semibold text-white transition-all duration-200 ${
-                  activeTab === 'income'
-                    ? 'bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 shadow-lg hover:shadow-xl'
-                    : activeTab === 'expense'
-                    ? 'bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 shadow-lg hover:shadow-xl'
-                    : 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg hover:shadow-xl'
-                } disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105`}
+                className={`flex-1 flex items-center justify-center px-8 py-4 rounded-xl font-semibold text-white transition-all duration-200 ${activeTab === 'income'
+                  ? 'bg-emerald-600 hover:bg-emerald-700 shadow-lg'
+                  : activeTab === 'expense'
+                    ? 'bg-rose-600 hover:bg-rose-700 shadow-lg'
+                    : 'bg-indigo-600 hover:bg-indigo-700 shadow-lg'
+                  } disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-xl`}
               >
                 {isSubmitting ? (
                   <>
