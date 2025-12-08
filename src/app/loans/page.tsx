@@ -1,102 +1,80 @@
 'use client'
 
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
+import {
+  PlusIcon,
+  BanknotesIcon,
+  CalendarDaysIcon,
+  ChartPieIcon,
+  CreditCardIcon,
+  HomeIcon,
+  AcademicCapIcon,
+  ArrowLongRightIcon
+} from '@heroicons/react/24/outline'
+import { FinanceDataManager } from '@/lib/supabaseDataManager'
+import { type Loan } from '@/types/finance'
 import { useRequireAuth } from '@/contexts/AuthContext'
-import { financeManager } from '@/lib/supabaseDataManager'
-import { useNotification } from '@/contexts/NotificationContext'
-import GlassCard from '@/components/GlassCard'
-import { usePrivacy } from '@/contexts/PrivacyContext'
-import { CurrencyRupeeIcon, CalendarIcon, PlusIcon, PencilIcon, TrashIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
-
-type LoanForm = {
-  name: string
-  principal: string
-  rate: string
-  tenureMonths: string
-  startDate: string
-}
 
 export default function LoansPage() {
-  const { user } = useRequireAuth()
-  const { locked } = usePrivacy()
-  const { showNotification } = useNotification()
-
-  const [loans, setLoans] = useState<any[]>([])
+  const { user, loading: authLoading } = useRequireAuth()
+  const router = useRouter()
+  const [loans, setLoans] = useState<Loan[]>([])
   const [loading, setLoading] = useState(true)
-  const [form, setForm] = useState<LoanForm>({ name: '', principal: '', rate: '', tenureMonths: '', startDate: '' })
-  const [submitting, setSubmitting] = useState(false)
 
-  const loadLoans = useCallback(async () => {
-    if (!user) return
-    try {
-      const data = await financeManager.getLoans()
-      setLoans(data)
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setLoading(false)
-    }
-  }, [user])
+  const financeManager = FinanceDataManager.getInstance()
 
   useEffect(() => {
-    loadLoans()
-  }, [loadLoans])
+    if (!user) return
 
-  const summary = useMemo(() => {
-    const totalMonthly = loans.reduce((sum, l) => sum + (l.monthlyAmount || 0), 0)
-    const totalOutstandingEmis = loans.reduce((sum, l) => sum + Math.max((l.tenureMonths || 0) - (l.emisPaid || 0), 0), 0)
-    return { totalMonthly, totalOutstandingEmis }
+    const fetchLoans = async () => {
+      try {
+        setLoading(true)
+        const data = await financeManager.getLoans()
+        setLoans(data)
+      } catch (error) {
+        console.error('Error fetching loans:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchLoans()
+  }, [user])
+
+  const stats = useMemo(() => {
+    const totalOutstanding = loans.reduce((sum, loan) => sum + loan.current_balance, 0)
+    const totalPrincipal = loans.reduce((sum, loan) => sum + loan.principal_amount, 0)
+    const monthlyCommitment = loans.reduce((sum, loan) => sum + (loan.emi_amount || 0), 0)
+    const paidPercentage = totalPrincipal > 0
+      ? Math.round(((totalPrincipal - totalOutstanding) / totalPrincipal) * 100)
+      : 0
+
+    return {
+      totalOutstanding,
+      monthlyCommitment,
+      paidPercentage,
+      activeCount: loans.length
+    }
   }, [loans])
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSubmitting(true)
-    try {
-      await financeManager.createLoan({
-        name: form.name,
-        principal: parseFloat(form.principal || '0'),
-        rate: parseFloat(form.rate || '0'),
-        tenureMonths: parseInt(form.tenureMonths || '0', 10),
-        startDate: form.startDate || new Date().toISOString().split('T')[0],
-      })
-      showNotification('Loan added successfully', 'success')
-      await loadLoans()
-      setForm({ name: '', principal: '', rate: '', tenureMonths: '', startDate: '' })
-    } catch (error) {
-      console.error(error)
-      showNotification('Failed to add loan', 'error')
-    } finally {
-      setSubmitting(false)
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount)
+
+  const getLoanIcon = (type: string) => {
+    switch (type) {
+      case 'home': return <HomeIcon className="h-6 w-6 text-blue-500" />
+      case 'education': return <AcademicCapIcon className="h-6 w-6 text-purple-500" />
+      case 'credit_card': return <CreditCardIcon className="h-6 w-6 text-orange-500" />
+      case 'personal': return <BanknotesIcon className="h-6 w-6 text-green-500" />
+      default: return <BanknotesIcon className="h-6 w-6 text-gray-500" />
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this loan?')) return
-    try {
-      await financeManager.deleteLoan(id)
-      showNotification('Loan deleted', 'success')
-      loadLoans()
-    } catch (e) {
-      showNotification('Failed to delete loan', 'error')
-    }
-  }
-
-  const handleMarkPaid = async (id: string) => {
-    try {
-      await financeManager.markLoanEmiPaid(id)
-      showNotification('EMI marked as paid', 'success')
-      loadLoans()
-    } catch (e) {
-      showNotification('Failed to update EMI', 'error')
-    }
-  }
-
-  const formatCurrency = (amount: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount)
-
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
       </div>
     )
   }
@@ -104,102 +82,155 @@ export default function LoansPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Loans & EMIs</h1>
-          <p className="text-gray-600">Track loans, monthly EMIs, and due dates</p>
-        </div>
 
-        <GlassCard className="mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Add Loan</h2>
-          <form onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input className="glass-input px-3 py-2 rounded-md" placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-            <input className="glass-input px-3 py-2 rounded-md" type="number" placeholder="Principal (₹)" value={form.principal} onChange={(e) => setForm({ ...form, principal: e.target.value })} required />
-            <input className="glass-input px-3 py-2 rounded-md" type="number" step="0.01" placeholder="Rate (%)" value={form.rate} onChange={(e) => setForm({ ...form, rate: e.target.value })} required />
-            <input className="glass-input px-3 py-2 rounded-md" type="number" placeholder="Tenure (months)" value={form.tenureMonths} onChange={(e) => setForm({ ...form, tenureMonths: e.target.value })} required />
-            <input className="glass-input px-3 py-2 rounded-md" type="date" placeholder="Start Date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
-            <div className="md:col-span-2">
-              <button type="submit" disabled={submitting} className="btn-primary inline-flex items-center px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">
-                <PlusIcon className="h-4 w-4 mr-2" />
-                {submitting ? 'Adding...' : 'Add Loan'}
-              </button>
-            </div>
-          </form>
-        </GlassCard>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <GlassCard>
-            <div className="flex items-center">
-              <CurrencyRupeeIcon className="h-8 w-8 text-rose-600" />
-              <div className="ml-4">
-                <p className="text-sm text-gray-600">Total Monthly EMI</p>
-                <p className="text-2xl font-bold text-gray-900">{locked ? '₹••••••' : formatCurrency(summary.totalMonthly)}</p>
-              </div>
-            </div>
-          </GlassCard>
-          <GlassCard>
-            <div className="flex items-center">
-              <CalendarIcon className="h-8 w-8 text-indigo-600" />
-              <div className="ml-4">
-                <p className="text-sm text-gray-600">Outstanding EMIs</p>
-                <p className="text-2xl font-bold text-gray-900">{summary.totalOutstandingEmis}</p>
-              </div>
-            </div>
-          </GlassCard>
-          <GlassCard>
-            <div className="flex items-center">
-              <CheckCircleIcon className="h-8 w-8 text-green-600" />
-              <div className="ml-4">
-                <p className="text-sm text-gray-600">Active Loans</p>
-                <p className="text-2xl font-bold text-gray-900">{loans.length}</p>
-              </div>
-            </div>
-          </GlassCard>
-        </div>
-
-        <GlassCard>
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">Loans</h2>
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Loans</h1>
+            <p className="mt-1 text-sm text-gray-500">Track your liabilities and EMI schedules</p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Principal</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rate</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EMI</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Paid/Total</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Due</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {loans.map(loan => (
-                  <tr
-                    key={loan.id}
-                    className="hover:bg-gray-50 cursor-pointer transition-colors"
+          <button
+            onClick={() => router.push('/loans/add')}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+          >
+            <PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+            Add New Loan
+          </button>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <BanknotesIcon className="h-6 w-6 text-gray-400" aria-hidden="true" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Total Outstanding</dt>
+                    <dd className="text-lg font-medium text-gray-900">{formatCurrency(stats.totalOutstanding)}</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <CalendarDaysIcon className="h-6 w-6 text-gray-400" aria-hidden="true" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Monthly EMI Total</dt>
+                    <dd className="text-lg font-medium text-gray-900">{formatCurrency(stats.monthlyCommitment)}</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <ChartPieIcon className="h-6 w-6 text-gray-400" aria-hidden="true" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Paid Off</dt>
+                    <dd className="text-lg font-medium text-gray-900">{stats.paidPercentage}%</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <BanknotesIcon className="h-6 w-6 text-gray-400" aria-hidden="true" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Active Loans</dt>
+                    <dd className="text-lg font-medium text-gray-900">{stats.activeCount}</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Loan List */}
+        <div className="bg-white shadow overflow-hidden sm:rounded-md">
+          <ul role="list" className="divide-y divide-gray-200">
+            {loans.map((loan) => {
+              const progress = loan.principal_amount > 0
+                ? ((loan.principal_amount - loan.current_balance) / loan.principal_amount) * 100
+                : 0
+
+              return (
+                <li key={loan.id}>
+                  <div
+                    onClick={() => router.push(`/loans/${loan.id}`)}
+                    className="block hover:bg-gray-50 transition cursor-pointer"
                   >
-                    <td className="px-6 py-3 text-sm font-medium text-gray-900" onClick={() => window.location.href = `/loans/${loan.id}`}>{loan.name}</td>
-                    <td className="px-6 py-3 text-sm font-semibold text-gray-900">{locked ? '₹••••••' : formatCurrency(loan.principal)}</td>
-                    <td className="px-6 py-3 text-sm text-gray-900">{loan.rate}%</td>
-                    <td className="px-6 py-3 text-sm font-semibold text-gray-900">{locked ? '₹••••••' : formatCurrency(loan.monthlyAmount)}</td>
-                    <td className="px-6 py-3 text-sm text-gray-900">{loan.emisPaid}/{loan.tenureMonths}</td>
-                    <td className="px-6 py-3 text-sm text-gray-900">{loan.nextDueDate}</td>
-                    <td className="px-6 py-3 text-right text-sm">
-                      <button className="px-3 py-1 rounded border mr-2 hover:bg-gray-100" onClick={(e) => { e.stopPropagation(); handleMarkPaid(loan.id); }}>Mark Paid</button>
-                      <button className="px-3 py-1 rounded border text-red-600 hover:bg-red-50" onClick={(e) => { e.stopPropagation(); handleDelete(loan.id); }}>Delete</button>
-                    </td>
-                  </tr>
-                ))}
-                {loans.length === 0 && (
-                  <tr>
-                    <td className="px-6 py-4 text-sm text-gray-500" colSpan={7}>No loans</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </GlassCard>
+                    <div className="px-4 py-4 sm:px-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 mr-4">
+                            {getLoanIcon(loan.type)}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-indigo-600 truncate">{loan.name}</p>
+                            <p className="text-xs text-gray-500 uppercase tracking-wide">{loan.type.replace('_', ' ')}</p>
+                          </div>
+                        </div>
+                        <div className="ml-2 flex-shrink-0 flex">
+                          <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                            {formatCurrency(loan.current_balance)} left
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-2 sm:flex sm:justify-between">
+                        <div className="sm:flex">
+                          {loan.emi_amount && (
+                            <p className="flex items-center text-sm text-gray-500 mr-6">
+                              <CalendarDaysIcon className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" aria-hidden="true" />
+                              EMI: {formatCurrency(loan.emi_amount)}
+                            </p>
+                          )}
+                          {loan.next_emi_date && (
+                            <p className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
+                              <CalendarDaysIcon className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" aria-hidden="true" />
+                              Next Due: {loan.next_emi_date}
+                            </p>
+                          )}
+                        </div>
+                        <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
+                          <div className="w-24 bg-gray-200 rounded-full h-2.5 mr-2">
+                            <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div>
+                          </div>
+                          <span>{Math.round(progress)}% Paid</span>
+                          <ArrowLongRightIcon className="ml-2 h-5 w-5 text-gray-400" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              )
+            })}
+            {loans.length === 0 && (
+              <li className="px-4 py-12 text-center text-gray-500">
+                No active loans found. Click "Add New Loan" to get started.
+              </li>
+            )}
+          </ul>
+        </div>
       </div>
     </div>
   )

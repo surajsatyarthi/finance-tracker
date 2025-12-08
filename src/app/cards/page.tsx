@@ -104,6 +104,7 @@ export default function CardsPage() {
     balance: card.currentBalance,
     utilization: getCreditCardUtilization(card.id),
     statementDate: card.statementDate,
+    dueDate: card.dueDate,
     isActive: card.isActive,
   }))
 
@@ -395,54 +396,97 @@ export default function CardsPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Limit</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Balance</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Utilization</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statement</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cycle Status</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredAndSortedCards.map((c) => (
-                  <tr key={c.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <CreditCardIcon className="h-5 w-5 text-indigo-600 mr-2" />
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{c.name}</div>
-                          <div className="group relative cursor-pointer" onClick={() => {
-                            showNotification(`Copied ${c.lastFour}`, 'success')
-                            // Logic to copy? Actually we don't have full number in metric.
-                          }}>
-                            <div className="text-xs text-gray-500 font-mono flex items-center gap-1">
-                              <span>••••</span>
-                              <span className="group-hover:text-black transition-colors">{c.lastFour}</span>
-                              <EyeIcon className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                {filteredAndSortedCards.map((c) => {
+                  // Calculate days metrics
+                  const today = new Date()
+                  const currentDay = today.getDate()
+
+                  // Due Date Calculation
+                  let dueDay = parseInt(c.dueDate?.toString() || '0')
+                  if (isNaN(dueDay) || dueDay === 0) dueDay = 1 // Default or handle NA
+
+                  let targetDueDate = new Date(today.getFullYear(), today.getMonth(), dueDay)
+                  if (currentDay > dueDay) {
+                    targetDueDate = new Date(today.getFullYear(), today.getMonth() + 1, dueDay)
+                  }
+                  const daysToDue = Math.ceil((targetDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+
+                  // Statement Date Calculation
+                  let stmtDay = parseInt(c.statementDate?.toString() || '0')
+                  let daysToStmt = 0
+                  let stmtLabel = 'NA'
+
+                  if (!isNaN(stmtDay) && stmtDay > 0) {
+                    let targetStmtDate = new Date(today.getFullYear(), today.getMonth(), stmtDay)
+                    if (currentDay > stmtDay) {
+                      targetStmtDate = new Date(today.getFullYear(), today.getMonth() + 1, stmtDay)
+                    }
+                    daysToStmt = Math.ceil((targetStmtDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+                    stmtLabel = `${daysToStmt} days`
+                  }
+
+                  return (
+                    <tr key={c.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <CreditCardIcon className="h-5 w-5 text-indigo-600 mr-2" />
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{c.name}</div>
+                            <div className="group relative cursor-pointer" onClick={() => {
+                              showNotification(`Copied ${c.lastFour}`, 'success')
+                            }}>
+                              <div className="text-xs text-gray-500 font-mono flex items-center gap-1">
+                                <span>••••</span>
+                                <span className="group-hover:text-black transition-colors">{c.lastFour}</span>
+                                <EyeIcon className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-bold text-gray-900">{locked ? '₹••••••' : `₹${c.limit.toLocaleString()}`}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text-sm font-bold ${c.balance > 0 ? 'text-rose-600' : 'text-gray-400'}`}>{locked ? '₹••••••' : `₹${c.balance.toLocaleString()}`}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="w-40">
-                        <div className="h-2 bg-gray-200 rounded-full">
-                          <div className="h-2 rounded-full bg-indigo-600" style={{ width: `${c.utilization}%` }}></div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm font-bold text-gray-900">{locked ? '₹••••••' : `₹${c.limit.toLocaleString()}`}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`text-sm font-bold ${c.balance > 0 ? 'text-rose-600' : 'text-gray-400'}`}>{locked ? '₹••••••' : `₹${c.balance.toLocaleString()}`}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="w-24">
+                          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${c.utilization > 30 ? 'bg-orange-500' : 'bg-green-500'}`} style={{ width: `${Math.min(c.utilization, 100)}%` }}></div>
+                          </div>
+                          <span className="text-xs text-gray-500 mt-1">{c.utilization}% used</span>
                         </div>
-                        <span className="text-xs text-gray-600 mt-1 inline-block">{c.utilization}%</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900 font-medium">{c.statementDate}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <button className="px-3 py-1 rounded border mr-2" onClick={() => openEdit(c.id)}>Edit</button>
-                      <button className="px-3 py-1 rounded border" onClick={async () => { await financeManager.deleteCreditCard(c.id); loadCards() }}>Delete</button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex flex-col gap-1">
+                          {/* Due Date Indicator */}
+                          <div className={`flex items-center text-xs font-medium px-2 py-0.5 rounded-full w-fit ${daysToDue <= 3 ? 'bg-red-100 text-red-700' :
+                            daysToDue <= 7 ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'
+                            }`}>
+                            <ClockIcon className="w-3 h-3 mr-1" />
+                            Due in {daysToDue} days
+                          </div>
+                          {/* Statement Indicator */}
+                          {stmtDay > 0 && (
+                            <div className="text-xs text-gray-400 pl-1">
+                              Stmt in {stmtLabel}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <button className="px-3 py-1 rounded border mr-2 text-sm hover:bg-gray-100" onClick={() => openEdit(c.id)}>Edit</button>
+                        <button className="px-3 py-1 rounded border text-sm text-red-600 hover:bg-red-50" onClick={async () => { await financeManager.deleteCreditCard(c.id); loadCards() }}>Delete</button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

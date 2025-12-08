@@ -224,8 +224,8 @@ export default function InfraRecordsPage() {
             </table>
           </div>
         </div>
-      </div >
-    </div >
+      </div>
+    </div>
   )
 }
 

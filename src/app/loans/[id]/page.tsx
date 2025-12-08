@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation'
 import {
     ArrowLeftIcon,
     BanknotesIcon,
-    CalendarDaysIcon,
     ChartBarIcon,
     DocumentTextIcon,
     CheckCircleIcon,
@@ -13,18 +12,16 @@ import {
     CalculatorIcon
 } from '@heroicons/react/24/outline'
 import {
-    getLoans,
-    getLoanPayments,
     generateAmortizationSchedule,
     calculatePrepaymentImpact,
     getLoanOutstandingBalance,
     getLoanTotalInterestPaid,
     getLoanTotalPrincipalPaid,
-    type LoanRecord,
-    type LoanPayment,
     type AmortizationEntry,
     type PrepaymentAnalysis
-} from '@/lib/dataManager'
+} from '@/lib/financialUtils'
+import { FinanceDataManager } from '@/lib/supabaseDataManager'
+import { Loan, LoanPayment } from '@/types/finance'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend } from 'recharts'
 
 export default function LoanDetailPage() {
@@ -32,45 +29,76 @@ export default function LoanDetailPage() {
     const router = useRouter()
     const loanId = params.id as string
 
-    const [loan, setLoan] = useState<LoanRecord | null>(null)
+    // Use shared 'Loan' type instead of legacy 'LoanRecord'
+    const [loan, setLoan] = useState<Loan | null>(null)
     const [payments, setPayments] = useState<LoanPayment[]>([])
     const [schedule, setSchedule] = useState<AmortizationEntry[]>([])
     const [activeTab, setActiveTab] = useState<'overview' | 'schedule' | 'payments' | 'calculator'>('overview')
     const [prepaymentAmount, setPrepaymentAmount] = useState<string>('')
     const [prepaymentAnalysis, setPrepaymentAnalysis] = useState<PrepaymentAnalysis | null>(null)
 
+    // Payment Modal State
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
+    const [paymentForm, setPaymentForm] = useState({ amount: '', date: new Date().toISOString().split('T')[0], type: 'emi_payment', notes: '' })
+    const [isSavingPayment, setIsSavingPayment] = useState(false)
+
+    const financeManager = FinanceDataManager.getInstance()
+
     useEffect(() => {
-        if (typeof window === 'undefined') return
+        const loadData = async () => {
+            await financeManager.initialize()
+            // We need getLoan (single) or find from list. 
+            // FinanceDataManager just has getLoans(). optimize later if needed.
+            // Wait, financeManager internal getLoans uses supabase? Yes.
+            const loans = await financeManager.getLoans() || []
+            // Need to cast or unsure if types match perfectly?
+            // Supabase types from `tables` vs Shared `Loan`.
+            // financeManager.getLoans() returns Database Row type. 
+            // We might need to map it to 'Loan' shared type if they differ significantly.
+            // Shared 'Loan' expects camelCase or snake_case? 
+            // src/types/finance.ts defines snake_case: user_id, principal_amount, etc.
+            // DB types are snake_case. So casting should work.
+            const foundLoan = (loans as unknown as Loan[]).find(l => l.id === loanId)
 
-        const loans = getLoans()
-        const foundLoan = loans.find(l => l.id === loanId)
+            if (!foundLoan) {
+                router.push('/loans')
+                return
+            }
 
-        if (!foundLoan) {
-            router.push('/loans')
-            return
+            setLoan(foundLoan)
+
+            // Fetch payments
+            const fetchedPayments = await financeManager.getLoanPayments(loanId) || []
+            setPayments(fetchedPayments as unknown as LoanPayment[])
+
+            // Generate Schedule using Utility
+            // Ensure 'fetchedPayments' matches 'LoanPayment' structure expected by utility
+            setSchedule(generateAmortizationSchedule(foundLoan, fetchedPayments as unknown as LoanPayment[]))
         }
-
-        setLoan(foundLoan)
-        setPayments(getLoanPayments(loanId))
-        setSchedule(generateAmortizationSchedule(loanId))
+        loadData()
     }, [loanId, router])
 
     const stats = useMemo(() => {
         if (!loan) return null
 
         return {
-            outstandingBalance: getLoanOutstandingBalance(loanId),
-            totalInterestPaid: getLoanTotalInterestPaid(loanId),
-            totalPrincipalPaid: getLoanTotalPrincipalPaid(loanId),
-            progress: (loan.emisPaid / loan.tenureMonths) * 100,
-            remainingEmis: loan.tenureMonths - loan.emisPaid
+            outstandingBalance: getLoanOutstandingBalance(loan, payments),
+            totalInterestPaid: getLoanTotalInterestPaid(loan, payments),
+            totalPrincipalPaid: getLoanTotalPrincipalPaid(loan, payments),
+            progress: (loan.emis_paid / loan.total_emis) * 100,
+            remainingEmis: loan.total_emis - loan.emis_paid
         }
-    }, [loan, loanId])
+    }, [loan, payments])
 
     const chartData = useMemo(() => {
         if (!loan || !stats) return { pieData: [], lineData: [] }
 
-        const totalInterest = loan.totalAmount - loan.principal
+        // Note: loan.totalAmount doesn't exist on DB row usually, it's calculated.
+        // Utility 'calculateEMI' gives totalAmount. 
+        // Or we assume 'emi_amount * total_emis'.
+        const totalAmount = loan.emi_amount * loan.total_emis
+        const totalInterest = totalAmount - loan.principal_amount
+
         const pieData = [
             { name: 'Principal Paid', value: stats.totalPrincipalPaid, color: '#10b981' },
             { name: 'Interest Paid', value: stats.totalInterestPaid, color: '#f59e0b' },
@@ -89,10 +117,46 @@ export default function LoanDetailPage() {
 
     const handlePrepaymentCalculation = () => {
         const amount = parseFloat(prepaymentAmount)
-        if (isNaN(amount) || amount <= 0) return
+        if (isNaN(amount) || amount <= 0 || !loan) return
 
-        const analysis = calculatePrepaymentImpact(loanId, amount)
+        const analysis = calculatePrepaymentImpact(loan, payments, amount)
         setPrepaymentAnalysis(analysis)
+    }
+
+    const handleRecordPayment = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!loan) return
+
+        try {
+            setIsSavingPayment(true)
+            await financeManager.updateLoanWithPayment(loan.id, {
+                amount: parseFloat(paymentForm.amount),
+                date: paymentForm.date,
+                type: paymentForm.type,
+                notes: paymentForm.notes
+            })
+
+            // Refresh data
+            const loans = await financeManager.getLoans()
+            const foundLoan = loans.find(l => l.id === loanId)
+            if (foundLoan) setLoan(foundLoan)
+
+            const fetchedPayments = await financeManager.getLoanPayments(loanId) || []
+            setPayments(fetchedPayments as unknown as LoanPayment[])
+
+            if (foundLoan) {
+                setSchedule(generateAmortizationSchedule(foundLoan, fetchedPayments as unknown as LoanPayment[]))
+            }
+
+            setIsPaymentModalOpen(false)
+            setPaymentForm({ amount: '', date: new Date().toISOString().split('T')[0], type: 'emi_payment', notes: '' })
+            alert('Payment recorded successfully')
+        } catch (error) {
+            console.error('Failed to record payment:', error)
+            alert('Failed to record payment')
+        } finally {
+            setIsSavingPayment(false)
+        }
     }
 
     if (!loan || !stats) {
@@ -103,8 +167,18 @@ export default function LoanDetailPage() {
         )
     }
 
+    // Helpers
+    // loan.monthlyAmount -> loan.emi_amount
+    // loan.principal -> loan.principal_amount
+    // loan.rate -> loan.interest_rate
+    // loan.tenureMonths -> loan.total_emis
+    // loan.startDate -> loan.start_date
+    // loan.nextDueDate -> loan.next_emi_date
+    // loan.totalAmount -> (calculated)
+    const totalAmount = (loan.emi_amount ?? 0) * (loan.total_emis ?? 1)
+
     const formatCurrency = (amount: number) => `₹${amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
-    const formatDate = (date: string) => new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+    const formatDate = (date: string) => date ? new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 py-8">
@@ -112,13 +186,22 @@ export default function LoanDetailPage() {
 
                 {/* Header */}
                 <div className="mb-6">
-                    <button
-                        onClick={() => router.push('/loans')}
-                        className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
-                    >
-                        <ArrowLeftIcon className="h-4 w-4 mr-2" />
-                        Back to Loans
-                    </button>
+                    <div className="flex justify-between items-center mb-4">
+                        <button
+                            onClick={() => router.push('/loans')}
+                            className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
+                        >
+                            <ArrowLeftIcon className="h-4 w-4 mr-2" />
+                            Back to Loans
+                        </button>
+                        <button
+                            onClick={() => setIsPaymentModalOpen(true)}
+                            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                        >
+                            <BanknotesIcon className="-ml-1 mr-2 h-5 w-5" />
+                            Record Payment
+                        </button>
+                    </div>
 
                     <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl shadow-lg p-8 text-white">
                         <div className="flex items-start justify-between">
@@ -130,19 +213,19 @@ export default function LoanDetailPage() {
                                 <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                     <div>
                                         <span className="text-blue-200">Principal</span>
-                                        <p className="font-semibold text-lg">{formatCurrency(loan.principal)}</p>
+                                        <p className="font-semibold text-lg">{formatCurrency(loan.principal_amount)}</p>
                                     </div>
                                     <div>
                                         <span className="text-blue-200">Interest Rate</span>
-                                        <p className="font-semibold text-lg">{loan.rate}% p.a.</p>
+                                        <p className="font-semibold text-lg">{loan.interest_rate ? `${loan.interest_rate}% p.a.` : '0% (N/A)'}</p>
                                     </div>
                                     <div>
                                         <span className="text-blue-200">Tenure</span>
-                                        <p className="font-semibold text-lg">{loan.tenureMonths} months</p>
+                                        <p className="font-semibold text-lg">{loan.total_emis ? `${loan.total_emis} months` : 'Flexible'}</p>
                                     </div>
                                     <div>
                                         <span className="text-blue-200">Monthly EMI</span>
-                                        <p className="font-semibold text-lg">{formatCurrency(loan.monthlyAmount)}</p>
+                                        <p className="font-semibold text-lg">{loan.emi_amount ? formatCurrency(loan.emi_amount) : 'Flexible'}</p>
                                     </div>
                                 </div>
                             </div>
@@ -151,7 +234,7 @@ export default function LoanDetailPage() {
                                 <p className="text-blue-200 text-sm mb-1">Outstanding Balance</p>
                                 <p className="text-4xl font-bold">{formatCurrency(stats.outstandingBalance)}</p>
                                 <p className="text-blue-200 text-sm mt-2">
-                                    Next Due: {formatDate(loan.nextDueDate)}
+                                    Next Due: {formatDate(loan.next_emi_date || '')}
                                 </p>
                             </div>
                         </div>
@@ -159,7 +242,7 @@ export default function LoanDetailPage() {
                         {/* Progress Bar */}
                         <div className="mt-6">
                             <div className="flex items-center justify-between text-sm mb-2">
-                                <span>Progress: {loan.emisPaid} / {loan.tenureMonths} EMIs paid</span>
+                                <span>Progress: {loan.emis_paid} / {loan.total_emis} EMIs paid</span>
                                 <span>{Math.round(stats.progress)}%</span>
                             </div>
                             <div className="w-full bg-blue-900/30 rounded-full h-3">
@@ -208,7 +291,7 @@ export default function LoanDetailPage() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-600">Total Payable</p>
-                                <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(loan.totalAmount)}</p>
+                                <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(totalAmount)}</p>
                             </div>
                             <DocumentTextIcon className="h-10 w-10 text-gray-500" />
                         </div>
@@ -457,6 +540,77 @@ export default function LoanDetailPage() {
                     </div>
                 </div>
             </div>
+
+        {/* Payment Modal */ }
+    {
+        isPaymentModalOpen && (
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
+                <div className="bg-white rounded-lg max-w-md w-full p-6">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Record Payment</h3>
+                    <form onSubmit={handleRecordPayment} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Amount</label>
+                            <input
+                                type="number"
+                                required
+                                min="0"
+                                step="0.01"
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                                value={paymentForm.amount}
+                                onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Date</label>
+                            <input
+                                type="date"
+                                required
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                                value={paymentForm.date}
+                                onChange={e => setPaymentForm({ ...paymentForm, date: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Type</label>
+                            <select
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                                value={paymentForm.type}
+                                onChange={e => setPaymentForm({ ...paymentForm, type: e.target.value })}
+                            >
+                                <option value="emi_payment">Regular EMI</option>
+                                <option value="prepayment">Prepayment (Principal Only)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Notes</label>
+                            <input
+                                type="text"
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                                value={paymentForm.notes}
+                                onChange={e => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                            />
+                        </div>
+                        <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                            <button
+                                type="submit"
+                                disabled={isSavingPayment}
+                                className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none sm:col-start-2 sm:text-sm disabled:opacity-50"
+                            >
+                                {isSavingPayment ? 'Saving...' : 'Save Payment'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setIsPaymentModalOpen(false)}
+                                className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:col-start-1 sm:text-sm"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        )
+    }
         </div>
     )
 }

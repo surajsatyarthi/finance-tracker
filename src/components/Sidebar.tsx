@@ -12,7 +12,11 @@ import {
     FlagIcon,
     CreditCardIcon,
     XMarkIcon,
-    ArrowRightOnRectangleIcon
+    ArrowRightOnRectangleIcon,
+    BanknotesIcon,
+    WalletIcon,
+    DocumentMagnifyingGlassIcon,
+    PresentationChartLineIcon
 } from '@heroicons/react/24/outline'
 
 interface SidebarProps {
@@ -26,15 +30,16 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
     const navigation = [
         { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-        { name: 'Accounts', href: '/accounts', icon: BuildingLibraryIcon },
-        { name: 'Income', href: '/income', icon: ArrowTrendingUpIcon },
+        { name: 'Accounts', href: '/accounts', icon: WalletIcon },
+        { name: 'Income', href: '/income', icon: BanknotesIcon },
         { name: 'Expenses', href: '/expenses/add', icon: ArrowTrendingDownIcon },
         { name: 'Budget', href: '/budget', icon: ChartBarIcon },
         { name: 'Goals', href: '/goals', icon: FlagIcon },
         { name: 'Loans', href: '/loans', icon: ArrowTrendingDownIcon },
         { name: 'Savings & FDs', href: '/savings-fds', icon: FlagIcon },
-        { name: 'Credit Cards', href: '/cards', icon: CreditCardIcon },
-        { name: 'CC Liability', href: '/credit-card-liability', icon: ArrowTrendingDownIcon },
+        { name: 'Credit Cards', href: '/credit-cards', icon: CreditCardIcon },
+        { name: 'Future Payables', href: '/liabilities', icon: ArrowTrendingDownIcon },
+        { name: 'Analytics', href: '/analytics', icon: PresentationChartLineIcon },
     ]
 
     return (
@@ -88,8 +93,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                                     href={item.href}
                                     onClick={onClose}
                                     className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${isActive
-                                            ? 'bg-indigo-50 text-indigo-700 shadow-sm'
-                                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                        ? 'bg-indigo-50 text-indigo-700 shadow-sm'
+                                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                                         }`}
                                 >
                                     <item.icon className={`h-5 w-5 mr-3 ${isActive ? 'text-indigo-600' : 'text-gray-400'}`} />

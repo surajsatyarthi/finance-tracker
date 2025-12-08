@@ -175,8 +175,8 @@ export default function SavingsFDsPage() {
             </div>
           </GlassCard>
         </div>
-      </div >
-    </div >
+      </div>
+    </div>
   )
 }
 

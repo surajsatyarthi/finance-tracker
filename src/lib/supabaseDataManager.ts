@@ -3,53 +3,26 @@
 
 import { supabase } from './supabase'
 import { Database } from '../types/database.types'
+import {
+  BankAccount,
+  LiquidityData,
+  FuturePayable,
+  EnhancedTransaction,
+  Category,
+  Budget,
+  Transaction,
+  CreditCard as DSCreditCard,
+  Loan,
+  Goal
+} from '@/types/finance'
 
 // Type definitions
 type Tables = Database['public']['Tables']
-type Account = Tables['accounts']['Row']
-type Transaction = Tables['transactions']['Row']
-type CreditCard = Tables['credit_cards']['Row'] & { current_balance: number; credit_limit: number; due_date: number | null }
-type Goal = Tables['goals']['Row']
-type Loan = Tables['loans']['Row']
-type LoanPayment = Tables['loan_payments']['Row']
+type DBAccount = Tables['accounts']['Row']
+type DBTransaction = Tables['transactions']['Row']
+type DBCreditCard = Tables['credit_cards']['Row']
+type DBLoan = Tables['loans']['Row']
 
-// --- Interfaces matching dataManager.ts for compatibility ---
-
-export interface BankAccount {
-  id: string
-  name: string
-  type: string
-  balance: number
-  currency: string
-  lastUpdated: string
-}
-
-export interface LiquidityData {
-  cashBalance: number
-  bankAccounts: BankAccount[]
-  totalLiquidity: number
-  lastUpdated: string
-}
-
-export interface FuturePayable {
-  id: string
-  type: 'credit_card' | 'emi' | 'bnpl'
-  amount: number
-  dueDate: string
-  description: string
-  source: string
-  originalTransactionId: string
-  status: 'pending' | 'paid'
-  timestamp: string
-}
-
-export interface EnhancedTransaction extends Omit<Transaction, 'created_at' | 'updated_at'> {
-  created_at: string
-  updated_at: string
-  formatted_amount: string
-  account_name?: string
-  category_name?: string
-}
 
 export class FinanceDataError extends Error {
   constructor(message: string, public code: string, public context?: Record<string, unknown>) {
@@ -172,6 +145,53 @@ export class FinanceDataManager {
     return data.bankAccounts
   }
 
+  async getCategories(): Promise<Category[]> {
+    if (!this.userId) await this.initialize()
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('user_id', this.userId!)
+      .order('name')
+
+    if (error) {
+      console.error('Error fetching categories:', error)
+      return []
+    }
+    return data || []
+  }
+
+  async getBudgets(year?: number): Promise<Budget[]> {
+    if (!this.userId) await this.initialize()
+    if (!this.userId) return []
+
+    // Check cache (only if year is provided, for simplicity)
+    if (year) {
+      const cached = this.getFromCache<Budget[]>(`budgets_${year}`)
+      if (cached) return cached
+    }
+
+    let query = supabase
+      .from('budgets')
+      .select('*')
+      .eq('user_id', this.userId)
+
+    if (year) {
+      query = query.eq('year', year)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error(`Error fetching budgets${year ? ` for ${year}` : ''}:`, error)
+      return []
+    }
+
+    if (year) {
+      this.setCache(`budgets_${year}`, data)
+    }
+    return data || []
+  }
+
   async storeAccount(account: Omit<BankAccount, 'id' | 'lastUpdated'>) {
     if (!this.userId) await this.initialize()
     if (!this.userId) throw new Error('User not initialized')
@@ -219,7 +239,9 @@ export class FinanceDataManager {
     }))
   }
 
-  async createTransaction(tx: { amount: number; type: string; description: string; date: string; category?: string; payment_method: string; account_id?: string }) {
+
+
+  async createTransaction(tx: { amount: number; type: 'income' | 'expense' | 'transfer'; description: string; date: string; category?: string; payment_method: string; account_id?: string }) {
     if (!this.userId) await this.initialize()
 
     const { data, error } = await supabase.from('transactions').insert({
@@ -274,6 +296,112 @@ export class FinanceDataManager {
     if (!this.userId) await this.initialize()
     const { data } = await supabase.from('transactions').select('*').eq('user_id', this.userId!).eq('type', 'income').order('date', { ascending: false })
     return data || []
+  }
+
+  async getExpenseTransactions() {
+    if (!this.userId) await this.initialize()
+    // Fetch all for aggregation (limit might need adjustment for very large datasets)
+    const { data } = await supabase.from('transactions').select('*').eq('user_id', this.userId!).eq('type', 'expense').order('date', { ascending: false })
+    return data || []
+  }
+
+  // --- Reports & Aggregations ---
+
+  async getMonthlyFlows(year: number) {
+    if (!this.userId) await this.initialize()
+
+    const startDate = `${year}-01-01`
+    const endDate = `${year}-12-31`
+
+    const { data: transactions, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('user_id', this.userId!)
+      .gte('date', startDate)
+      .lte('date', endDate)
+
+    if (error) {
+      logger.error('Error fetching yearly flows', error)
+      return []
+    }
+
+    const monthlyData = new Array(12).fill(0).map((_, i) => ({
+      month: i, // 0-11
+      income: 0,
+      expense: 0
+    }))
+
+    transactions.forEach(t => {
+      const date = new Date(t.date)
+      const monthIndex = date.getMonth()
+      if (monthIndex >= 0 && monthIndex < 12) {
+        if (t.type === 'income') {
+          monthlyData[monthIndex].income += t.amount
+        } else if (t.type === 'expense') {
+          monthlyData[monthIndex].expense += t.amount
+        }
+      }
+    })
+
+    return monthlyData
+  }
+
+  async getCategoryBreakdown(startDate: string, endDate: string) {
+    if (!this.userId) await this.initialize()
+
+    const { data: transactions, error } = await supabase
+      .from('transactions')
+      .select('amount, category:categories(name)')
+      .eq('user_id', this.userId!)
+      .eq('type', 'expense')
+      .gte('date', startDate)
+      .lte('date', endDate)
+
+    if (error) {
+      logger.error('Error fetching category breakdown', error)
+      return []
+    }
+
+    const categoryMap: Record<string, number> = {}
+
+    transactions.forEach((t: any) => {
+      const catName = t.category?.name || 'Uncategorized'
+      categoryMap[catName] = (categoryMap[catName] || 0) + t.amount
+    })
+
+    return Object.entries(categoryMap)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+  }
+
+  async getNetWorthHistory(days = 30) {
+    if (!this.userId) await this.initialize()
+
+    const { data, error } = await supabase
+      .from('daily_snapshots')
+      .select('*')
+      .eq('user_id', this.userId!)
+      .order('date', { ascending: true })
+      .limit(days) // This might fetch oldest first due to order, let's check
+
+    // If we want last 30 days history...
+    // We should probably order desc limit 30 then reverse.
+    // But for chart line, asc is good.
+    // We need date range filter usually.
+
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - days)
+    const cutoffStr = cutoff.toISOString().split('T')[0]
+
+    const { data: history, error: hError } = await supabase
+      .from('daily_snapshots')
+      .select('date, total_assets, total_liabilities, net_worth')
+      .eq('user_id', this.userId!)
+      .gte('date', cutoffStr)
+      .order('date', { ascending: true })
+
+    if (hError) return []
+    return history
   }
 
   async getExpenseTransactions() {
@@ -406,23 +534,28 @@ export class FinanceDataManager {
 
   // --- Loans (New) ---
 
-  async getLoans(): Promise<any[]> {
+  async getLoans(): Promise<Loan[]> {
     if (!this.userId) await this.initialize()
     const { data, error } = await supabase.from('loans').select('*').eq('user_id', this.userId!).eq('is_active', true)
     if (error) return []
 
     return data.map(l => ({
       id: l.id,
+      user_id: l.user_id,
       name: l.name,
-      principal: l.principal_amount,
-      currentBalance: l.current_balance,
-      monthlyAmount: l.emi_amount,
-      rate: l.interest_rate,
-      tenureMonths: l.total_emis,
-      emisPaid: l.emis_paid,
-      startDate: l.start_date,
-      nextDueDate: l.next_emi_date,
-      type: l.type // Added type to distinguish 'EMI' vs 'LOAN'
+      type: l.type,
+      principal_amount: l.principal_amount,
+      current_balance: l.current_balance,
+      interest_rate: l.interest_rate,
+      emi_amount: l.emi_amount,
+      total_emis: l.total_emis,
+      emis_paid: l.emis_paid,
+      start_date: l.start_date,
+      next_emi_date: l.next_emi_date || undefined,
+      linked_credit_card_id: l.linked_credit_card_id || undefined,
+      is_active: l.is_active || false,
+      created_at: l.created_at,
+      updated_at: l.updated_at
     }))
   }
 
@@ -431,17 +564,18 @@ export class FinanceDataManager {
     const { error } = await supabase.from('loans').insert({
       user_id: this.userId!,
       name: loan.name,
-      type: loan.type || 'LOAN',
-      principal_amount: loan.principal,
-      current_balance: loan.principal, // initially same
-      emi_amount: loan.monthlyAmount,
-      total_emis: loan.tenureMonths,
-      emis_paid: loan.emisPaid || 0,
-      start_date: loan.startDate,
-      next_emi_date: loan.nextDueDate,
-      interest_rate: loan.rate,
-      is_active: true
-    })
+      type: loan.type,
+      principal_amount: loan.principal_amount,
+      current_balance: loan.principal_amount, // Start full
+      interest_rate: loan.interest_rate,
+      emi_amount: loan.emi_amount,
+      total_emis: loan.total_emis,
+      emis_paid: 0,
+      start_date: loan.start_date,
+      next_emi_date: loan.start_date, // First EMI due on start or next month? Usually next month. user can edit.
+      is_active: true,
+      linked_credit_card_id: loan.linked_credit_card_id || null
+    }).select().single()
     if (error) throw error
     return { success: true }
   }
@@ -468,6 +602,429 @@ export class FinanceDataManager {
     return { success: true }
   }
 
+  // --- Investments (New) ---
+
+  async getInvestments(): Promise<any[]> {
+    if (!this.userId) await this.initialize()
+    const { data, error } = await supabase
+      .from('investments')
+      .select('*')
+      .eq('user_id', this.userId!)
+      .eq('is_active', true)
+      .order('current_value', { ascending: false })
+
+    if (error) {
+      logger.error('Error fetching investments', error)
+      return []
+    }
+    return data
+  }
+
+  async createInvestment(investment: {
+    name: string
+    type: string
+    amount_invested: number
+    current_value: number
+    quantity?: number
+    purchase_date?: string
+  }) {
+    if (!this.userId) await this.initialize()
+    const { error } = await supabase.from('investments').insert({
+      user_id: this.userId!,
+      name: investment.name,
+      type: investment.type,
+      amount_invested: investment.amount_invested,
+      current_value: investment.current_value,
+      quantity: investment.quantity,
+      purchase_date: investment.purchase_date,
+      is_active: true
+    })
+
+    if (error) throw error
+    return { success: true }
+  }
+
+  async deleteInvestment(id: string) {
+    if (!this.userId) await this.initialize()
+    await supabase.from('investments').delete().eq('id', id)
+    return { success: true }
+  }
+
+  async getLoanPayments(loanId: string) {
+    if (!this.userId) await this.initialize()
+    const { data, error } = await supabase
+      .from('loan_payments')
+      .select('*')
+      .eq('loan_id', loanId)
+      .eq('user_id', this.userId!)
+      .order('payment_date', { ascending: false })
+
+    if (error) {
+      logger.error('Error fetching loan payments', error)
+      return []
+    }
+    return data
+  }
+
+  async updateLoanWithPayment(loanId: string, payment: { amount: number; date: string; type: string; notes?: string }) {
+    if (!this.userId) await this.initialize()
+
+    // 1. Get Loan details
+    const { data: loan, error: loanError } = await supabase
+      .from('loans')
+      .select('*')
+      .eq('id', loanId)
+      .single()
+
+    if (loanError || !loan) throw new Error('Loan not found')
+
+    // 2. Calculate components (simple logic for now, precise logic belongs in component/utils to pre-calc)
+    // Here we assume the client passes correct split or we calc?
+    // Let's calc simply:
+    const monthlyRate = loan.interest_rate / 12 / 100
+    const interestComponent = loan.current_balance * monthlyRate
+    const principalComponent = Math.min(payment.amount - interestComponent, loan.current_balance)
+
+    // 3. Insert Payment
+    const { error: paymentError } = await supabase.from('loan_payments').insert({
+      user_id: this.userId!,
+      loan_id: loanId,
+      amount: payment.amount,
+      payment_date: payment.date,
+      principal_amount: principalComponent,
+      interest_amount: interestComponent,
+      balance_after_payment: loan.current_balance - principalComponent
+    })
+
+    if (paymentError) throw paymentError
+
+    // 4. Update Loan Balance & EMIs Paid
+    const newBalance = loan.current_balance - principalComponent
+    let newEmisPaid = loan.emis_paid
+    let nextDueDate = loan.next_emi_date
+
+    if (payment.amount >= loan.emi_amount) {
+      newEmisPaid += 1
+      // Calculate next due date (simple: add 1 month)
+      if (nextDueDate) {
+        const d = new Date(nextDueDate)
+        d.setMonth(d.getMonth() + 1)
+        nextDueDate = d.toISOString().split('T')[0]
+      }
+    }
+
+    await this.updateLoan(loanId, {
+      currentBalance: newBalance,
+      emisPaid: newEmisPaid,
+      nextDueDate: nextDueDate
+    })
+
+    return { newBalance, newEmisPaid }
+  }
+
+  // --- Pay Later (BNPL) ---
+
+  async getPayLaterServices(): Promise<any[]> {
+    if (!this.userId) await this.initialize()
+    const { data, error } = await supabase
+      .from('pay_later_services')
+      .select('*')
+      .eq('user_id', this.userId!)
+      .neq('status', 'deleted') // Soft delete check if implemented, else just filter
+      .order('next_due_date', { ascending: true })
+
+    if (error) {
+      // If table doesn't exist yet, return empty to prevent crash
+      console.warn('Error fetching pay later services (Table might be missing):', error.message)
+      return []
+    }
+
+    return data.map(s => ({
+      id: s.id,
+      serviceName: s.service_name,
+      serviceCode: s.service_code,
+      creditLimit: s.credit_limit,
+      usedAmount: s.used_amount,
+      currentDue: s.current_due,
+      availableAmount: s.credit_limit - s.used_amount, // Calc on fly
+      nextDueDate: s.next_due_date,
+      dueSchedule: s.due_schedule,
+      status: s.status,
+      interestRate: s.interest_rate,
+      penaltyFee: s.penalty_fee,
+      lastUsed: s.last_used
+    }))
+  }
+
+  async createPayLaterService(service: any) {
+    if (!this.userId) await this.initialize()
+    const { error } = await supabase.from('pay_later_services').insert({
+      user_id: this.userId!,
+      service_name: service.serviceName,
+      service_code: service.serviceCode,
+      credit_limit: service.creditLimit,
+      used_amount: service.usedAmount || 0,
+      current_due: service.currentDue || 0,
+      next_due_date: service.nextDueDate,
+      due_schedule: service.dueSchedule,
+      status: service.status || 'active',
+      interest_rate: service.interestRate,
+      penalty_fee: service.penaltyFee
+    })
+    if (error) throw error
+    return { success: true }
+  }
+
+  async updatePayLaterService(id: string, updates: any) {
+    if (!this.userId) await this.initialize()
+
+    const dbUpdates: any = {}
+    if (updates.serviceName) dbUpdates.service_name = updates.serviceName
+    if (updates.serviceCode) dbUpdates.service_code = updates.serviceCode
+    if (updates.creditLimit !== undefined) dbUpdates.credit_limit = updates.creditLimit
+    if (updates.usedAmount !== undefined) dbUpdates.used_amount = updates.usedAmount
+    if (updates.currentDue !== undefined) dbUpdates.current_due = updates.currentDue
+    if (updates.nextDueDate) dbUpdates.next_due_date = updates.nextDueDate
+    if (updates.status) dbUpdates.status = updates.status
+
+    const { error } = await supabase.from('pay_later_services').update({
+      ...dbUpdates,
+      updated_at: new Date().toISOString()
+    }).eq('id', id)
+
+    if (error) throw error
+    return { success: true }
+  }
+
+  async deletePayLaterService(id: string) {
+    if (!this.userId) await this.initialize()
+    const { error } = await supabase.from('pay_later_services').delete().eq('id', id)
+    if (error) throw error
+    return { success: true }
+  }
+
+  // --- Goals (New) ---
+
+  async getGoals(): Promise<Goal[]> {
+    if (!this.userId) await this.initialize()
+    const { data, error } = await supabase
+      .from('goals')
+      .select('*')
+      .eq('user_id', this.userId!)
+      .order('target_date', { ascending: true })
+
+    if (error) {
+      logger.error('Error fetching goals', error)
+      return []
+    }
+
+    return data.map(g => ({
+      ...g,
+      target_date: g.target_date || undefined
+    }))
+  }
+
+  async createGoal(goal: { name: string; target_amount: number; target_date?: string; category?: string; priority?: string }) {
+    if (!this.userId) await this.initialize()
+    const { error } = await supabase.from('goals').insert({
+      user_id: this.userId!,
+      name: goal.name,
+      target_amount: goal.target_amount,
+      current_amount: 0,
+      target_date: goal.target_date,
+      category: goal.category,
+      priority: goal.priority || 'medium',
+      is_completed: false
+    })
+
+    if (error) throw error
+    return { success: true }
+  }
+
+  async updateGoalProgress(id: string, amountToAdd: number) {
+    if (!this.userId) await this.initialize()
+
+    // Get current amount first (atomicity issue? ideally use RPC, but read-write ok for single user)
+    const { data: goal } = await supabase.from('goals').select('current_amount').eq('id', id).single()
+    if (!goal) throw new Error('Goal not found')
+
+    const newAmount = goal.current_amount + amountToAdd
+    const { error } = await supabase.from('goals').update({
+      current_amount: newAmount,
+      updated_at: new Date().toISOString()
+    }).eq('id', id)
+
+    if (error) throw error
+    return { success: true, newAmount }
+  }
+
+  async deleteGoal(id: string) {
+    if (!this.userId) await this.initialize()
+    await supabase.from('goals').delete().eq('id', id)
+    return { success: true }
+  }
+
+  async updateGoal(id: string, updates: any) {
+    if (!this.userId) await this.initialize()
+    const { error } = await supabase
+      .from('goals')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('user_id', this.userId!)
+
+    if (error) throw error
+    return { success: true }
+  }
+
+  // --- Account Management ---
+
+  async updateAccountBalance(id: string, newBalance: number) {
+    if (!this.userId) await this.initialize()
+    const { error } = await supabase.from('accounts').update({
+      balance: newBalance,
+      updated_at: new Date().toISOString()
+    }).eq('id', id)
+
+    if (error) throw error
+    return { success: true }
+  }
+
+
+
+  async processExpense(expense: {
+    amount: number
+    description: string
+    date: string
+    paymentMethod: string
+    bankAccount?: string
+    creditCard?: string
+    bnplProvider?: string
+    emiDetails?: any
+    category: string
+  }) {
+    if (!this.userId) await this.initialize()
+
+    // Resolve Category ID (Simple lookup or null for now)
+    // Ideally we cache categories or search. For now we put string in description if needed or subcategory.
+    // Assuming 'uncategorized' or similar handling in real app.
+    // We will store category string in 'subcategory' for now to preserve data.
+
+    const commonPayload = {
+      user_id: this.userId!,
+      amount: expense.amount,
+      date: expense.date, // transaction_date or date
+      description: expense.description,
+      subcategory: expense.category, // Storing category string here for legacy compatibility
+      type: 'expense',
+      created_at: new Date().toISOString()
+    }
+
+    if (expense.paymentMethod === 'cash' || expense.paymentMethod === 'upi') {
+      // 1. Transaction Table
+      const { error: txError } = await supabase.from('transactions').insert({
+        ...commonPayload,
+        payment_method: expense.paymentMethod,
+        account_id: expense.bankAccount // Null for cash? Or cash account?
+      })
+      if (txError) throw txError
+
+      // 2. Update Balance if Bank Account involved (UPI)
+      if (expense.paymentMethod === 'upi' && expense.bankAccount) {
+        // Fetch current balance
+        const { data: account } = await supabase.from('accounts').select('balance').eq('id', expense.bankAccount).single()
+        if (account) {
+          await supabase.from('accounts').update({
+            balance: account.balance - expense.amount
+          }).eq('id', expense.bankAccount)
+        }
+      }
+      return { success: true }
+
+    } else if (expense.paymentMethod === 'credit_card_emi') {
+      if (!expense.creditCard) throw new Error('Credit card required')
+      if (!expense.emiDetails) throw new Error('EMI Details required')
+
+      // Create a Linked Loan instead of a Transaction
+      await this.createLoan({
+        name: expense.description, // e.g. "iPhone 16"
+        type: 'credit_card', // New type? Or use 'personal'? Let's use 'credit_card' as per schema check
+        principal_amount: expense.amount,
+        interest_rate: expense.emiDetails.interestRate,
+        emi_amount: expense.emiDetails.monthlyAmount,
+        total_emis: expense.emiDetails.tenure,
+        start_date: expense.date,
+        linked_credit_card_id: expense.creditCard
+      })
+
+      // Do NOT update credit card balance immediately with full amount? 
+      // Actually, the card limit IS blocked by 50k usually. 
+      // User said "do not write 50000 in expense". 
+      // But for "Credit Card Balance" tracking (Limit Utilization), we DO need to reduce available limit.
+      // But the user's "Current Balance" on card usually reflects unbilled amount.
+      // If converted to EMI, the bank moves it to a separate loan bucket usually.
+      // The "Outstanding" on card statement increases by EMI amount each month.
+      // So I should NOT add 50k to `current_balance`. 
+      // I will only touch `createLoan`.
+
+      // Handle Processing Fee
+      const fee = expense.emiDetails.processingFee
+      if (fee && fee > 0) {
+        const { error: feeError } = await supabase.from('credit_card_transactions').insert({
+          user_id: this.userId!,
+          credit_card_id: expense.creditCard,
+          amount: fee,
+          type: 'fee',
+          description: `Processing Fee: ${expense.description}`,
+          transaction_date: expense.date
+        })
+        if (feeError) throw feeError
+
+        // Update card balance for fee only
+        const { data: card } = await supabase.from('credit_cards').select('current_balance').eq('id', expense.creditCard).single()
+        if (card) {
+          await supabase.from('credit_cards').update({
+            current_balance: card.current_balance + fee
+          }).eq('id', expense.creditCard)
+        }
+      }
+
+      return { success: true }
+
+    } else if (expense.paymentMethod === 'credit_card') {
+      if (!expense.creditCard) throw new Error('Credit card required')
+
+      // 1. Credit Card Transaction Table
+      const { error: ccError } = await supabase.from('credit_card_transactions').insert({
+        user_id: this.userId!,
+        credit_card_id: expense.creditCard,
+        amount: expense.amount,
+        type: 'purchase', // Changed from debit? Schema has 'purchase'
+        description: expense.description,
+        transaction_date: expense.date
+      })
+      if (ccError) throw ccError
+
+      // 2. Update Credit Card Balance
+      const { data: card } = await supabase.from('credit_cards').select('current_balance').eq('id', expense.creditCard).single()
+      if (card) {
+        await supabase.from('credit_cards').update({
+          current_balance: card.current_balance + expense.amount
+        }).eq('id', expense.creditCard)
+      }
+      return { success: true }
+    } else if (expense.paymentMethod === 'bnpl') {
+      // BNPL handling - Map to transactions for now or custom logic
+      const { error: txError } = await supabase.from('transactions').insert({
+        ...commonPayload,
+        payment_method: 'bnpl',
+        description: `[BNPL: ${expense.bnplProvider}] ${expense.description}`
+      })
+      if (txError) throw txError
+      return { success: true }
+    }
+
+    throw new Error('Unsupported payment method')
+  }
 
   // --- Future Payables / Projections ---
   // This is a computed view in Supabase mode, aggregating from Loans and Cards
@@ -575,11 +1132,6 @@ export class FinanceDataManager {
   }
 
   // --- Goals & FDs ---
-  async getGoals() {
-    if (!this.userId) await this.initialize()
-    const { data } = await supabase.from('goals').select('*').eq('user_id', this.userId!)
-    return data || []
-  }
 
   async getFDs() {
     // Map Goals to FDs where category = 'Fixed Deposit'
@@ -839,41 +1391,6 @@ export class FinanceDataManager {
   }
 
   // --- Goals (CRUD) ---
-  async createGoal(goal: any) {
-    if (!this.userId) await this.initialize()
-    const { data, error } = await supabase.from('goals').insert({
-      user_id: this.userId!,
-      name: goal.name,
-      target_amount: goal.target_amount,
-      current_amount: goal.current_amount || 0,
-      target_date: goal.target_date,
-      category: goal.category,
-      priority: goal.priority || 'medium',
-      is_completed: goal.is_completed || false
-    }).select().single()
-
-    if (error) throw error
-    return data
-  }
-
-  async updateGoal(id: string, updates: any) {
-    if (!this.userId) await this.initialize()
-    const { error } = await supabase
-      .from('goals')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .eq('user_id', this.userId!)
-
-    if (error) throw error
-    return { success: true }
-  }
-
-  async deleteGoal(id: string) {
-    if (!this.userId) await this.initialize()
-    const { error } = await supabase.from('goals').delete().eq('id', id).eq('user_id', this.userId!)
-    if (error) throw error
-    return { success: true }
-  }
 
   // --- Budgets ---
   async getBudgetLimits(month: number, year: number) {
@@ -1180,36 +1697,260 @@ export class FinanceDataManager {
     }))
   }
 
-  async getBudgets() {
+  async getMonthlyCategorySpending(month: number, year: number): Promise<{ category: string; limit: number; spent: number }[]> {
     if (!this.userId) await this.initialize()
-    const { data } = await supabase.from('budgets').select('*').eq('user_id', this.userId!)
-    return data || []
+
+    // 1. Get Budgets
+    const budgets = await this.getBudgets()
+    // Filter for current month/year or general defaults?
+    // DB has specific month/year. Let's assume we fetch relevant ones.
+    const relevantBudgets = budgets.filter((b: any) => b.month === month && b.year === year)
+    const budgetMap = new Map<string, number>()
+    relevantBudgets.forEach((b: any) => budgetMap.set(b.category_name, b.monthly_limit))
+
+    // 2. Aggregate Transactions (Cash/Bank)
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`
+    const endDate = new Date(year, month, 0).toISOString().split('T')[0] // Last day of month
+
+    const { data: transactions } = await supabase
+      .from('transactions')
+      .select('amount, subcategory') // subcategory holds the category string currently
+      .eq('user_id', this.userId!)
+      .eq('type', 'expense')
+      .gte('date', startDate)
+      .lte('date', endDate)
+
+    // 3. Aggregate CC Transactions
+    const { data: ccTransactions } = await supabase
+      .from('credit_card_transactions')
+      .select('amount, description') // description often holds category or we need to infer?
+      // Wait, processExpense puts category in description for CC?
+      // Let's look at processExpense:
+      // description: expense.description (which was category in Add Page UI)
+      // So yes, description likely holds the category name for CC transactions currently.
+      .eq('user_id', this.userId!)
+      .eq('type', 'debit')
+      .gte('transaction_date', startDate)
+      .lte('transaction_date', endDate)
+
+    const spendingMap = new Map<string, number>()
+
+    // Helper to normalize category names
+    const normalize = (s: string) => s?.trim() || 'Uncategorized'
+
+    transactions?.forEach((t: any) => {
+      const cat = normalize(t.subcategory)
+      spendingMap.set(cat, (spendingMap.get(cat) || 0) + t.amount)
+    })
+
+    ccTransactions?.forEach((t: any) => {
+      const cat = normalize(t.description)
+      spendingMap.set(cat, (spendingMap.get(cat) || 0) + t.amount)
+    })
+
+    // 4. Merge
+    const result: { category: string; limit: number; spent: number }[] = []
+
+    // Add all budgeted categories
+    budgetMap.forEach((limit, category) => {
+      result.push({
+        category,
+        limit,
+        spent: spendingMap.get(category) || 0
+      })
+      spendingMap.delete(category) // Remove so we know what's left
+    })
+
+    // Add remaining spending (Unbudgeted)
+    spendingMap.forEach((spent, category) => {
+      result.push({
+        category,
+        limit: 0, // No budget set
+        spent
+      })
+    })
+
+    return result.sort((a, b) => b.spent - a.spent)
+  }
+
+  async getProjectedLiabilities(): Promise<FuturePayable[]> {
+    if (!this.userId) await this.initialize()
+
+    // Import helper dynamically or ensure it is imported at top. 
+    // Since we can't edit top easily in this chunk, we assume it's available or we use dynamic import
+    // Ideally, we should add the import. For now, let's use the tool again to fix imports if needed.
+    const { calculateCreditCardDueDate } = await import('./financialUtils')
+
+    // 1. Get all Active Credit Cards
+    const { data: cards, error: cardError } = await supabase
+      .from('credit_cards')
+      .select('*')
+      .eq('user_id', this.userId!)
+      .eq('is_active', true)
+
+    if (cardError || !cards) return []
+
+    const liabilities: FuturePayable[] = []
+
+    // 2. For each card, get UNPAID transactions
+    // In a real system, we'd need a way to link payments to transactions or track "open" items.
+    // For now, simpler approximation: 
+    // Get all transactions in the current billing cycle? 
+    // OR: Get all transactions since the last "Payment" type transaction?
+    // Let's use: transactions "since the start of the current cycle" if defined, 
+    // or just fetch all recent and let the user see them.
+
+    // BETTER: Any `purchase` that hasn't been effectively "cleared".
+    // Since we don't have atomic clearing, we can just project ALL transactions from the last 2 months
+    // and group them. The USER interprets the total.
+    // OR: Use the `Calculate Balance` approach -> `current_balance` is the truth. 
+    // But the User wants to know specific due dates.
+
+    // STRATEGY: 
+    // Fetch all transactions from last 45 days.
+    // Calculate Due Date for each.
+    // Sum them up by Due Date bucket.
+
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - 60) // Look back 60 days
+
+    const { data: txs } = await supabase
+      .from('credit_card_transactions')
+      .select('*')
+      .eq('user_id', this.userId!)
+      .eq('type', 'purchase') // Only new liabilities
+      .gte('transaction_date', cutoffDate.toISOString())
+
+    if (!txs) return []
+
+    // Group by (Card + DueDate)
+    const liabilityMap = new Map<string, { amount: number, cardName: string, notes: string[] }>()
+
+    txs.forEach((tx: any) => {
+      const card = cards.find(c => c.id === tx.credit_card_id)
+      if (!card || !card.statement_date || !card.due_date) return
+
+      const dueDate = calculateCreditCardDueDate(
+        tx.transaction_date,
+        card.statement_date,
+        card.due_date
+      )
+
+      // Key: HDFC-2024-10-05
+      const key = `${card.name}|${dueDate}`
+      const existing = liabilityMap.get(key) || { amount: 0, cardName: card.name, notes: [] }
+
+      existing.amount += tx.amount
+      // existing.notes.push(`${tx.description} (${tx.amount})`) // Optional detail
+
+      liabilityMap.set(key, existing)
+    })
+
+    // 2.5 Fetch and Merge Linked Loans (EMIs)
+    const { data: linkedLoans } = await supabase
+      .from('loans')
+      .select('*')
+      .eq('user_id', this.userId!)
+      .eq('is_active', true)
+      .not('linked_credit_card_id', 'is', null)
+      .gt('current_balance', 0)
+
+    if (linkedLoans) {
+      linkedLoans.forEach((loan: any) => {
+        const card = cards.find(c => c.id === loan.linked_credit_card_id)
+        if (!card || !card.statement_date || !card.due_date) return
+
+        // Project the EMI for the current billing cycle
+        // We simulate a transaction happening "today" to find the next relevant due date
+        const dueDate = calculateCreditCardDueDate(
+          new Date().toISOString(),
+          card.statement_date,
+          card.due_date
+        )
+
+        const key = `${card.name}|${dueDate}`
+        const existing = liabilityMap.get(key) || { amount: 0, cardName: card.name, notes: [] }
+
+        existing.amount += loan.emi_amount
+        // existing.notes.push(`EMI: ${loan.name} (${loan.emi_amount})`)
+
+        liabilityMap.set(key, existing)
+      })
+    }
+
+    // Convert to FuturePayable list
+    liabilityMap.forEach((val, key) => {
+      const [_, dueDate] = key.split('|')
+
+      // Filter out past due dates? Or keep them as "Overdue"?
+      // Keep them.
+
+      liabilities.push({
+        id: key, // unique enough for UI key
+        type: 'credit_card_due',
+        amount: val.amount,
+        dueDate: dueDate,
+        description: `Credit Card Bill: ${val.cardName}`,
+        source: val.cardName,
+        status: new Date(dueDate) < new Date() ? 'overdue' : 'pending'
+      })
+    })
+
+    return liabilities.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+  }
+
+
+
+  // --- Category Management ---
+
+  async addCategory(name: string, type: 'income' | 'expense') {
+    if (!this.userId) await this.initialize()
+    const { data, error } = await supabase.from('categories').insert({
+      user_id: this.userId!,
+      name: name,
+      type: type
+    }).select().single()
+
+    if (error) throw error
+    return data
+  }
+
+  async deleteCategory(id: string) {
+    if (!this.userId) await this.initialize()
+    const { error } = await supabase.from('categories').delete().eq('id', id)
+    if (error) throw error
+    return { success: true }
   }
 
   // --- Backup / Export ---
   async exportUserData() {
     if (!this.userId) await this.initialize()
 
-    const [accounts, transactions, loans, cards, goals, budgets] = await Promise.all([
+    // Fetch all relevant data
+    const [accounts, transactions, categories, creditCards, loans, goals, payLater] = await Promise.all([
       this.getAccounts(),
-      this.getTransactions(),
-      this.getLoans(),
+      this.getTransactions(10000), // All txns
+      this.getCategories(),
       this.getCreditCards(),
+      this.getLoans(),
       this.getGoals(),
-      this.getBudgets()
+      this.getPayLaterServices()
     ])
 
-    return {
+    const exportData = {
+      version: '1.0',
       timestamp: new Date().toISOString(),
       accounts,
       transactions,
+      categories,
+      creditCards,
       loans,
-      cards,
       goals,
-      budgets
+      payLater
     }
+
+    return exportData
   }
 }
 
 export const financeManager = FinanceDataManager.getInstance()
-export { Logger }

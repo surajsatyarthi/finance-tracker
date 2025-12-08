@@ -53,6 +53,7 @@ export function PrivacyProvider({ children }: { children: React.ReactNode }) {
     }) as unknown as boolean
   }
 
+  /* Auto-lock disabled per user request
   const resetTimer = () => {
     if (timer.current) window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => setLocked(true), 90_000)
@@ -71,6 +72,11 @@ export function PrivacyProvider({ children }: { children: React.ReactNode }) {
       if (timer.current) window.clearTimeout(timer.current)
     }
   }, [])
+  */
+
+  // Keep empty effect for consistency if needed, or just remove. 
+  // For cleanest diff, I'll just remove the logic body but keep the functions as stubs or just remove completely.
+  // Replacing the whole block with nothing is cleaner.
 
   return (
     <PrivacyContext.Provider value={{ locked, lock, unlock, setPassword }}>

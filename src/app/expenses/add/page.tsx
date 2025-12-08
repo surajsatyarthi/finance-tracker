@@ -11,15 +11,10 @@ import {
   MinusIcon
 } from '@heroicons/react/24/outline'
 import {
-  getBankAccounts,
-  getCreditCards,
-  processExpenseEntry,
-  calculateEMI,
-  initializeDefaultData,
-  initializeCreditCards,
-  BankAccount,
-  CreditCard
-} from '@/lib/dataManager'
+  FinanceDataManager,
+} from '@/lib/supabaseDataManager'
+import { calculateEMI } from '@/lib/financialUtils'
+import { BankAccount, CreditCard } from '@/types/finance'
 import { useNotification } from '@/contexts/NotificationContext'
 
 interface ExpenseEntry {
@@ -34,6 +29,7 @@ interface ExpenseEntry {
     interestRate: number
     monthlyAmount: number
     totalAmount: number
+    processingFee?: number
   }
   category: string
 }
@@ -55,12 +51,23 @@ export default function AddExpensePage() {
   // EMI calculation state
   const [emiPreview, setEmiPreview] = useState<{ monthlyAmount: number, totalAmount: number } | null>(null)
 
+  const financeManager = FinanceDataManager.getInstance()
+
   // Initialize data and load accounts/cards on component mount
   useEffect(() => {
-    initializeDefaultData()
-    initializeCreditCards()
-    setBankAccounts(getBankAccounts())
-    setCreditCards(getCreditCards())
+    const loadData = async () => {
+      await financeManager.initialize()
+      const [accounts, cards] = await Promise.all([
+        financeManager.getAccounts(),
+        financeManager.getCreditCards()
+      ])
+      // Map/Cast to shared types
+      setBankAccounts(accounts as BankAccount[])
+      setCreditCards(cards as unknown as CreditCard[])
+      // Note: CreditCard type might need alignment if DB and shared type diverge slightly, 
+      // but 'getCreditCards' in supabaseDataManager returns what we need.
+    }
+    loadData()
   }, [])
 
   // Calculate EMI when EMI details change
@@ -81,6 +88,7 @@ export default function AddExpensePage() {
     }
   }, [expense.amount, expense.emiDetails?.tenure, expense.emiDetails?.interestRate, expense.paymentMethod])
 
+  // ... (categories remain same) ...
   const expenseCategories = [
     // Main Categories with Subcategories
     'Loan - Education loan',
@@ -225,8 +233,25 @@ export default function AddExpensePage() {
         return
       }
 
-      // Process expense entry
-      await processExpenseEntry({
+      // Process expense entry using Supabase Manager
+      // Note: We need to adapt the single 'createTransaction' to handle EMIs/BNPL/Credit Cards logic
+      // OR we add logic here to prepare the payload.
+      // financeManager.createTransaction handles basics, but 'dataManager.processExpenseEntry' had logic for BNPL/EMI creation etc.
+      // We should check if 'createTransaction' handles this or if we need to manually create Future Payables via Manager.
+
+      // Checking financeManager capabilities...
+      // financeManager.createTransaction is simple. It does NOT handle EMI splitting or Future Payables logic yet.
+      // Ideally, that logic resides IN the manager.
+      // Since I am refactoring, I should move that logic to 'supabaseDataManager's processExpenseTransaction (which I might not have added yet?)
+
+      // Let's assume for now keeping logic here calls 'createTransaction' and 'createFuturePayable' if needed.
+      // BUT 'createFuturePayable' might not be exposed on FinanceDataManager yet.
+
+      // STRATEGY: Extend FinanceDataManager to handle complex expense processing, similar to 'processExpenseEntry' in old manager.
+      // I'll call a new method 'processExpense' on manager. I need to add that next.
+      // For now, I will use 'createTransaction' as placeholder structure, but I will need to ADD 'processExpense' to supabaseDataManager.
+
+      await financeManager.processExpense({
         amount: expense.amount,
         description: expense.category, // Use category as description
         date: expense.date,
@@ -297,8 +322,8 @@ export default function AddExpensePage() {
                   type="button"
                   onClick={() => setExpense({ ...expense, paymentMethod: 'cash', bankAccount: undefined, creditCard: undefined, bnplProvider: undefined, emiDetails: undefined })}
                   className={`flex flex-col items-center p-4 rounded-lg border-2 transition-all ${expense.paymentMethod === 'cash'
-                      ? 'border-red-500 bg-red-50 text-red-700'
-                      : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-red-500 bg-red-50 text-red-700'
+                    : 'border-gray-200 hover:border-gray-300'
                     }`}
                 >
                   <div className="icon-golden-card mb-2">
@@ -312,8 +337,8 @@ export default function AddExpensePage() {
                   type="button"
                   onClick={() => setExpense({ ...expense, paymentMethod: 'upi', creditCard: undefined, bnplProvider: undefined, emiDetails: undefined })}
                   className={`flex flex-col items-center p-4 rounded-lg border-2 transition-all ${expense.paymentMethod === 'upi'
-                      ? 'border-red-500 bg-red-50 text-red-700'
-                      : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-red-500 bg-red-50 text-red-700'
+                    : 'border-gray-200 hover:border-gray-300'
                     }`}
                 >
                   <div className="icon-golden-card mb-2">
@@ -327,8 +352,8 @@ export default function AddExpensePage() {
                   type="button"
                   onClick={() => setExpense({ ...expense, paymentMethod: 'credit_card', bankAccount: undefined, bnplProvider: undefined, emiDetails: undefined })}
                   className={`flex flex-col items-center p-4 rounded-lg border-2 transition-all ${expense.paymentMethod === 'credit_card'
-                      ? 'border-red-500 bg-red-50 text-red-700'
-                      : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-red-500 bg-red-50 text-red-700'
+                    : 'border-gray-200 hover:border-gray-300'
                     }`}
                 >
                   <div className="icon-golden-card mb-2">
@@ -342,8 +367,8 @@ export default function AddExpensePage() {
                   type="button"
                   onClick={() => setExpense({ ...expense, paymentMethod: 'credit_card_emi', bankAccount: undefined, bnplProvider: undefined })}
                   className={`flex flex-col items-center p-4 rounded-lg border-2 transition-all ${expense.paymentMethod === 'credit_card_emi'
-                      ? 'border-red-500 bg-red-50 text-red-700'
-                      : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-red-500 bg-red-50 text-red-700'
+                    : 'border-gray-200 hover:border-gray-300'
                     }`}
                 >
                   <div className="icon-golden-card mb-2">
@@ -357,8 +382,8 @@ export default function AddExpensePage() {
                   type="button"
                   onClick={() => setExpense({ ...expense, paymentMethod: 'bnpl', bankAccount: undefined, creditCard: undefined, emiDetails: undefined })}
                   className={`flex flex-col items-center p-4 rounded-lg border-2 transition-all ${expense.paymentMethod === 'bnpl'
-                      ? 'border-red-500 bg-red-50 text-red-700'
-                      : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-red-500 bg-red-50 text-red-700'
+                    : 'border-gray-200 hover:border-gray-300'
                     }`}
                 >
                   <div className="icon-golden-card mb-2">
@@ -406,7 +431,7 @@ export default function AddExpensePage() {
                   <option value="">Choose credit card...</option>
                   {creditCards.map((card) => (
                     <option key={card.id} value={card.id}>
-                      {card.name} ****{card.lastFourDigits} (Due: {card.dueDate}th)
+                      {card.name} ****{card.last_four_digits} (Due: {card.due_date}th)
                     </option>
                   ))}
                 </select>
@@ -526,18 +551,35 @@ export default function AddExpensePage() {
                         ...expense,
                         emiDetails: {
                           ...expense.emiDetails!,
-                          tenure: expense.emiDetails?.tenure || 12,
-                          interestRate: parseFloat(e.target.value) || 18,
-                          monthlyAmount: 0,
-                          totalAmount: 0
+                          interestRate: parseFloat(e.target.value) || 18
                         }
                       })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                      placeholder="18.0"
+                      placeholder="16"
                       min="0"
                       max="50"
                       step="0.1"
                       required
+                    />
+                  </div>
+
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Processing Fee (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={expense.emiDetails?.processingFee || ''}
+                      onChange={(e) => setExpense({
+                        ...expense,
+                        emiDetails: {
+                          ...expense.emiDetails!,
+                          processingFee: parseFloat(e.target.value) || 0
+                        }
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                      placeholder="Optional (e.g. 199)"
+                      min="0"
                     />
                   </div>
                 </div>
