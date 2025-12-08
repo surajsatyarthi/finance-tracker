@@ -51,7 +51,9 @@ export default function IncomePage() {
 
   const incomeCategories = [
     'business',
-    'investment'
+    'salary',
+    'investment',
+    'others'
   ]
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -135,8 +137,8 @@ export default function IncomePage() {
                   type="button"
                   onClick={() => setIncome({ ...income, type: 'cash', bankAccount: undefined })}
                   className={`flex items-center p-4 rounded-lg border-2 transition-all ${income.type === 'cash'
-                      ? 'border-green-500 bg-green-50 text-green-700'
-                      : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-green-500 bg-green-50 text-green-700'
+                    : 'border-gray-200 hover:border-gray-300'
                     }`}
                 >
                   <div className="icon-golden-card mr-3">
@@ -152,8 +154,8 @@ export default function IncomePage() {
                   type="button"
                   onClick={() => setIncome({ ...income, type: 'non-cash' })}
                   className={`flex items-center p-4 rounded-lg border-2 transition-all ${income.type === 'non-cash'
-                      ? 'border-green-500 bg-green-50 text-green-700'
-                      : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-green-500 bg-green-50 text-green-700'
+                    : 'border-gray-200 hover:border-gray-300'
                     }`}
                 >
                   <div className="icon-golden-card mr-3">

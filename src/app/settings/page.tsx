@@ -9,8 +9,13 @@ import {
     ArrowDownTrayIcon,
     TrashIcon,
     PlusIcon,
-    TagIcon
+    TagIcon,
+    ArrowPathIcon
 } from '@heroicons/react/24/outline'
+
+import { initialLiquidity } from '@/lib/liquidityData'
+import { initialGoals } from '@/lib/goalsData'
+import { initialCards } from '@/lib/cardsData'
 
 interface Category {
     id: string
@@ -103,6 +108,25 @@ export default function SettingsPage() {
             alert('Failed to export data')
         } finally {
             setExporting(false)
+        }
+    }
+
+    const handleResetDemoData = async () => {
+        if (!confirm('This will RESET your accounts, goals, and cards to the initial demo state. Current balances might be overwritten. Continue?')) return
+
+        setLoading(true)
+        try {
+            console.log('Seeding Demo Data...')
+            await financeManager.seedLiquidity(initialLiquidity)
+            await financeManager.seedGoals(initialGoals)
+            await financeManager.seedCreditCards(initialCards)
+
+            alert('Demo data restored successfully!')
+            window.location.reload() // Force reload to refresh all data context
+        } catch (error) {
+            console.error('Error seeding data:', error)
+            alert('Failed to reset demo data')
+            setLoading(false)
         }
     }
 
@@ -218,6 +242,25 @@ export default function SettingsPage() {
                         className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
                     >
                         {exporting ? 'Exporting...' : 'Export All Data (JSON)'}
+                    </button>
+                </div>
+
+                {/* Danger Zone / Debug */}
+                <div className="bg-white rounded-xl shadow-sm border border-red-100 p-6">
+                    <div className="flex items-center gap-2 mb-4">
+                        <ArrowPathIcon className="h-5 w-5 text-red-400" />
+                        <h2 className="text-lg font-medium text-red-900">Reset Demo Data</h2>
+                    </div>
+                    <p className="text-sm text-gray-500 mb-6">
+                        If your dashboard shows 0 or missing data, use this to restore the initial demo dataset (Accounts, Goals, Cards).
+                    </p>
+
+                    <button
+                        onClick={handleResetDemoData}
+                        disabled={loading}
+                        className="inline-flex items-center px-4 py-2 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+                    >
+                        {loading ? 'Restoring...' : 'Restore Demo Data'}
                     </button>
                 </div>
 
