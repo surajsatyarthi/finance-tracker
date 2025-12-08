@@ -12,23 +12,24 @@ interface FeedbackModalProps {
 
 export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
     const [message, setMessage] = useState('')
-    const [file, setFile] = useState<File | null>(null)
+    const [files, setFiles] = useState<File[]>([])
     const [sending, setSending] = useState(false)
     const [success, setSuccess] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!message.trim() && !file) return
+        if (!message.trim() && files.length === 0) return
 
         setSending(true)
 
         try {
             const formData = new FormData()
             formData.append('message', message)
-            if (file) {
-                formData.append('file', file)
-            }
+            formData.append('message', message)
+            files.forEach(file => {
+                formData.append('files', file)
+            })
 
             const res = await fetch('/api/feedback', {
                 method: 'POST',
@@ -37,8 +38,9 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 
             if (res.ok) {
                 setSuccess(true)
+                setSuccess(true)
                 setMessage('')
-                setFile(null)
+                setFiles([])
                 setTimeout(() => {
                     setSuccess(false)
                     onClose()
@@ -55,9 +57,13 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
     }
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            setFile(e.target.files[0])
+        if (e.target.files) {
+            setFiles(prev => [...prev, ...Array.from(e.target.files!)])
         }
+    }
+
+    const removeFile = (index: number) => {
+        setFiles(prev => prev.filter((_, i) => i !== index))
     }
 
     return (
@@ -135,30 +141,42 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
                                             </div>
 
                                             {/* File Attachment */}
-                                            <div className="mb-4 flex items-center justify-between">
-                                                <input
-                                                    type="file"
-                                                    ref={fileInputRef}
-                                                    onChange={handleFileChange}
-                                                    accept="image/*"
-                                                    className="hidden"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => fileInputRef.current?.click()}
-                                                    className={`flex items-center text-sm ${file ? 'text-indigo-600 font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
-                                                >
-                                                    <PaperClipIcon className="h-5 w-5 mr-1" />
-                                                    {file ? file.name.slice(0, 20) + (file.name.length > 20 ? '...' : '') : 'Attach Screenshot'}
-                                                </button>
-                                                {file && (
+                                            <div className="mb-4">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <input
+                                                        type="file"
+                                                        ref={fileInputRef}
+                                                        onChange={handleFileChange}
+                                                        accept="image/*"
+                                                        className="hidden"
+                                                        multiple
+                                                    />
                                                     <button
                                                         type="button"
-                                                        onClick={() => setFile(null)}
-                                                        className="text-xs text-red-500 hover:text-red-700"
+                                                        onClick={() => fileInputRef.current?.click()}
+                                                        className="flex items-center text-sm text-gray-500 hover:text-gray-700"
                                                     >
-                                                        Remove
+                                                        <PaperClipIcon className="h-5 w-5 mr-1" />
+                                                        Attach Screenshot(s)
                                                     </button>
+                                                </div>
+
+                                                {/* File List */}
+                                                {files.length > 0 && (
+                                                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                                                        {files.map((f, i) => (
+                                                            <div key={i} className="flex justify-between items-center bg-gray-50 p-2 rounded text-xs">
+                                                                <span className="truncate max-w-[200px] text-gray-700">{f.name}</span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => removeFile(i)}
+                                                                    className="text-red-500 hover:text-red-700 ml-2"
+                                                                >
+                                                                    <XMarkIcon className="h-4 w-4" />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 )}
                                             </div>
 

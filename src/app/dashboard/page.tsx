@@ -9,7 +9,9 @@ import {
   PlusIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
-  BuildingLibraryIcon
+  ArrowTrendingDownIcon,
+  BuildingLibraryIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
 import Link from 'next/link' // Existing
 
@@ -481,6 +483,31 @@ export default function Dashboard() {
           </h1>
           <p className="text-neutral-600">Here&apos;s an overview of your financial portfolio</p>
         </div>
+
+        {/* Zero State Banner */}
+        {stats.totalAssets === 0 && stats.totalLiabilities === 0 && !dataLoading && (
+          <div className="mb-8 rounded-md bg-yellow-50 p-4 border border-yellow-200">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400" aria-hidden="true" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-yellow-800">No Data Detected</h3>
+                <div className="mt-2 text-sm text-yellow-700">
+                  <p>
+                    It looks like your dashboard is empty. This can happen if the initial setup didn&apos;t complete.
+                  </p>
+                  <p className="mt-2">
+                    <Link href="/settings" className="font-bold underline hover:text-yellow-600">
+                      Go to Settings &rarr; Reset Demo Data
+                    </Link>
+                    {' '}to restore default accounts and goals.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Professional Financial Metrics */}
         {/* ... (Keep existing first row of cards) */}

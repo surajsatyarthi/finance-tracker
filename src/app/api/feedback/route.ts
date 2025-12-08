@@ -8,30 +8,35 @@ export async function POST(req: NextRequest) {
     try {
         const formData = await req.formData()
         const message = formData.get('message') as string
-        const file = formData.get('file') as File | null
+        const files = formData.getAll('files') as File[]
 
-        if (!message && !file) {
+        if (!message && files.length === 0) {
             return NextResponse.json({ error: 'Message or file is required' }, { status: 400 })
         }
 
         const timestamp = new Date().toLocaleString('en-IN')
         const userAgent = req.headers.get('user-agent') || 'Unknown Device'
 
-        let imageLink = ''
+        let imageLinks = ''
 
-        // Handle File Upload
-        if (file) {
-            const buffer = Buffer.from(await file.arrayBuffer())
-            const filename = `screenshot_${Date.now()}_${file.name.replace(/\s/g, '_')}`
+        // Handle File Uploads
+        if (files.length > 0) {
             const uploadDir = path.join(process.cwd(), 'public', 'feedback_uploads')
 
-            // Ensure directory exists (redundant check but safe)
+            // Ensure directory exists
             if (!fs.existsSync(uploadDir)) {
                 fs.mkdirSync(uploadDir, { recursive: true })
             }
 
-            await writeFile(path.join(uploadDir, filename), buffer)
-            imageLink = `![Screenshot](/feedback_uploads/${filename})`
+            for (const file of files) {
+                if (file.size > 0 && file.name) {
+                    const buffer = Buffer.from(await file.arrayBuffer())
+                    const filename = `screenshot_${Date.now()}_${file.name.replace(/\s/g, '_')}`
+
+                    await writeFile(path.join(uploadDir, filename), buffer)
+                    imageLinks += `\n![Screenshot](/feedback_uploads/${filename})`
+                }
+            }
         }
 
         // Append to Markdown File
@@ -41,7 +46,7 @@ export async function POST(req: NextRequest) {
 **Message**: 
 ${message || '(No text provided)'}
 
-${imageLink}
+${imageLinks}
 
 ---
 `
