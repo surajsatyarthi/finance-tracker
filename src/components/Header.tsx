@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import {
   Bars3Icon,
   PlusIcon
@@ -9,7 +10,10 @@ import {
 import Sidebar from './Sidebar'
 
 export default function Header() {
+  const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  if (pathname === '/login') return null
 
   return (
     <>
@@ -25,10 +29,11 @@ export default function Header() {
             >
               <Bars3Icon className="h-6 w-6" />
             </button>
-            <Link href="/dashboard" className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600 hidden sm:block">
+            <Link href="/dashboard" className="text-xl font-bold text-gray-900 hidden sm:block">
               Finance Tracker
             </Link>
           </div>
+
 
           {/* Right: Actions */}
           <div className="flex items-center gap-3">

@@ -7,12 +7,10 @@ import {
   CreditCardIcon,
   PlusIcon
 } from '@heroicons/react/24/outline'
-import { 
-  getBankAccounts, 
-  processIncomeEntry, 
-  initializeDefaultData,
-  BankAccount 
-} from '@/lib/dataManager'
+import {
+  FinanceDataManager,
+} from '@/lib/supabaseDataManager'
+import { BankAccount } from '@/types/finance'
 import { useNotification } from '@/contexts/NotificationContext'
 
 interface IncomeEntry {
@@ -34,14 +32,21 @@ export default function IncomePage() {
     type: 'cash',
     category: 'business'
   })
-  
+
   const [loading, setLoading] = useState(false)
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
 
-  // Initialize data and load bank accounts on component mount
+  const financeManager = FinanceDataManager.getInstance()
+
+  // Initialize data on component mount
   useEffect(() => {
-    initializeDefaultData()
-    setBankAccounts(getBankAccounts())
+    const loadData = async () => {
+      await financeManager.initialize()
+      const accounts = await financeManager.getAccounts()
+      // Map to shared BankAccount interface if needed or cast
+      setBankAccounts(accounts as BankAccount[])
+    }
+    loadData()
   }, [])
 
   const incomeCategories = [
@@ -65,18 +70,19 @@ export default function IncomePage() {
         return
       }
 
-      // Process income entry using data manager
-      await processIncomeEntry({
+      // Process income entry using Supabase Manager
+      await financeManager.createTransaction({
         amount: income.amount,
-        description: income.description,
+        type: 'income',
+        description: income.description || 'Income',
         date: income.date,
-        type: income.type,
-        bankAccount: income.bankAccount,
+        payment_method: income.type,
+        account_id: income.bankAccount,
         category: income.category
       })
-      
+
       showNotification(`₹${income.amount.toLocaleString()} ${income.type} income added successfully!`, 'success')
-      
+
       // Reset form
       setIncome({
         amount: 0,
@@ -118,7 +124,7 @@ export default function IncomePage() {
         {/* Income Form */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
-            
+
             {/* Income Type Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -127,12 +133,11 @@ export default function IncomePage() {
               <div className="grid grid-cols-2 gap-4">
                 <button
                   type="button"
-                  onClick={() => setIncome({...income, type: 'cash', bankAccount: undefined})}
-                  className={`flex items-center p-4 rounded-lg border-2 transition-all ${
-                    income.type === 'cash'
+                  onClick={() => setIncome({ ...income, type: 'cash', bankAccount: undefined })}
+                  className={`flex items-center p-4 rounded-lg border-2 transition-all ${income.type === 'cash'
                       ? 'border-green-500 bg-green-50 text-green-700'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <div className="icon-golden-card mr-3">
                     <BanknotesIcon className="h-6 w-6 icon-white" />
@@ -142,15 +147,14 @@ export default function IncomePage() {
                     <p className="text-sm text-gray-500">Physical money</p>
                   </div>
                 </button>
-                
+
                 <button
                   type="button"
-                  onClick={() => setIncome({...income, type: 'non-cash'})}
-                  className={`flex items-center p-4 rounded-lg border-2 transition-all ${
-                    income.type === 'non-cash'
+                  onClick={() => setIncome({ ...income, type: 'non-cash' })}
+                  className={`flex items-center p-4 rounded-lg border-2 transition-all ${income.type === 'non-cash'
                       ? 'border-green-500 bg-green-50 text-green-700'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <div className="icon-golden-card mr-3">
                     <CreditCardIcon className="h-6 w-6 icon-white" />
@@ -171,7 +175,7 @@ export default function IncomePage() {
                 </label>
                 <select
                   value={income.bankAccount || ''}
-                  onChange={(e) => setIncome({...income, bankAccount: e.target.value})}
+                  onChange={(e) => setIncome({ ...income, bankAccount: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   required={income.type === 'non-cash'}
                 >
@@ -193,7 +197,7 @@ export default function IncomePage() {
               <input
                 type="number"
                 value={income.amount || ''}
-                onChange={(e) => setIncome({...income, amount: parseFloat(e.target.value) || 0})}
+                onChange={(e) => setIncome({ ...income, amount: parseFloat(e.target.value) || 0 })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                 placeholder="Enter income amount"
                 required
@@ -209,7 +213,7 @@ export default function IncomePage() {
               </label>
               <select
                 value={income.category}
-                onChange={(e) => setIncome({...income, category: e.target.value})}
+                onChange={(e) => setIncome({ ...income, category: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
               >
                 {incomeCategories.map((category) => (
@@ -228,7 +232,7 @@ export default function IncomePage() {
               <input
                 type="text"
                 value={income.description}
-                onChange={(e) => setIncome({...income, description: e.target.value})}
+                onChange={(e) => setIncome({ ...income, description: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                 placeholder="Brief description of income"
               />
@@ -242,7 +246,7 @@ export default function IncomePage() {
               <input
                 type="date"
                 value={income.date}
-                onChange={(e) => setIncome({...income, date: e.target.value})}
+                onChange={(e) => setIncome({ ...income, date: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                 required
               />

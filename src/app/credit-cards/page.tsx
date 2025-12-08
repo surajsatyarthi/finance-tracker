@@ -19,6 +19,7 @@ type CreditCard = Database['public']['Tables']['credit_cards']['Row']
 
 export default function CreditCardsPage() {
   const { user } = useRequireAuth() // Get authenticated user
+  const [activeTab, setActiveTab] = useState<'credit' | 'debit'>('credit')
   const [showBalances, setShowBalances] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [creditCards, setCreditCards] = useState<CreditCard[]>([])
@@ -27,7 +28,7 @@ export default function CreditCardsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch credit cards from Supabase or localStorage
+  // Fetch cards... (existing useEffect logic)
   useEffect(() => {
     if (!user) return
 
@@ -36,7 +37,6 @@ export default function CreditCardsPage() {
         setLoading(true)
         setError(null)
 
-        // Try Supabase first
         const { data, error: fetchError } = await supabase
           .from('credit_cards')
           .select('*')
@@ -44,40 +44,12 @@ export default function CreditCardsPage() {
           .eq('is_active', true)
           .order('name')
 
-        if (fetchError) {
-          throw fetchError
-        }
+        if (fetchError) throw fetchError
 
         setCreditCards(data || [])
       } catch (err) {
-        console.error('Error fetching from Supabase, falling back to localStorage:', err)
-        // Fallback to localStorage
-        if (typeof window !== 'undefined') {
-          const { getCreditCards: getLocalCards } = await import('@/lib/dataManager')
-          const localCards = getLocalCards()
-          // Convert to Supabase format
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          setCreditCards(localCards.map(card => ({
-            id: card.id,
-            user_id: user?.id || '',
-            name: card.name,
-            card_type: 'Credit Card',
-            bank: null,
-            last_four_digits: card.lastFourDigits,
-            credit_limit: card.creditLimit,
-            current_balance: card.currentBalance,
-            due_date: card.dueDate,
-            statement_date: parseInt(card.statementDate) || null,
-            annual_fee: card.annualFee,
-            cashback_rate: null,
-            partner_merchants: null,
-            benefits: null,
-            is_active: card.isActive,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          })) as any)
-        }
+        console.error('Error fetching from Supabase:', err)
+        setError('Failed to load cards')
       } finally {
         setLoading(false)
       }
@@ -86,12 +58,17 @@ export default function CreditCardsPage() {
     fetchCreditCards()
   }, [user])
 
-  // Filtered credit cards based on search
+  // Filtered cards based on search AND active tab
   const filteredCards = useMemo(() => {
-    return creditCards.filter(card =>
-      card.name.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  }, [creditCards, searchTerm])
+    return creditCards.filter(card => {
+      const matchesSearch = card.name.toLowerCase().includes(searchTerm.toLowerCase())
+      // Debit cards have null/0 limit. Credit cards have limit > 0.
+      const isDebit = !card.credit_limit || card.credit_limit <= 0
+      const matchesTab = activeTab === 'debit' ? isDebit : !isDebit
+
+      return matchesSearch && matchesTab
+    })
+  }, [creditCards, searchTerm, activeTab])
 
   // Calculate summary stats
   const summaryStats = useMemo(() => {
@@ -244,6 +221,34 @@ export default function CreditCardsPage() {
           </div>
         </div>
 
+        {/* Tabs */}
+        <div className="flex space-x-4 mb-6 border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('credit')}
+            className={`pb-2 px-4 text-sm font-medium transition-colors relative ${activeTab === 'credit'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
+          >
+            Credit Cards
+            <span className="ml-2 bg-gray-100 text-gray-600 py-0.5 px-2 rounded-full text-xs">
+              {creditCards.filter(c => (c.credit_limit || 0) > 0).length}
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTab('debit')}
+            className={`pb-2 px-4 text-sm font-medium transition-colors relative ${activeTab === 'debit'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
+          >
+            Debit Cards
+            <span className="ml-2 bg-gray-100 text-gray-600 py-0.5 px-2 rounded-full text-xs">
+              {creditCards.filter(c => !c.credit_limit || c.credit_limit <= 0).length}
+            </span>
+          </button>
+        </div>
+
         {/* Search */}
         <div className="mb-6">
           <div className="relative">
@@ -309,15 +314,21 @@ export default function CreditCardsPage() {
                         Bank Details
                       </th>
                     )}
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Credit Limit
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Current Balance
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Available Credit
-                    </th>
+                    {activeTab === 'credit' && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Credit Limit
+                      </th>
+                    )}
+                    {activeTab === 'credit' && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Current Balance
+                      </th>
+                    )}
+                    {activeTab === 'credit' && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Available Credit
+                      </th>
+                    )}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Due Date
                     </th>
@@ -428,26 +439,32 @@ export default function CreditCardsPage() {
                           </td>
                         )}
 
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {showBalances ? `₹${(card.credit_limit || 0).toLocaleString()}` : '₹***,***'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {showBalances ? `₹${(card.current_balance || 0).toLocaleString()}` : '₹***,***'}
-                          </div>
-                          {showBalances && (card.credit_limit || 0) > 0 && (
-                            <div className="text-xs text-gray-500">
-                              {Math.round(utilization)}% utilization
+                        {activeTab === 'credit' && (
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {showBalances ? `₹${(card.credit_limit || 0).toLocaleString()}` : '₹***,***'}
                             </div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-green-600">
-                            {showBalances ? `₹${availableCredit.toLocaleString()}` : '₹***,***'}
-                          </div>
-                        </td>
+                          </td>
+                        )}
+                        {activeTab === 'credit' && (
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {showBalances ? `₹${(card.current_balance || 0).toLocaleString()}` : '₹***,***'}
+                            </div>
+                            {showBalances && (card.credit_limit || 0) > 0 && (
+                              <div className="text-xs text-gray-500">
+                                {Math.round(utilization)}% utilization
+                              </div>
+                            )}
+                          </td>
+                        )}
+                        {activeTab === 'credit' && (
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-green-600">
+                              {showBalances ? `₹${availableCredit.toLocaleString()}` : '₹***,***'}
+                            </div>
+                          </td>
+                        )}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center text-sm text-gray-900">
                             <CalendarDaysIcon className="h-4 w-4 text-gray-400 mr-1" />

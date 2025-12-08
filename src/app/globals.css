@@ -1,10 +1,5 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #000000;
-}
-
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -12,199 +7,142 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
+
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ffffff;
+    --background: #ffffff;
+    --foreground: #000000;
   }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: #0a0a0a;
+      --foreground: #ffffff;
+    }
+  }
+
+  body {
+    color: var(--foreground);
+    @apply font-sans;
+  }
+
+  /* Base element overrides - lowest specificity */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply text-gray-900;
+  }
+
+  p {
+    @apply text-gray-700;
+  }
+
+  /* Link styles that don't override buttons */
+  a:not([class*="btn-"]):not([class*="bg-"]) {
+    color: #0078c2;
+    text-decoration: none;
+  }
+
+  a:not([class*="btn-"]):not([class*="bg-"]):hover {
+    color: #01609d;
+  }
+
+  /* Reset inputs */
+  input,
+  textarea,
+  select {
+    @apply text-gray-900 bg-white;
+  }
+
+
+  /* Ensure high contrast for all text elements */
+  .bg-white\/80 {
+    --tw-bg-opacity: 0.95;
+  }
+
+  .bg-white\/90 {
+    --tw-bg-opacity: 0.98;
+  }
+
+  /* Fix comprehensive text color issues */
+  .text-white {
+    color: #ffffff !important;
+  }
+
+  .text-black {
+    color: #000000 !important;
+  }
+
+  /* Gray text colors */
+  .text-gray-900 {
+    color: #111827 !important;
+  }
+
+  .text-gray-800 {
+    color: #1f2937 !important;
+  }
+
+  .text-gray-700 {
+    color: #374151 !important;
+  }
+
+  .text-gray-600 {
+    color: #4b5563 !important;
+  }
+
+  .text-gray-500 {
+    color: #6b7280 !important;
+  }
+
+  .text-gray-400 {
+    color: #9ca3af !important;
+  }
+
+  /* Premium text colors - fix the main issue */
+  .text-premium-900 {
+    color: #0f172a !important;
+  }
+
+  .text-premium-800 {
+    color: #1e293b !important;
+  }
+
+  .text-premium-700 {
+    color: #334155 !important;
+  }
+
+  .text-premium-600 {
+    color: #475569 !important;
+  }
+
+  .text-premium-500 {
+    color: #64748b !important;
+  }
+
+  .text-premium-400 {
+    color: #94a3b8 !important;
+  }
+
+  /* Primary colors */
+  .text-primary-600 {
+    color: #0078c2 !important;
+  }
+
+  .text-primary-700 {
+    color: #01609d !important;
+  }
+
+  /* Placeholder colors */
+  .placeholder-premium-400::placeholder {
+    color: #94a3b8 !important;
+  }
+
+  /* Input text colors */
 }
 
-body {
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-/* Ensure high contrast for all text elements */
-.bg-white\/80 {
-  --tw-bg-opacity: 0.95;
-}
-
-.bg-white\/90 {
-  --tw-bg-opacity: 0.98;
-}
-
-/* Fix comprehensive text color issues */
-.text-white {
-  color: #ffffff !important;
-}
-
-.text-black {
-  color: #000000 !important;
-}
-
-/* Gray text colors */
-.text-gray-900 {
-  color: #111827 !important;
-}
-
-.text-gray-800 {
-  color: #1f2937 !important;
-}
-
-.text-gray-700 {
-  color: #374151 !important;
-}
-
-.text-gray-600 {
-  color: #4b5563 !important;
-}
-
-.text-gray-500 {
-  color: #6b7280 !important;
-}
-
-.text-gray-400 {
-  color: #9ca3af !important;
-}
-
-/* Premium text colors - fix the main issue */
-.text-premium-900 {
-  color: #0f172a !important;
-}
-
-.text-premium-800 {
-  color: #1e293b !important;
-}
-
-.text-premium-700 {
-  color: #334155 !important;
-}
-
-.text-premium-600 {
-  color: #475569 !important;
-}
-
-.text-premium-500 {
-  color: #64748b !important;
-}
-
-.text-premium-400 {
-  color: #94a3b8 !important;
-}
-
-/* Primary colors */
-.text-primary-600 {
-  color: #0078c2 !important;
-}
-
-.text-primary-700 {
-  color: #01609d !important;
-}
-
-/* Placeholder colors */
-.placeholder-premium-400::placeholder {
-  color: #94a3b8 !important;
-}
-
-/* Input text colors */
-input {
-  color: #1f2937 !important;
-}
-
-label {
-  color: #334155 !important;
-}
-
-/* Button text */
-button {
-  color: inherit;
-}
-
-/* Link colors */
-a {
-  color: #0078c2;
-}
-
-a:hover {
-  color: #01609d;
-}
-
-/* Form elements */
-.form-input,
-.form-select,
-.form-textarea {
-  color: #1f2937 !important;
-  background-color: rgba(255, 255, 255, 0.9) !important;
-}
-
-/* Ensure all text is visible */
-* {
-  text-shadow: none !important;
-}
-
-/* Specific fixes for common patterns */
-p,
-span,
-div {
-  color: inherit;
-}
-
-/* Force dark text on light backgrounds */
-.bg-white p,
-.bg-white span,
-.bg-white div:not(.bg-gradient-to-r):not(.text-white) {
-  color: #1f2937 !important;
-}
-
-.bg-white\/90 p,
-.bg-white\/90 span,
-.bg-white\/90 div:not(.bg-gradient-to-r):not(.text-white) {
-  color: #1f2937 !important;
-}
-
-.bg-white\/80 p,
-.bg-white\/80 span,
-.bg-white\/80 div:not(.bg-gradient-to-r):not(.text-white) {
-  color: #1f2937 !important;
-}
-
-.text-blue-600 {
-  color: #2563eb !important;
-}
-
-.text-blue-700 {
-  color: #1d4ed8 !important;
-}
-
-.placeholder-gray-500::placeholder {
-  color: #6b7280 !important;
-  opacity: 1;
-}
-
-/* Ensure input text is always visible */
-input[type="email"],
-input[type="password"],
-input[type="text"] {
-  color: #000000 !important;
-  background-color: #ffffff !important;
-}
-
-/* Button text should be white on blue buttons */
-.bg-blue-600,
-.bg-blue-700 {
-  color: #ffffff !important;
-}
-
-/* Ensure all labels are black */
-label {
-  color: #000000 !important;
-  font-weight: 600;
-}
-
-/* Paragraph text should be black by default */
-p {
-  color: #000000 !important;
-}
 
 /* Link colors scoped elsewhere to avoid conflicting with buttons */
 
