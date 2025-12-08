@@ -1110,21 +1110,32 @@ export class FinanceDataManager {
       }
     })
 
-    // 2. Upcoming Loan EMIs
+    // 2. Upcoming Loan EMIs - Project for next 12 months
     const loans = await this.getLoans()
     loans.forEach(loan => {
-      if (loan.nextDueDate) {
-        payables.push({
-          id: `emi_${loan.id}`,
-          type: 'emi',
-          amount: loan.monthlyAmount,
-          dueDate: loan.nextDueDate,
-          description: `EMI for ${loan.name}`,
-          source: loan.name,
-          originalTransactionId: '',
-          status: 'pending',
-          timestamp: new Date().toISOString()
-        })
+      if (loan.next_emi_date && loan.is_active) {
+        let baseDate = new Date(loan.next_emi_date)
+        const day = baseDate.getDate()
+
+        // Generate for 12 months
+        for (let i = 0; i < 12; i++) {
+          // Check if loan expires before this? (emis_paid + i < total_emis)
+          if (loan.total_emis > 0 && (loan.emis_paid + i) >= loan.total_emis) break
+
+          const dueDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + i, day)
+
+          payables.push({
+            id: `emi_${loan.id}_${i}`,
+            type: 'emi',
+            amount: loan.emi_amount,
+            dueDate: dueDate.toISOString().split('T')[0],
+            description: `EMI ${loan.emis_paid + i + 1}/${loan.total_emis} - ${loan.name}`,
+            source: loan.name,
+            originalTransactionId: '',
+            status: 'pending',
+            timestamp: new Date().toISOString()
+          })
+        }
       }
     })
 

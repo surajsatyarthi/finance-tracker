@@ -47,7 +47,7 @@ export default function RootLayout({
               <div className="min-h-screen app-shell">
                 <PWARegister />
                 <Header />
-                <main>
+                <main className="pt-20 pb-24 lg:pt-0 lg:pb-0">
                   {children}
                 </main>
                 <BottomNav />
