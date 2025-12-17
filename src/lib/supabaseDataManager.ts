@@ -534,6 +534,29 @@ export class FinanceDataManager {
 
   // --- Loans (New) ---
 
+  async seedLoans(loans: any[]) {
+    if (!this.userId) await this.initialize()
+
+    // Check if loans exist using exact count in a lightweight way
+    const { count } = await supabase
+      .from('loans')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', this.userId!)
+
+    // Only seed if absolutely no loans exist
+    if (count === 0) {
+      console.log('Seeding Loans...')
+      for (const loan of loans) {
+        // Use createLoan but ensure we catch errors individually
+        try {
+          await this.createLoan(loan)
+        } catch (e) {
+          console.error('Error seeding loan:', loan.name, e)
+        }
+      }
+    }
+  }
+
   async getLoans(): Promise<Loan[]> {
     if (!this.userId) await this.initialize()
     const { data, error } = await supabase.from('loans').select('*').eq('user_id', this.userId!).eq('is_active', true)
@@ -1962,6 +1985,30 @@ export class FinanceDataManager {
 
     return exportData
   }
+}
+
+  // --- Feedback ---
+  async submitFeedback(message: string, userAgent: string, images: string[] = []): Promise < { success: boolean; error?: string } > {
+  try {
+    const { error } = await supabase
+      .from('feedback')
+      .insert({
+        message,
+        user_agent: userAgent,
+        images
+      })
+
+      if(error) throw error
+
+      return { success: true }
+  } catch(error) {
+    console.error('Submit feedback error:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}
 }
 
 export const financeManager = FinanceDataManager.getInstance()

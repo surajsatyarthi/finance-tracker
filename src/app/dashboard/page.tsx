@@ -9,7 +9,6 @@ import {
   PlusIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
-  ArrowTrendingDownIcon,
   BuildingLibraryIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
@@ -20,6 +19,7 @@ import { initialLiquidity } from '@/lib/liquidityData'
 import { initialGoals } from '@/lib/goalsData'
 import { initialCards } from '@/lib/cardsData'
 import { budgetProjections2025 } from '@/lib/budgetData'
+import { initialLoans } from '@/lib/loansData'
 import { useNotification } from '@/contexts/NotificationContext'
 // ... imports
 
@@ -147,6 +147,10 @@ export default function Dashboard() {
           seeded = true
         }
 
+        // 3. Seed Loans if missing (Fix for Zero Outstanding Loan)
+        // Checks inside seedLoans for existence
+        promises.push(financeManager.seedLoans(initialLoans))
+
         // 3. Seed Credit Cards if empty, OR if data looks incomplete (Smart Repair)
         // Check first card for 'benefits' column data presence
         const needsRestock = existingCards.length === 0 || (existingCards.length > 0 && !existingCards[0].benefits)
@@ -208,9 +212,8 @@ export default function Dashboard() {
         financeManager.getFuturePayables(),
         financeManager.getLoans(), // Helper needed
         financeManager.getCreditCards(),
-        financeManager.getCreditCards(),
         financeManager.getGoals(),
-        financeManager.getBudgets(2025),
+        financeManager.getBudgets(2026),
         financeManager.getPayLaterServices()
       ])
 
@@ -289,7 +292,7 @@ export default function Dashboard() {
       // Calculate 2026 Projection from Dynamic Budgets (DB)
       // Transform DB records to projection format first
       const projectionMap = new Map<string, number[]>()
-      const dbBudgets = await financeManager.getBudgets(2025)
+      const dbBudgets = await financeManager.getBudgets(2026)
       dbBudgets.forEach(b => {
         if (!projectionMap.has(b.category_name)) projectionMap.set(b.category_name, new Array(12).fill(0))
         projectionMap.get(b.category_name)![b.month - 1] = Number(b.monthly_limit)
@@ -640,45 +643,7 @@ export default function Dashboard() {
         </GlassCard>
 
         {/* ... (Rest of existing content) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* ... (Income/Expense split cards) keeping existing calls */}
-          <GlassCard>
-            <div className="flex items-center">
-              <ArrowTrendingUpIcon className="h-8 w-8 text-green-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Business Income</p>
-                <p className="text-2xl font-bold text-gray-900">₹{stats.partitionSplit.bi.toLocaleString()}</p>
-              </div>
-            </div>
-          </GlassCard>
-          <GlassCard>
-            <div className="flex items-center">
-              <ArrowTrendingUpIcon className="h-8 w-8 text-blue-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Personal Income</p>
-                <p className="text-2xl font-bold text-gray-900">₹{stats.partitionSplit.pi.toLocaleString()}</p>
-              </div>
-            </div>
-          </GlassCard>
-          <GlassCard>
-            <div className="flex items-center">
-              <ArrowTrendingDownIcon className="h-8 w-8 text-rose-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Business Expenses</p>
-                <p className="text-2xl font-bold text-gray-900">₹{stats.partitionSplit.be.toLocaleString()}</p>
-              </div>
-            </div>
-          </GlassCard>
-          <GlassCard>
-            <div className="flex items-center">
-              <ArrowTrendingDownIcon className="h-8 w-8 text-indigo-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Personal Expenses</p>
-                <p className="text-2xl font-bold text-gray-900">₹{stats.partitionSplit.pe.toLocaleString()}</p>
-              </div>
-            </div>
-          </GlassCard>
-        </div>
+        {/* Legacy Partition Cards Removed by Request */}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* ... (Ratios cards) keeping existing calls */}
@@ -828,21 +793,6 @@ export default function Dashboard() {
                   <div>
                     <p className="font-medium text-gray-900">Accounts</p>
                     <p className="text-sm text-gray-500">(10)</p>
-                  </div>
-                </Link>
-                <Link
-                  href="/transactions/add"
-                  className="flex items-center p-4 rounded-lg bg-success-50 border border-success-200 hover:bg-success-100 transition-colors"
-                >
-                  {/* ... */}
-                  <div className="p-2 bg-success-500 rounded-lg mr-3">
-                    <div className="icon-golden-card">
-                      <PlusIcon className="h-5 w-5 icon-white" />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="font-medium text-success-900">Add Transaction</p>
-                    <p className="text-sm text-success-600">Record Activity</p>
                   </div>
                 </Link>
                 <Link

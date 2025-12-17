@@ -1,8 +1,5 @@
-
 import { NextRequest, NextResponse } from 'next/server'
-import fs from 'fs'
-import path from 'path'
-import { writeFile } from 'fs/promises'
+import { financeManager } from '@/lib/supabaseDataManager'
 
 export async function POST(req: NextRequest) {
     try {
@@ -14,46 +11,35 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Message or file is required' }, { status: 400 })
         }
 
-        const timestamp = new Date().toLocaleString('en-IN')
         const userAgent = req.headers.get('user-agent') || 'Unknown Device'
+        const images: string[] = []
 
-        let imageLinks = ''
+        // Process files to Base64 (Limit size to avoid payload issues)
+        // 5MB limit roughly
+        const MAX_SIZE = 5 * 1024 * 1024
 
-        // Handle File Uploads
-        if (files.length > 0) {
-            const uploadDir = path.join(process.cwd(), 'public', 'feedback_uploads')
-
-            // Ensure directory exists
-            if (!fs.existsSync(uploadDir)) {
-                fs.mkdirSync(uploadDir, { recursive: true })
+        for (const file of files) {
+            if (file.size > MAX_SIZE) {
+                console.warn(`File ${file.name} too large, skipping`)
+                continue
             }
-
-            for (const file of files) {
-                if (file.size > 0 && file.name) {
-                    const buffer = Buffer.from(await file.arrayBuffer())
-                    const filename = `screenshot_${Date.now()}_${file.name.replace(/\s/g, '_')}`
-
-                    await writeFile(path.join(uploadDir, filename), buffer)
-                    imageLinks += `\n![Screenshot](/feedback_uploads/${filename})`
-                }
+            if (file.type.startsWith('image/')) {
+                const buffer = await file.arrayBuffer()
+                const base64 = Buffer.from(buffer).toString('base64')
+                const dataUrl = `data:${file.type};base64,${base64}`
+                images.push(dataUrl)
             }
         }
 
-        // Append to Markdown File
-        const feedbackEntry = `
-## Feedback - ${timestamp}
-**Device**: ${userAgent}
-**Message**: 
-${message || '(No text provided)'}
+        // Submit to Supabase
+        const result = await financeManager.submitFeedback(message, userAgent, images)
 
-${imageLinks}
+        if (result.success) {
+            return NextResponse.json({ success: true, message: 'Feedback saved' })
+        } else {
+            return NextResponse.json({ error: result.error || 'Failed to save to database' }, { status: 500 })
+        }
 
----
-`
-        const feedbackFile = path.join(process.cwd(), 'MOBILE_FEEDBACK.md')
-        fs.appendFileSync(feedbackFile, feedbackEntry)
-
-        return NextResponse.json({ success: true, message: 'Feedback saved' })
     } catch (error) {
         console.error('Error saving feedback:', error)
         return NextResponse.json({ error: 'Failed to save feedback' }, { status: 500 })
