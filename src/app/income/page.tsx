@@ -30,7 +30,7 @@ export default function IncomePage() {
     description: '',
     date: new Date().toISOString().split('T')[0],
     type: 'cash',
-    category: 'business'
+    category: 'salary'
   })
 
   const [loading, setLoading] = useState(false)
@@ -50,7 +50,6 @@ export default function IncomePage() {
   }, [])
 
   const incomeCategories = [
-    'business',
     'salary',
     'investment',
     'others'
@@ -91,7 +90,7 @@ export default function IncomePage() {
         description: '',
         date: new Date().toISOString().split('T')[0],
         type: 'cash',
-        category: 'business'
+        category: 'salary'
       })
 
       // Redirect after 2 seconds

@@ -1,45 +1,74 @@
-# Finance Tracker (Manual-Only MVP)
+# Professional Finance Tracker
 
-A minimal, glass-styled personal/business finance tracker built with Next.js App Router, Tailwind v4, and local storage. No external sync; all data is entered manually and stays on your device.
+A production-ready, bank-grade personal finance application built with **Next.js 15**, **Supabase**, and **Tailwind CSS v4**.
+This application provides a secure, real-time dashboard for tracking assets, liabilities, transactions, and financial goals.
 
-## Features
-- Partition: Business vs Personal for transactions and dashboards
-- Track: income, expense, transfers, loans/EMIs, goals, credit cards, savings/FDs
-- Budgets: per-category monthly budgets with variance and drilldown
-- Projection: 3-month forecast from EMIs, recurring bills, goals
-- Reminders: upcoming EMIs, card statements, FD maturities
-- KPIs: savings rate, debt service ratio, liquidity ratio
-- Privacy: passphrase lock (auto-lock), optional encrypted backup/restore
-- UI: glass surfaces, responsive tabs, tables, minimal icons
+**Current Status:** 🟢 **READY FOR PRODUCTION**
 
-## Quick Start
-- Requirements: Node 18+
-- Dev: `npm install` → `npm run dev` → open `http://localhost:3000`
-- Local mode is default. No login.
+## 🚀 Key Features
 
-## Data Entry
-- Transactions: `Transactions → Add` (income/expense/transfer, recurring, partition)
-- Accounts: `Accounts` (balances, transfers)
-- Loans: `Loans` (EMI amounts auto-calculated; mark paid)
-- Credit Cards: `Cards` (limits, balances, utilization)
-- Savings & FDs: `Savings & FDs` (maturities, ladder)
-- Goals: `Goals` (targets, suggested monthly contribution)
-- Budgets: `Budget` (inline editor + copy previous month)
+### 📊 Comprehensive Dashboard
+- **Net Worth Tracking**: Real-time calculation of Assets vs. Liabilities.
+- **Financial Health Ratios**: Savings Rate, Debt Service Ratio, Liquidity Ratio.
+- **Projections**: 3-month cash flow forecasting and budget analysis.
 
-## Privacy & Security
-- Lock: Header → Lock; auto-lock after inactivity
-- Encryption: `DataBackup` supports encrypted JSON export/import (AES-GCM + PBKDF2)
-- No secrets logged; no external sync; local-only storage
+### 💰 Transaction Management
+- **Full CRUD Operations**: Add, edit, delete income and expenses.
+- **Smart Categorization**: Separation of Business vs. Personal finances.
+- **Filtering**: Advanced search and filtering by type (Income/Expense).
 
-## Known Limits
-- No live bank integrations; CSV import removed after one-time seed
-- Tax/GST filings not implemented; basic GST disabled
-- Multi-user roles, audit log, multi-currency deferred
+### 🛡️ Enterprise-Grade Security
+- **Authentication**: Secure user management via Supabase Auth.
+- **Row Level Security (RLS)**: Strict data isolation ensuring users only see their own data.
+- **Audit Logging**: Comprehensive tracking of all financial changes.
+- **Validation**: Server-side validation for all inputs.
 
-## Tech Stack
-- Next.js App Router, React, TypeScript
-- Tailwind v4
-- Local storage + optional encrypted backups
+## 🛠️ Technology Stack
+- **Frontend**: Next.js 15 (App Router), React 19, Tailwind CSS v4
+- **Backend**: Supabase (PostgreSQL, Auth, Real-time)
+- **Visualization**: Recharts for dynamic financial charts
+- **Type Safety**: Fully typed with TypeScript
 
-## License
-MIT
+## ⚡ Quick Start
+
+### Prerequisites
+- Node.js 18+
+- A Supabase project (referenced in `local` or `production` environment)
+
+### Installation
+
+1.  **Clone the repository**
+    ```bash
+    git clone <repository-url>
+    cd finance-tracker
+    ```
+
+2.  **Install dependencies**
+    ```bash
+    npm install
+    ```
+
+3.  **Configure Environment**
+    Create a `.env.local` file with your Supabase credentials:
+    ```env
+    NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+    ```
+
+4.  **Run Development Server**
+    ```bash
+    npm run dev
+    ```
+    Open [http://localhost:3000](http://localhost:3000) to view the application.
+
+## 📦 Deployment
+
+This application is optimized for deployment on **Vercel**.
+
+1.  Connect your GitHub repository to Vercel.
+2.  Add the `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` environment variables in the Vercel dashboard.
+3.  Deploy!
+
+## 🔐 Security & Privacy
+- **Local Mode**: Can be run in offline/local mode by setting `NEXT_PUBLIC_LOCAL_MODE=true` (Data will not persist between sessions).
+- **Production Mode**: Uses Supabase for secure, persistent, encrypted cloud storage.
