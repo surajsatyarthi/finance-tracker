@@ -5,7 +5,6 @@ import { AuthProvider } from '../contexts/AuthContext';
 import { NotificationProvider } from '../contexts/NotificationContext';
 import { PrivacyProvider } from '../contexts/PrivacyContext';
 import PWARegister from '../components/PWARegister';
-import MainShell from '../components/MainShell';
 
 const lato = Lato({
   variable: "--font-lato",
@@ -45,9 +44,7 @@ export default function RootLayout({
             <PrivacyProvider>
               <div className="min-h-screen">
                 <PWARegister />
-                <MainShell>
-                  {children}
-                </MainShell>
+                {children}
               </div>
             </PrivacyProvider>
           </NotificationProvider>
