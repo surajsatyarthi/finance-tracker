@@ -7,13 +7,16 @@ import {
   Bars3Icon,
   PlusIcon
 } from '@heroicons/react/24/outline'
+import { useAuth } from '../contexts/AuthContext'
 import Sidebar from './Sidebar'
 
 export default function Header() {
   const pathname = usePathname()
+  const { user, loading } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  if (pathname === '/login') return null
+  // Hide on login page or if not logged in
+  if (pathname === '/login' || (!loading && !user)) return null
 
   return (
     <>
