@@ -56,7 +56,7 @@ export default function LoginPage() {
       <div className="max-w-md w-full space-y-8 relative z-10">
         <div className="text-center">
           <div className="flex justify-center mb-6">
-            <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg transform rotate-0">
+            <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
               <span className="text-white font-bold text-2xl">₹</span>
             </div>
           </div>
@@ -165,4 +165,4 @@ export default function LoginPage() {
       </div>
     </div>
   )
-}/* Force Build 2 */
+}
