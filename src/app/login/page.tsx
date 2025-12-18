@@ -51,8 +51,18 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-neutral-50">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-neutral-50 relative overflow-hidden">
+      {/* Background Wordmark Branding */}
+      <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden flex flex-col items-center justify-center whitespace-nowrap">
+        <div className="text-[12rem] md:text-[20rem] font-black text-gray-200/40 uppercase tracking-tighter transform -rotate-12 leading-none">
+          SURAJ SATYARTHI
+        </div>
+        <div className="text-[12rem] md:text-[20rem] font-black text-gray-200/20 uppercase tracking-tighter transform -rotate-12 leading-none mt-8">
+          SURAJ SATYARTHI
+        </div>
+      </div>
+
+      <div className="max-w-md w-full space-y-8 relative z-10">
         <div className="text-center">
           <div className="flex justify-center mb-6">
             <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg transform rotate-3">
