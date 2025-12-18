@@ -12,12 +12,12 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
     const pathname = usePathname()
 
     // 1. Define truly public pages that must never show the shell
-    const isPublicPage = pathname === '/login' || pathname === '/'
+    // Using startsWith to handle any query params or sub-paths
+    const isPublicPage = pathname === '/' || pathname?.startsWith('/login')
 
     // 2. Determine visibility: 
     // - Hide if on a public page
     // - Hide if definitely logged out (user is null)
-    // This removes ghost paddings and leaked menus from the login experience.
     const showShell = !isPublicPage && !!user
 
     if (!showShell) {
