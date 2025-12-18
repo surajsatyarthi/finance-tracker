@@ -8,17 +8,21 @@ import BottomNav from './BottomNav'
 import PWARegister from './PWARegister'
 
 export default function MainShell({ children }: { children: React.ReactNode }) {
-    const { user, loading } = useAuth()
+    const { user } = useAuth()
     const pathname = usePathname()
 
-    // Determine if we should show the authenticated shell
-    // We hide it on /login and if the user is definitely logged out
-    const isPublicPage = pathname === '/login'
-    const showShell = !isPublicPage && (loading || !!user)
+    // 1. Define truly public pages that must never show the shell
+    const isPublicPage = pathname === '/login' || pathname === '/'
+
+    // 2. Determine visibility: 
+    // - Hide if on a public page
+    // - Hide if definitely logged out (user is null)
+    // This removes ghost paddings and leaked menus from the login experience.
+    const showShell = !isPublicPage && !!user
 
     if (!showShell) {
         return (
-            <div className="min-h-screen bg-slate-50">
+            <div className="min-h-screen bg-neutral-50">
                 <main>
                     {children}
                 </main>
@@ -27,10 +31,12 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 relative">
-            <PWARegister />
+        <div className="min-h-screen bg-neutral-50 relative">
             <Header />
-            {/* The padding is only applied when the shell is active */}
+            {/* 
+              Global layout padding is strictly contained here.
+              This prevents padding from affecting the login page.
+            */}
             <main className="pt-20 pb-24 lg:pt-0 lg:pb-0 min-h-screen">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     {children}
