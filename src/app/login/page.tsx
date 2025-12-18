@@ -53,10 +53,10 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-neutral-50 relative overflow-hidden">
       {/* Background Wordmark Branding - SVG Injection for guaranteed visibility */}
-      <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden flex flex-col items-center justify-center">
+      <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden flex flex-col items-center justify-center bg-indigo-50/50">
         <svg
           viewBox="0 0 1000 300"
-          className="w-[150%] h-auto transform -rotate-12 opacity-[0.08]"
+          className="w-[180%] h-auto transform -rotate-12 opacity-15"
           aria-hidden="true"
         >
           <text
@@ -66,9 +66,9 @@ export default function LoginPage() {
             dominantBaseline="middle"
             className="font-black"
             style={{
-              fontSize: '180px',
-              fontFamily: 'var(--font-lato), sans-serif',
-              fill: '#4338ca',
+              fontSize: '150px',
+              fontFamily: 'Inter, sans-serif',
+              fill: '#1e1b4b',
               fontWeight: 900
             }}
           >
