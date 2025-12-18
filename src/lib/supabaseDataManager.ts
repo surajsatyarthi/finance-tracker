@@ -1985,30 +1985,29 @@ export class FinanceDataManager {
 
     return exportData
   }
-}
 
   // --- Feedback ---
-  async submitFeedback(message: string, userAgent: string, images: string[] = []): Promise < { success: boolean; error?: string } > {
-  try {
-    const { error } = await supabase
-      .from('feedback')
-      .insert({
-        message,
-        user_agent: userAgent,
-        images
-      })
+  async submitFeedback(message: string, userAgent: string, images: string[] = []): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase
+        .from('feedback')
+        .insert({
+          message,
+          user_agent: userAgent,
+          images
+        })
 
-      if(error) throw error
+      if (error) throw error
 
       return { success: true }
-  } catch(error) {
-    console.error('Submit feedback error:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
+    } catch (error) {
+      console.error('Submit feedback error:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }
     }
   }
-}
 }
 
 export const financeManager = FinanceDataManager.getInstance()

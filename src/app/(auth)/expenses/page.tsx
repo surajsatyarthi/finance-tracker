@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useEffect } from 'react'
-import { useRequireAuth } from '../../contexts/AuthContext'
+import { useRequireAuth } from '@/contexts/AuthContext'
 import {
   BanknotesIcon,
   MagnifyingGlassIcon,
@@ -59,7 +59,7 @@ export default function Expenses() {
           .eq('user_id', '00000000-0000-0000-0000-000000000001')
           .eq('type', 'expense')
           .order('date', { ascending: false })
-        
+
         if (error) {
           console.error('Error loading expenses:', error)
         } else {
@@ -76,11 +76,11 @@ export default function Expenses() {
     loadExpenses()
   }, [])
 
-  const uniquePaymentMethods = useMemo(() => 
-    [...new Set(expenses.map(e => e.payment_method))].sort(), 
+  const uniquePaymentMethods = useMemo(() =>
+    [...new Set(expenses.map(e => e.payment_method))].sort(),
     [expenses]
   )
-  const months = ['01','02','03','04','05','06','07','08','09','10','11','12']
+  const months = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']
 
   const filteredSorted = useMemo(() => {
     const term = searchTerm.trim().toLowerCase()
@@ -128,11 +128,11 @@ export default function Expenses() {
   const summaryStats = useMemo(() => {
     const currentMonth = new Date().getMonth() + 1
     const currentYear = new Date().getFullYear()
-    
+
     const currentMonthExpenses = expenses.filter(expense => {
       const expenseDate = new Date(expense.date)
-      return expenseDate.getMonth() + 1 === currentMonth && 
-             expenseDate.getFullYear() === currentYear
+      return expenseDate.getMonth() + 1 === currentMonth &&
+        expenseDate.getFullYear() === currentYear
     })
 
     return {

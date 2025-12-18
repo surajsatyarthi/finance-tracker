@@ -13,7 +13,7 @@ import {
     XMarkIcon
 } from '@heroicons/react/24/outline'
 import { financeManager } from '@/lib/supabaseDataManager'
-import { useRequireAuth } from '../../contexts/AuthContext'
+import { useRequireAuth } from '@/contexts/AuthContext'
 import GlassCard from '@/components/GlassCard'
 
 type TransactionItem = {

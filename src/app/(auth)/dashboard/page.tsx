@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { useRequireAuth } from '../../contexts/AuthContext'
+import { useRequireAuth } from '@/contexts/AuthContext'
 import {
   BanknotesIcon,
   ChartBarIcon,
