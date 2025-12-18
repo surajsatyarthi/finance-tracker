@@ -52,14 +52,50 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-neutral-50 relative overflow-hidden">
-      {/* Background Wordmark Branding - High-contrast watermark */}
-      <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden flex flex-col items-center justify-center whitespace-nowrap">
-        <div className="text-[12rem] md:text-[20rem] font-black text-indigo-900/10 uppercase tracking-tighter transform -rotate-12 leading-none">
-          SURAJ SATYARTHI
-        </div>
-        <div className="text-[12rem] md:text-[20rem] font-black text-indigo-900/[0.05] uppercase tracking-tighter transform -rotate-12 leading-none mt-8">
-          SURAJ SATYARTHI
-        </div>
+      {/* Background Wordmark Branding - SVG Injection for guaranteed visibility */}
+      <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden flex flex-col items-center justify-center">
+        <svg
+          viewBox="0 0 1000 300"
+          className="w-[150%] h-auto transform -rotate-12 opacity-[0.08]"
+          aria-hidden="true"
+        >
+          <text
+            x="50%"
+            y="50%"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            className="font-black"
+            style={{
+              fontSize: '180px',
+              fontFamily: 'var(--font-lato), sans-serif',
+              fill: '#4338ca',
+              fontWeight: 900
+            }}
+          >
+            SURAJ SATYARTHI
+          </text>
+        </svg>
+        <svg
+          viewBox="0 0 1000 300"
+          className="w-[150%] h-auto transform -rotate-12 opacity-[0.04] -mt-20"
+          aria-hidden="true"
+        >
+          <text
+            x="50%"
+            y="50%"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            className="font-black"
+            style={{
+              fontSize: '180px',
+              fontFamily: 'var(--font-lato), sans-serif',
+              fill: '#4338ca',
+              fontWeight: 900
+            }}
+          >
+            SURAJ SATYARTHI
+          </text>
+        </svg>
       </div>
 
       <div className="max-w-md w-full space-y-8 relative z-10">
