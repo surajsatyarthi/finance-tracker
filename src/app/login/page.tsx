@@ -51,7 +51,12 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-neutral-50 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-yellow-400 relative overflow-hidden">
+
+      {/* DEPLOYMENT PROOF MARKER */}
+      <div className="absolute top-4 left-4 bg-black text-white px-4 py-2 font-black text-xl z-50 rounded-lg shadow-2xl">
+        V5_YELLOW_TEST_ACTIVE
+      </div>
 
       <div className="max-w-md w-full space-y-8 relative z-10">
         <div className="text-center">
