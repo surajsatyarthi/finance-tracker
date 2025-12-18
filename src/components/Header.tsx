@@ -12,11 +12,7 @@ import Sidebar from './Sidebar'
 
 export default function Header() {
   const pathname = usePathname()
-  const { user, loading } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-
-  // Hide on login page or if not logged in
-  if (pathname === '/login' || (!loading && !user)) return null
 
   return (
     <>
