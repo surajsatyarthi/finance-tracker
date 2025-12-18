@@ -35,10 +35,12 @@ const items = [
 
 export default function BottomNav() {
   const pathname = usePathname()
+  const { user, loading } = useAuth()
 
   const [feedbackOpen, setFeedbackOpen] = useState(false)
 
-  if (pathname === '/login') return null
+  // Hide on login page or if not logged in
+  if (pathname === '/login' || (!loading && !user)) return null
 
   return (
     <>
