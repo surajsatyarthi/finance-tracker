@@ -10,22 +10,30 @@ import PWARegister from './PWARegister'
 export default function MainShell({ children }: { children: React.ReactNode }) {
     const { user } = useAuth()
     const pathname = usePathname()
+    const [mounted, setMounted] = React.useState(false)
+
+    React.useEffect(() => {
+        setMounted(true)
+    }, [])
 
     // 1. Define truly public pages that must never show the shell
-    // Debugging pathname for production alignment
-    console.log('[MainShell] Pathname:', pathname, 'User:', !!user)
-
     const isPublicPage = pathname === '/' || pathname === '/login' || pathname?.startsWith('/login?') || pathname?.startsWith('/login/')
 
     // 2. Determine visibility: 
     // - Hide if on a public page
     // - Hide if definitely logged out (user is null)
-    const showShell = !isPublicPage && !!user
-    console.log('[MainShell] Show Shell:', showShell)
+    // - Use mounted state to avoid hydration flashes of the shell
+    const showShell = mounted && !isPublicPage && !!user
+
+    // Debugging (Client side)
+    if (mounted) {
+        console.log('[MainShell] Pathname:', pathname, 'User:', !!user, 'isPublic:', isPublicPage, 'showShell:', showShell)
+    }
 
     if (!showShell) {
         return (
             <div className="min-h-screen bg-neutral-50">
+                <PWARegister />
                 <main>
                     {children}
                 </main>
