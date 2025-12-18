@@ -222,8 +222,8 @@ export default function Dashboard() {
 
       const totalAssets = liquidity.totalLiquidity
       const totalCreditCardBalance = ccSummary.totalOutstanding
-      const totalLoanOutstanding = loans.reduce((sum: number, l: any) => sum + (l.currentBalance || 0), 0)
-      const totalPayLaterUsed = payLater.reduce((sum: number, s: any) => sum + (s.usedAmount || 0), 0)
+      const totalLoanOutstanding = loans.reduce((sum: number, l: any) => sum + (Number(l.current_balance) || 0), 0)
+      const totalPayLaterUsed = payLater.reduce((sum: number, s: any) => sum + (Number(s.usedAmount) || 0), 0)
       const totalLiabilities = totalCreditCardBalance + totalLoanOutstanding + totalPayLaterUsed
 
       // Auto-save Daily Snapshot (Idempotent)
@@ -258,7 +258,7 @@ export default function Dashboard() {
           type: t.type,
           description: t.description || '',
           date: t.date,
-          categories: null
+          categories: t.category ? { name: t.category } : null
         }))
 
       // Partition Split
@@ -319,7 +319,7 @@ export default function Dashboard() {
       const upcomingAmount = upcomingList.reduce((sum, p) => sum + p.amount, 0)
 
       // Ratios
-      const monthlyEmi = loans.reduce((sum: number, l: any) => sum + (l.monthlyAmount || 0), 0)
+      const monthlyEmi = loans.reduce((sum: number, l: any) => sum + (Number(l.emi_amount) || 0), 0)
       const savingsRate = monthlyIncome > 0 ? Math.round((monthlySavings / monthlyIncome) * 100) : 0
       const debtService = monthlyIncome > 0 ? Math.round((monthlyEmi / monthlyIncome) * 100) : 0
       const liquidityRatio = totalAssets > 0 ? Math.round(((totalAssets - totalCreditCardBalance) / totalAssets) * 100) : 0

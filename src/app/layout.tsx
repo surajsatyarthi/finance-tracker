@@ -3,10 +3,9 @@ import { Lato, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from '../contexts/AuthContext';
 import { NotificationProvider } from '../contexts/NotificationContext';
-import Header from '../components/Header';
-import BottomNav from '../components/BottomNav';
 import { PrivacyProvider } from '../contexts/PrivacyContext';
 import PWARegister from '../components/PWARegister';
+import MainShell from '../components/MainShell';
 
 const lato = Lato({
   variable: "--font-lato",
@@ -44,9 +43,12 @@ export default function RootLayout({
         <AuthProvider>
           <NotificationProvider>
             <PrivacyProvider>
-              <MainShell>
-                {children}
-              </MainShell>
+              <div className="min-h-screen">
+                <PWARegister />
+                <MainShell>
+                  {children}
+                </MainShell>
+              </div>
             </PrivacyProvider>
           </NotificationProvider>
         </AuthProvider>
