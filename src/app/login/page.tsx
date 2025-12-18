@@ -55,9 +55,16 @@ export default function LoginPage() {
 
       <div className="max-w-md w-full space-y-8 relative z-10">
         <div className="text-center">
-          <div className="flex justify-center mb-6">
-            <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-2xl">₹</span>
+          <div className="flex justify-center mb-6 relative">
+            {/* BUILD MARKER - Remove after verification */}
+            <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 text-[10px] font-mono text-red-500 whitespace-nowrap">
+              BUILD: 22:20_FORCE_STRAIGHT
+            </div>
+            <div
+              className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg"
+              style={{ transform: 'none !important', rotate: '0deg !important' }}
+            >
+              <span className="text-white font-bold text-2xl" style={{ transform: 'none !important' }}>₹</span>
             </div>
           </div>
           <h2 className="text-3xl font-bold tracking-tight text-gray-900">
