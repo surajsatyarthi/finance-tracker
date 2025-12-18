@@ -51,15 +51,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-indigo-50/80 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-neutral-50 relative overflow-hidden">
 
       <div className="max-w-md w-full space-y-8 relative z-10">
         <div className="text-center">
           <div className="flex justify-center mb-6 relative">
-            {/* BUILD MARKER - Remove after verification */}
-            <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 text-[10px] font-mono text-red-600 font-bold whitespace-nowrap bg-white px-2 py-1 rounded shadow-sm">
-              DEPLOY_SYNC_CHECK_10:52PM
-            </div>
             <div
               className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg"
               style={{ transform: 'none !important', rotate: '0deg !important' }}
