@@ -7,6 +7,9 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useNotification } from '@/contexts/NotificationContext'
 
 export default function LoginPage() {
+  useEffect(() => {
+    console.log("CRITICAL_BOOT_SUCCESS: V6_RED_TEST_IS_LIVE_11:59PM")
+  }, [])
   const router = useRouter()
   const { signIn } = useAuth()
   const { showNotification } = useNotification()
@@ -51,11 +54,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-yellow-400 relative overflow-hidden">
+    <div
+      className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden"
+      style={{ backgroundColor: 'red', position: 'relative' }}
+    >
 
-      {/* DEPLOYMENT PROOF MARKER */}
-      <div className="absolute top-4 left-4 bg-black text-white px-4 py-2 font-black text-xl z-50 rounded-lg shadow-2xl">
-        V5_YELLOW_TEST_ACTIVE
+      {/* EXTREME DEPLOYMENT PROOF MARKER */}
+      <div className="fixed inset-x-0 top-0 bg-white text-red-600 px-4 py-8 font-black text-4xl z-[9999] text-center shadow-2xl border-b-8 border-red-600">
+        V6_RED_TEST_IS_LIVE_11:58PM
       </div>
 
       <div className="max-w-md w-full space-y-8 relative z-10">
