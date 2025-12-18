@@ -52,12 +52,12 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-neutral-50 relative overflow-hidden">
-      {/* Background Wordmark Branding - Increased opacity for visibility */}
-      <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden flex flex-col items-center justify-center whitespace-nowrap opacity-100">
-        <div className="text-[12rem] md:text-[20rem] font-black text-gray-200 uppercase tracking-tighter transform -rotate-12 leading-none">
+      {/* Background Wordmark Branding - High-contrast watermark */}
+      <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden flex flex-col items-center justify-center whitespace-nowrap">
+        <div className="text-[12rem] md:text-[20rem] font-black text-indigo-900/10 uppercase tracking-tighter transform -rotate-12 leading-none">
           SURAJ SATYARTHI
         </div>
-        <div className="text-[12rem] md:text-[20rem] font-black text-gray-300/40 uppercase tracking-tighter transform -rotate-12 leading-none mt-8">
+        <div className="text-[12rem] md:text-[20rem] font-black text-indigo-900/[0.05] uppercase tracking-tighter transform -rotate-12 leading-none mt-8">
           SURAJ SATYARTHI
         </div>
       </div>

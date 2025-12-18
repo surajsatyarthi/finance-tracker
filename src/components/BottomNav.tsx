@@ -1,4 +1,3 @@
-
 'use client'
 
 import Link from 'next/link'
@@ -16,7 +15,7 @@ import {
   ChatBubbleLeftRightIcon
 } from '@heroicons/react/24/outline'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import FeedbackModal from './FeedbackModal'
 
 const items = [
@@ -35,8 +34,18 @@ const items = [
 
 export default function BottomNav() {
   const pathname = usePathname()
-
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) return null
+
+  // Failsafe: Hide if on a public page
+  const isPublicPage = pathname === '/' || pathname === '/login' || pathname?.startsWith('/login?') || pathname?.startsWith('/login/')
+  if (isPublicPage) return null
 
   return (
     <>
