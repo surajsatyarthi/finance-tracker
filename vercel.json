@@ -1,9 +1,6 @@
 {
   "framework": "nextjs",
   "buildCommand": "npm run build",
-  "projectSettings": {
-    "framework": "nextjs"
-  },
   "headers": [
     {
       "source": "/(.*)",
@@ -17,7 +14,7 @@
           "value": "nosniff"
         },
         {
-          "key": "Referrer-Policy", 
+          "key": "Referrer-Policy",
           "value": "strict-origin-when-cross-origin"
         },
         {
@@ -52,7 +49,9 @@
       "maxDuration": 10
     }
   },
-  "regions": ["cle1"],
+  "regions": [
+    "cle1"
+  ],
   "rewrites": [
     {
       "source": "/healthz",

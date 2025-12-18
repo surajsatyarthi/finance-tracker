@@ -7,9 +7,6 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useNotification } from '@/contexts/NotificationContext'
 
 export default function LoginPage() {
-  useEffect(() => {
-    console.log("CRITICAL_BOOT_SUCCESS: V6_RED_TEST_IS_LIVE_11:59PM")
-  }, [])
   const router = useRouter()
   const { signIn } = useAuth()
   const { showNotification } = useNotification()
@@ -54,24 +51,16 @@ export default function LoginPage() {
   }
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden"
-      style={{ backgroundColor: 'red', position: 'relative' }}
-    >
-
-      {/* EXTREME DEPLOYMENT PROOF MARKER */}
-      <div className="fixed inset-x-0 top-0 bg-white text-red-600 px-4 py-8 font-black text-4xl z-[9999] text-center shadow-2xl border-b-8 border-red-600">
-        V6_RED_TEST_IS_LIVE_11:58PM
-      </div>
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-neutral-50 relative overflow-hidden">
 
       <div className="max-w-md w-full space-y-8 relative z-10">
         <div className="text-center">
-          <div className="flex justify-center mb-6 relative">
+          <div className="flex justify-center mb-6">
             <div
               className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg"
-              style={{ transform: 'none !important', rotate: '0deg !important' }}
+              style={{ transform: 'rotate(0deg)' }}
             >
-              <span className="text-white font-bold text-2xl" style={{ transform: 'none !important' }}>₹</span>
+              <span className="text-white font-bold text-2xl">₹</span>
             </div>
           </div>
           <h2 className="text-3xl font-bold tracking-tight text-gray-900">
