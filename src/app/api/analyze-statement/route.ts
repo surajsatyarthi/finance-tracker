@@ -32,8 +32,38 @@ export async function POST(request: NextRequest) {
         await writeFile(tempPath, buffer)
 
         try {
-            // Parse the statement
-            const parser = new ICICIParser()
+            // Parse the statement - Auto-detect bank
+            const text = await require('child_process').execSync(`pdftotext "${tempPath}" -`).toString()
+
+            let parser
+            if (text.includes('ICICI') || text.includes('Amazon Pay') || text.includes('Adani One')) {
+                const { ICICIParser } = await import('@/scripts/statement-analyzer/parsers/icici-parser')
+                parser = new ICICIParser()
+            } else if (text.includes('YES Bank') || text.includes('Pop')) {
+                const { YESBankParser } = await import('@/scripts/statement-analyzer/parsers/yesbank-parser')
+                parser = new YESBankParser()
+            } else if (text.includes('IndusInd') || text.includes('Rupay') || text.includes('Aura Edge')) {
+                const { IndusindParser } = await import('@/scripts/statement-analyzer/parsers/indusind-parser')
+                parser = new IndusindParser()
+            } else if (text.includes('RBL') || text.includes('Bajaj Finserv') || text.includes('Platinum Delight')) {
+                const { RBLParser } = await import('@/scripts/statement-analyzer/parsers/rbl-parser')
+                parser = new RBLParser()
+            } else if (text.includes('State Bank') || text.includes('SBI') || text.includes('BPCL') || text.includes('SimplySAVE')) {
+                const { SBIParser } = await import('@/scripts/statement-analyzer/parsers/sbi-parser')
+                parser = new SBIParser()
+            } else if (text.includes('Axis Bank') || text.includes('Axis') || text.includes('Neo') || text.includes('My Zone')) {
+                const { AxisParser } = await import('@/scripts/statement-analyzer/parsers/axis-parser')
+                parser = new AxisParser()
+            } else if (text.includes('HDFC') || text.includes('Millenia') || text.includes('Millennia') || text.includes('Neu')) {
+                const { HDFCParser } = await import('@/scripts/statement-analyzer/parsers/hdfc-parser')
+                parser = new HDFCParser()
+            } else {
+                return NextResponse.json(
+                    { error: 'Bank not supported yet. Supported banks: ICICI, YES Bank, Indusind, RBL, SBI, Axis, HDFC' },
+                    { status: 400 }
+                )
+            }
+
             const result = await parser.analyze(tempPath)
 
             // Clean up temp file
