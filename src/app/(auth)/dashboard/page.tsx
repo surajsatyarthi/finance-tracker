@@ -38,6 +38,7 @@ import {
 } from 'recharts'
 import { financeManager } from '@/lib/supabaseDataManager'
 import GlassCard from '@/components/GlassCard'
+import { formatDate, formatDateShort } from '@/lib/dateUtils'
 
 interface Transaction {
   id: string
@@ -487,30 +488,8 @@ export default function Dashboard() {
           <p className="text-neutral-600">Here&apos;s an overview of your financial portfolio</p>
         </div>
 
-        {/* Zero State Banner */}
-        {stats.totalAssets === 0 && stats.totalLiabilities === 0 && !dataLoading && (
-          <div className="mb-8 rounded-md bg-yellow-50 p-4 border border-yellow-200">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400" aria-hidden="true" />
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-yellow-800">No Data Detected</h3>
-                <div className="mt-2 text-sm text-yellow-700">
-                  <p>
-                    It looks like your dashboard is empty. This can happen if the initial setup didn&apos;t complete.
-                  </p>
-                  <p className="mt-2">
-                    <Link href="/settings" className="font-bold underline hover:text-yellow-600">
-                      Go to Settings &rarr; Reset Demo Data
-                    </Link>
-                    {' '}to restore default accounts and goals.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+
+
 
         {/* Professional Financial Metrics */}
         {/* ... (Keep existing first row of cards) */}
@@ -628,7 +607,7 @@ export default function Dashboard() {
                   <tr key={idx}>
                     <td className="px-6 py-3 text-sm text-gray-900">{r.kind}</td>
                     <td className="px-6 py-3 text-sm text-gray-900">{r.label}</td>
-                    <td className="px-6 py-3 text-sm text-gray-900">{new Date(r.due).toLocaleDateString('en-IN')}</td>
+                    <td className="px-6 py-3 text-sm text-gray-900">{formatDate(r.due)}</td>
                     <td className="px-6 py-3 text-sm font-semibold text-right text-gray-900">₹{Number(r.amount || 0).toLocaleString()}</td>
                   </tr>
                 ))}
@@ -855,7 +834,7 @@ export default function Dashboard() {
                           {transaction.description || 'Transaction'}
                         </p>
                         <p className="text-sm text-gray-500">
-                          {transaction.categories?.name} • {new Date(transaction.date).toLocaleDateString()}
+                          {transaction.categories?.name} • {formatDate(transaction.date)}
                         </p>
                       </div>
                       <div className={`text-sm font-semibold px-2 py-1 rounded ${transaction.type === 'income' ? 'text-success-700 bg-success-100' : 'text-error-700 bg-error-100'}`}>

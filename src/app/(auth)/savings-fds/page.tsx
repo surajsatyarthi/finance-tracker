@@ -6,6 +6,7 @@ import { financeManager } from '@/lib/supabaseDataManager'
 import GlassCard from '@/components/GlassCard'
 import { usePrivacy } from '@/contexts/PrivacyContext'
 import { CurrencyRupeeIcon, CalendarIcon, PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { formatDate } from '@/lib/dateUtils'
 
 type FDForm = {
   name: string
@@ -118,8 +119,8 @@ export default function SavingsFDsPage() {
                     <td className="px-6 py-3 text-sm font-medium text-gray-900">{fd.name}</td>
                     <td className="px-6 py-3 text-sm font-semibold text-gray-900">{locked ? '₹••••••' : formatCurrency(fd.amount)}</td>
                     <td className="px-6 py-3 text-sm text-gray-900">{fd.rate}%</td>
-                    <td className="px-6 py-3 text-sm text-gray-900">{fd.startDate}</td>
-                    <td className="px-6 py-3 text-sm text-gray-900">{fd.maturityDate}</td>
+                    <td className="px-6 py-3 text-sm text-gray-900">{formatDate(fd.startDate)}</td>
+                    <td className="px-6 py-3 text-sm text-gray-900">{formatDate(fd.maturityDate)}</td>
                     <td className="px-6 py-3 text-right text-sm">
                       <button className="px-3 py-1 rounded border mr-2" onClick={() => {
                         setEditingId(fd.id)
@@ -153,7 +154,7 @@ export default function SavingsFDsPage() {
                     <CalendarIcon className="h-5 w-5 text-indigo-600" />
                     <span className="text-sm font-medium text-gray-900">{fd.name}</span>
                   </div>
-                  <div className="text-sm text-gray-700">{new Date(fd.maturityDate).toLocaleDateString('en-IN')}</div>
+                  <div className="text-sm text-gray-700">{formatDate(fd.maturityDate)}</div>
                 </div>
               ))}
               {maturityCalendar.length === 0 && <p className="text-sm text-gray-500">No upcoming maturities</p>}

@@ -34,6 +34,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Income', href: '/income', icon: BanknotesIcon },
         { name: 'Expenses', href: '/expenses/add', icon: ArrowTrendingDownIcon },
         { name: 'Budget', href: '/budget', icon: ChartBarIcon },
+        { name: 'Summary', href: '/summary', icon: DocumentMagnifyingGlassIcon },
         { name: 'Goals', href: '/goals', icon: FlagIcon },
         { name: 'Loans', href: '/loans', icon: ArrowTrendingDownIcon },
         { name: 'Savings & FDs', href: '/savings-fds', icon: FlagIcon },

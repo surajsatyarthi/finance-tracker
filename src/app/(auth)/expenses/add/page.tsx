@@ -297,12 +297,7 @@ export default function AddExpensePage() {
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <div className="icon-golden-card">
-              <MinusIcon className="h-6 w-6 icon-white" />
-            </div>
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900">Add Expense</h1>
+          <h1 className="text-3xl font-bold text-red-600">Add Expense</h1>
           <p className="text-gray-600 mt-2">Track your spending across different payment methods</p>
         </div>
 
@@ -323,10 +318,10 @@ export default function AddExpensePage() {
                   onClick={() => setExpense({ ...expense, paymentMethod: 'cash', bankAccount: undefined, creditCard: undefined, bnplProvider: undefined, emiDetails: undefined })}
                   className={`flex flex-col items-center p-4 rounded-lg border-2 transition-all ${expense.paymentMethod === 'cash'
                     ? 'border-red-500 bg-red-50 text-red-700'
-                    : 'border-gray-200 hover:border-gray-300'
+                    : 'border-gray-200 hover:border-gray-300 text-gray-700'
                     }`}
                 >
-                  <div className="icon-golden-card mb-2">
+                  <div className="icon-red-card mb-2">
                     <BanknotesIcon className="h-6 w-6 icon-white" />
                   </div>
                   <span className="text-sm font-medium">Cash</span>
@@ -338,10 +333,10 @@ export default function AddExpensePage() {
                   onClick={() => setExpense({ ...expense, paymentMethod: 'upi', creditCard: undefined, bnplProvider: undefined, emiDetails: undefined })}
                   className={`flex flex-col items-center p-4 rounded-lg border-2 transition-all ${expense.paymentMethod === 'upi'
                     ? 'border-red-500 bg-red-50 text-red-700'
-                    : 'border-gray-200 hover:border-gray-300'
+                    : 'border-gray-200 hover:border-gray-300 text-gray-700'
                     }`}
                 >
-                  <div className="icon-golden-card mb-2">
+                  <div className="icon-red-card mb-2">
                     <DevicePhoneMobileIcon className="h-6 w-6 icon-white" />
                   </div>
                   <span className="text-sm font-medium">UPI</span>
@@ -353,10 +348,10 @@ export default function AddExpensePage() {
                   onClick={() => setExpense({ ...expense, paymentMethod: 'credit_card', bankAccount: undefined, bnplProvider: undefined, emiDetails: undefined })}
                   className={`flex flex-col items-center p-4 rounded-lg border-2 transition-all ${expense.paymentMethod === 'credit_card'
                     ? 'border-red-500 bg-red-50 text-red-700'
-                    : 'border-gray-200 hover:border-gray-300'
+                    : 'border-gray-200 hover:border-gray-300 text-gray-700'
                     }`}
                 >
-                  <div className="icon-golden-card mb-2">
+                  <div className="icon-red-card mb-2">
                     <CreditCardIcon className="h-6 w-6 icon-white" />
                   </div>
                   <span className="text-sm font-medium">Credit Card</span>
@@ -368,10 +363,10 @@ export default function AddExpensePage() {
                   onClick={() => setExpense({ ...expense, paymentMethod: 'credit_card_emi', bankAccount: undefined, bnplProvider: undefined })}
                   className={`flex flex-col items-center p-4 rounded-lg border-2 transition-all ${expense.paymentMethod === 'credit_card_emi'
                     ? 'border-red-500 bg-red-50 text-red-700'
-                    : 'border-gray-200 hover:border-gray-300'
+                    : 'border-gray-200 hover:border-gray-300 text-gray-700'
                     }`}
                 >
-                  <div className="icon-golden-card mb-2">
+                  <div className="icon-red-card mb-2">
                     <CalendarDaysIcon className="h-6 w-6 icon-white" />
                   </div>
                   <span className="text-sm font-medium">EMI</span>
@@ -383,15 +378,29 @@ export default function AddExpensePage() {
                   onClick={() => setExpense({ ...expense, paymentMethod: 'bnpl', bankAccount: undefined, creditCard: undefined, emiDetails: undefined })}
                   className={`flex flex-col items-center p-4 rounded-lg border-2 transition-all ${expense.paymentMethod === 'bnpl'
                     ? 'border-red-500 bg-red-50 text-red-700'
-                    : 'border-gray-200 hover:border-gray-300'
+                    : 'border-gray-200 hover:border-gray-300 text-gray-700'
                     }`}
                 >
-                  <div className="icon-golden-card mb-2">
+                  <div className="icon-red-card mb-2">
                     <ClockIcon className="h-6 w-6 icon-white" />
                   </div>
                   <span className="text-sm font-medium">BNPL</span>
                 </button>
               </div>
+            </div>
+
+            {/* Date - Right after Payment Method */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Date
+              </label>
+              <input
+                type="date"
+                value={expense.date}
+                onChange={(e) => setExpense({ ...expense, date: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                required
+              />
             </div>
 
             {/* Bank Account Selection (for UPI) - Paid Via */}
@@ -474,20 +483,6 @@ export default function AddExpensePage() {
                 required
                 min="0.01"
                 step="0.01"
-              />
-            </div>
-
-            {/* Date */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Date
-              </label>
-              <input
-                type="date"
-                value={expense.date}
-                onChange={(e) => setExpense({ ...expense, date: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                required
               />
             </div>
 

@@ -178,7 +178,14 @@ export default function LoanDetailPage() {
     const totalAmount = (loan.emi_amount ?? 0) * (loan.total_emis ?? 1)
 
     const formatCurrency = (amount: number) => `₹${amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
-    const formatDate = (date: string) => date ? new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'
+    const formatDate = (date: string) => {
+        if (!date) return 'N/A'
+        const d = new Date(date)
+        const day = d.getDate().toString().padStart(2, '0')
+        const month = (d.getMonth() + 1).toString().padStart(2, '0')
+        const year = d.getFullYear()
+        return `${day}/${month}/${year}`
+    }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 py-8">
@@ -541,76 +548,76 @@ export default function LoanDetailPage() {
                 </div>
             </div>
 
-        {/* Payment Modal */ }
-    {
-        isPaymentModalOpen && (
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-                <div className="bg-white rounded-lg max-w-md w-full p-6">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Record Payment</h3>
-                    <form onSubmit={handleRecordPayment} className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Amount</label>
-                            <input
-                                type="number"
-                                required
-                                min="0"
-                                step="0.01"
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
-                                value={paymentForm.amount}
-                                onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                            />
+            {/* Payment Modal */}
+            {
+                isPaymentModalOpen && (
+                    <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
+                        <div className="bg-white rounded-lg max-w-md w-full p-6">
+                            <h3 className="text-lg font-medium text-gray-900 mb-4">Record Payment</h3>
+                            <form onSubmit={handleRecordPayment} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Amount</label>
+                                    <input
+                                        type="number"
+                                        required
+                                        min="0"
+                                        step="0.01"
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                                        value={paymentForm.amount}
+                                        onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Date</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                                        value={paymentForm.date}
+                                        onChange={e => setPaymentForm({ ...paymentForm, date: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Type</label>
+                                    <select
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                                        value={paymentForm.type}
+                                        onChange={e => setPaymentForm({ ...paymentForm, type: e.target.value })}
+                                    >
+                                        <option value="emi_payment">Regular EMI</option>
+                                        <option value="prepayment">Prepayment (Principal Only)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Notes</label>
+                                    <input
+                                        type="text"
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                                        value={paymentForm.notes}
+                                        onChange={e => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                                    />
+                                </div>
+                                <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                                    <button
+                                        type="submit"
+                                        disabled={isSavingPayment}
+                                        className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none sm:col-start-2 sm:text-sm disabled:opacity-50"
+                                    >
+                                        {isSavingPayment ? 'Saving...' : 'Save Payment'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsPaymentModalOpen(false)}
+                                        className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:col-start-1 sm:text-sm"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </form>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Date</label>
-                            <input
-                                type="date"
-                                required
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
-                                value={paymentForm.date}
-                                onChange={e => setPaymentForm({ ...paymentForm, date: e.target.value })}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Type</label>
-                            <select
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
-                                value={paymentForm.type}
-                                onChange={e => setPaymentForm({ ...paymentForm, type: e.target.value })}
-                            >
-                                <option value="emi_payment">Regular EMI</option>
-                                <option value="prepayment">Prepayment (Principal Only)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Notes</label>
-                            <input
-                                type="text"
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
-                                value={paymentForm.notes}
-                                onChange={e => setPaymentForm({ ...paymentForm, notes: e.target.value })}
-                            />
-                        </div>
-                        <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
-                            <button
-                                type="submit"
-                                disabled={isSavingPayment}
-                                className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none sm:col-start-2 sm:text-sm disabled:opacity-50"
-                            >
-                                {isSavingPayment ? 'Saving...' : 'Save Payment'}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setIsPaymentModalOpen(false)}
-                                className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:col-start-1 sm:text-sm"
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        )
-    }
+                    </div>
+                )
+            }
         </div>
     )
 }

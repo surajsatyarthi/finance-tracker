@@ -14,6 +14,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { FinanceDataManager } from '@/lib/supabaseDataManager'
 import { type Loan } from '@/types/finance'
+import { formatDate } from '@/lib/dateUtils'
 import { useRequireAuth } from '@/contexts/AuthContext'
 
 export default function LoansPage() {
@@ -207,7 +208,7 @@ export default function LoansPage() {
                           {loan.next_emi_date && (
                             <p className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
                               <CalendarDaysIcon className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" aria-hidden="true" />
-                              Next Due: {loan.next_emi_date}
+                              Next Due: {formatDate(loan.next_emi_date)}
                             </p>
                           )}
                         </div>

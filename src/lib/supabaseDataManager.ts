@@ -1016,25 +1016,70 @@ export class FinanceDataManager {
     } else if (expense.paymentMethod === 'credit_card') {
       if (!expense.creditCard) throw new Error('Credit card required')
 
-      // 1. Credit Card Transaction Table
-      const { error: ccError } = await supabase.from('credit_card_transactions').insert({
-        user_id: this.userId!,
-        credit_card_id: expense.creditCard,
-        amount: expense.amount,
-        type: 'purchase', // Changed from debit? Schema has 'purchase'
-        description: expense.description,
-        transaction_date: expense.date
-      })
-      if (ccError) throw ccError
+      // Fetch card details to determine if it's a debit card or credit card
+      const { data: cardDetails, error: cardError } = await supabase
+        .from('credit_cards')
+        .select('card_type, current_balance, name')
+        .eq('id', expense.creditCard)
+        .single()
 
-      // 2. Update Credit Card Balance
-      const { data: card } = await supabase.from('credit_cards').select('current_balance').eq('id', expense.creditCard).single()
-      if (card) {
+      if (cardError || !cardDetails) throw new Error('Card not found')
+
+      // Check if this is a debit card
+      const isDebitCard = cardDetails.card_type?.toLowerCase() === 'debit'
+
+      if (isDebitCard) {
+        // DEBIT CARD: Treat like a bank account withdrawal (similar to UPI)
+        // 1. Record transaction in transactions table
+        const { error: txError } = await supabase.from('transactions').insert({
+          ...commonPayload,
+          payment_method: 'card',
+          account_id: null, // We could link to a specific account if needed
+          description: `[Debit Card: ${cardDetails.name}] ${expense.description}`
+        })
+        if (txError) throw txError
+
+        // 2. Find linked bank account (assuming debit card name matches account name)
+        // Or we can look for an account with the same name prefix
+        const { data: account } = await supabase
+          .from('accounts')
+          .select('id, balance')
+          .eq('user_id', this.userId!)
+          .eq('name', cardDetails.name)
+          .single()
+
+        // 3. Update bank account balance
+        if (account) {
+          await supabase.from('accounts').update({
+            balance: account.balance - expense.amount
+          }).eq('id', account.id)
+        } else {
+          logger.warn(`No matching bank account found for debit card: ${cardDetails.name}`)
+        }
+
+        return { success: true }
+
+      } else {
+        // CREDIT CARD: Only update card balance (do NOT touch bank accounts)
+        // 1. Credit Card Transaction Table
+        const { error: ccError } = await supabase.from('credit_card_transactions').insert({
+          user_id: this.userId!,
+          credit_card_id: expense.creditCard,
+          amount: expense.amount,
+          type: 'purchase',
+          description: expense.description,
+          transaction_date: expense.date
+        })
+        if (ccError) throw ccError
+
+        // 2. Update Credit Card Balance (increase liability)
         await supabase.from('credit_cards').update({
-          current_balance: card.current_balance + expense.amount
+          current_balance: cardDetails.current_balance + expense.amount
         }).eq('id', expense.creditCard)
+
+        return { success: true }
       }
-      return { success: true }
+
     } else if (expense.paymentMethod === 'bnpl') {
       // BNPL handling - Map to transactions for now or custom logic
       const { error: txError } = await supabase.from('transactions').insert({
@@ -1615,43 +1660,30 @@ export class FinanceDataManager {
   async seedLiquidity(accounts: { name: string; type: string; balance: number; currency: string }[]) {
     if (!this.userId) await this.initialize()
 
-    // Upsert accounts based on name + user_id? 
-    // Schema might not have unique constraint on (user_id, name).
-    // So we check existence first or just insert.
-    // User wants to "update it in the app", implies persistence.
-    // I'll check if account with name exists, if so update balance, else insert.
+    // Clean replacement: Delete all existing accounts and insert fresh
+    // This ensures exact match with the provided baseline data (Dec 19, 2025)
 
+    // Step 1: Delete all existing accounts for this user
+    await supabase
+      .from('accounts')
+      .delete()
+      .eq('user_id', this.userId!)
+
+    // Step 2: Insert all new accounts with exact names as provided
     for (const acc of accounts) {
-      const { data: existing } = await supabase
+      await supabase
         .from('accounts')
-        .select('id')
-        .eq('user_id', this.userId!)
-        .eq('name', acc.name)
-        .maybeSingle()
-
-      if (existing) {
-        // Update balance? User provided "current liquidity", so yes overwrite.
-        await supabase
-          .from('accounts')
-          .update({
-            balance: acc.balance,
-            type: acc.type,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existing.id)
-      } else {
-        await supabase
-          .from('accounts')
-          .insert({
-            user_id: this.userId!,
-            name: acc.name,
-            type: acc.type,
-            balance: acc.balance,
-            currency: acc.currency,
-            is_active: true
-          })
-      }
+        .insert({
+          user_id: this.userId!,
+          name: acc.name,
+          type: acc.type,
+          balance: acc.balance,
+          currency: acc.currency,
+          is_active: true
+        })
     }
+
+    logger.info('Accounts seeded successfully', { count: accounts.length })
     return { success: true }
   }
 

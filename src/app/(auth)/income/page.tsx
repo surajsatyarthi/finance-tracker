@@ -10,7 +10,7 @@ import {
 import {
   FinanceDataManager,
 } from '@/lib/supabaseDataManager'
-import { BankAccount } from '@/types/finance'
+import { BankAccount, Category } from '@/types/finance'
 import { useNotification } from '@/contexts/NotificationContext'
 
 interface IncomeEntry {
@@ -30,11 +30,12 @@ export default function IncomePage() {
     description: '',
     date: new Date().toISOString().split('T')[0],
     type: 'cash',
-    category: 'salary'
+    category: ''
   })
 
   const [loading, setLoading] = useState(false)
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
+  const [incomeCategories, setIncomeCategories] = useState<Category[]>([])
 
   const financeManager = FinanceDataManager.getInstance()
 
@@ -42,18 +43,16 @@ export default function IncomePage() {
   useEffect(() => {
     const loadData = async () => {
       await financeManager.initialize()
-      const accounts = await financeManager.getAccounts()
-      // Map to shared BankAccount interface if needed or cast
+      const [accounts, categories] = await Promise.all([
+        financeManager.getAccounts(),
+        financeManager.getCategories()
+      ])
       setBankAccounts(accounts as BankAccount[])
+      // Filter for income categories only
+      setIncomeCategories(categories.filter((c: Category) => c.type === 'income'))
     }
     loadData()
   }, [])
-
-  const incomeCategories = [
-    'salary',
-    'investment',
-    'others'
-  ]
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -111,12 +110,7 @@ export default function IncomePage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 py-8">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <div className="icon-golden-card">
-              <PlusIcon className="h-6 w-6 icon-white" />
-            </div>
-          </div>
+        <div className="text-center mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Add Income</h1>
           <p className="text-gray-600 mt-2">Track your cash and non-cash earnings</p>
         </div>
@@ -168,6 +162,20 @@ export default function IncomePage() {
               </div>
             </div>
 
+            {/* Date - 2nd position */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Date
+              </label>
+              <input
+                type="date"
+                value={income.date}
+                onChange={(e) => setIncome({ ...income, date: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                required
+              />
+            </div>
+
             {/* Bank Account Selection (for non-cash) */}
             {income.type === 'non-cash' && (
               <div>
@@ -217,9 +225,10 @@ export default function IncomePage() {
                 onChange={(e) => setIncome({ ...income, category: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
               >
+                <option value="">Select Category</option>
                 {incomeCategories.map((category) => (
-                  <option key={category} value={category}>
-                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                  <option key={category.id} value={category.name}>
+                    {category.name}
                   </option>
                 ))}
               </select>
@@ -239,19 +248,7 @@ export default function IncomePage() {
               />
             </div>
 
-            {/* Date */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Date
-              </label>
-              <input
-                type="date"
-                value={income.date}
-                onChange={(e) => setIncome({ ...income, date: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                required
-              />
-            </div>
+
 
             {/* Submit Button */}
             <button

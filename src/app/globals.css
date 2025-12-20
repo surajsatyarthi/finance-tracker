@@ -163,6 +163,23 @@
   box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4) !important;
 }
 
+/* Red Icons for Expense Pages */
+.icon-red-card {
+  background: linear-gradient(135deg, #f87171, #ef4444, #dc2626) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3) !important;
+  transition: all 0.3s ease !important;
+  padding: 0.5rem !important;
+  border-radius: 0.5rem !important;
+}
+
+.icon-red-card:hover {
+  background: linear-gradient(135deg, #ef4444, #dc2626, #b91c1c) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4) !important;
+}
+
 .icon-white {
   color: white !important;
 }

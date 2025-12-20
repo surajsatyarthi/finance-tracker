@@ -14,6 +14,7 @@ import { parseStatementCSV, ParsedTransaction } from '@/lib/statementParser'
 import { useNotification } from '@/contexts/NotificationContext'
 import { useRequireAuth } from '@/contexts/AuthContext'
 import GlassCard from '@/components/GlassCard'
+import { formatDate } from '@/lib/dateUtils'
 
 export default function ReconcilePage() {
     const { user } = useRequireAuth()
@@ -166,7 +167,7 @@ export default function ReconcilePage() {
                                                 <div className="mt-2 flex justify-between">
                                                     <div className="sm:flex">
                                                         <p className="flex items-center text-sm text-gray-500">
-                                                            {txn.date}
+                                                            {formatDate(txn.date)}
                                                         </p>
                                                         <p className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
                                                             {formatCurrency(txn.amount)}

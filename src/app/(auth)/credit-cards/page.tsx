@@ -22,6 +22,7 @@ export default function CreditCardsPage() {
   const [activeTab, setActiveTab] = useState<'credit' | 'debit'>('credit')
   const [showBalances, setShowBalances] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [benefitFilter, setBenefitFilter] = useState('All')
   const [creditCards, setCreditCards] = useState<CreditCard[]>([])
   const [showCardDetails, setShowCardDetails] = useState(false)
   const [copiedField, setCopiedField] = useState<string | null>(null)
@@ -62,13 +63,20 @@ export default function CreditCardsPage() {
   const filteredCards = useMemo(() => {
     return creditCards.filter(card => {
       const matchesSearch = card.name.toLowerCase().includes(searchTerm.toLowerCase())
-      // Debit cards have null/0 limit. Credit cards have limit > 0.
-      const isDebit = !card.credit_limit || card.credit_limit <= 0
+      // Debit cards use card_type = 'debit' or credit_limit = 1
+      const isDebit = card.card_type === 'debit' || card.credit_limit === 1
       const matchesTab = activeTab === 'debit' ? isDebit : !isDebit
 
-      return matchesSearch && matchesTab
+      // Benefits Filter
+      let matchesBenefit = true
+      if (benefitFilter !== 'All') {
+        const benefitsText = JSON.stringify(card.benefits || '').toLowerCase() + ' ' + ((card as any).use_on || '').toLowerCase()
+        matchesBenefit = benefitsText.includes(benefitFilter.toLowerCase())
+      }
+
+      return matchesSearch && matchesTab && matchesBenefit
     })
-  }, [creditCards, searchTerm, activeTab])
+  }, [creditCards, searchTerm, activeTab, benefitFilter])
 
   // Calculate summary stats
   const summaryStats = useMemo(() => {
@@ -232,7 +240,7 @@ export default function CreditCardsPage() {
           >
             Credit Cards
             <span className="ml-2 bg-gray-100 text-gray-600 py-0.5 px-2 rounded-full text-xs">
-              {creditCards.filter(c => (c.credit_limit || 0) > 0).length}
+              {creditCards.filter(c => c.card_type !== 'debit' && c.credit_limit !== 1).length}
             </span>
           </button>
           <button
@@ -244,9 +252,27 @@ export default function CreditCardsPage() {
           >
             Debit Cards
             <span className="ml-2 bg-gray-100 text-gray-600 py-0.5 px-2 rounded-full text-xs">
-              {creditCards.filter(c => !c.credit_limit || c.credit_limit <= 0).length}
+              {creditCards.filter(c => c.card_type === 'debit' || c.credit_limit === 1).length}
             </span>
           </button>
+        </div>
+
+        {/* Benefits Filter */}
+        <div className="mb-6 overflow-x-auto">
+          <div className="flex space-x-2 pb-2">
+            {['All', 'Travel', 'Dining', 'Shopping', 'Fuel', 'Movies', 'Groceries', 'UPI', 'Lounge'].map((category) => (
+              <button
+                key={category}
+                onClick={() => setBenefitFilter(category)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${benefitFilter === category
+                  ? 'bg-blue-100 text-blue-700 border border-blue-200 shadow-sm'
+                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                  }`}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Search */}
@@ -304,16 +330,28 @@ export default function CreditCardsPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Card Details
                     </th>
+
                     {showCardDetails && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Benefits & Partners
+                        Card Number
                       </th>
                     )}
                     {showCardDetails && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Bank Details
+                        CVV
                       </th>
                     )}
+                    {showCardDetails && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Expiry
+                      </th>
+                    )}
+                    {showCardDetails && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Benefits
+                      </th>
+                    )}
+
                     {activeTab === 'credit' && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Credit Limit
@@ -345,126 +383,112 @@ export default function CreditCardsPage() {
                     return (
                       <tr
                         key={card.id}
-                        onClick={() => window.location.href = `/credit-cards/${card.id}`}
-                        className="hover:bg-gray-50 cursor-pointer transition-colors"
+                        className="hover:bg-gray-50 transition-colors"
                       >
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <CreditCardIcon className="h-5 w-5 text-gray-400 mr-3" />
                             <div>
                               <div className="text-sm font-medium text-gray-900">{card.name}</div>
-                              <div className="text-sm text-gray-500">{card.card_type} • {maskCardNumber(card.last_four_digits)}</div>
+                              <div className="text-sm text-gray-500">{(card as any).card_network || card.card_type}</div>
                               {(card.annual_fee || 0) > 0 && (
-                                <div className="text-xs text-orange-600 mt-1">
-                                  Annual Fee: ₹{card.annual_fee}
-                                </div>
+                                <div className="text-xs text-orange-600 mt-1">Fee: ₹{card.annual_fee}</div>
                               )}
                               {card.cashback_rate && (
-                                <div className="text-xs text-green-600 mt-1">
-                                  {card.cashback_rate}% cashback
-                                </div>
+                                <div className="text-xs text-green-600 mt-1">{card.cashback_rate}% cashback</div>
                               )}
                             </div>
                           </div>
                         </td>
 
-                        {/* Benefits & Partners - Only show when toggled */}
+                        {/* Card Number Column */}
                         {showCardDetails && (
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="space-y-2">
-                              <div className="space-y-3">
-                                {/* Partners */}
-                                {card.partner_merchants && card.partner_merchants.length > 0 && (
-                                  <div>
-                                    <div className="text-xs font-semibold text-gray-700 mb-1">Partners</div>
-                                    <div className="flex flex-wrap gap-1">
-                                      {card.partner_merchants.map((partner, idx) => (
-                                        <span key={idx} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                                          {partner}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Benefits JSON Rendering */}
-                                {card.benefits && (
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                                    {/* Rewards & Cashback */}
-                                    {(card.benefits as any).cashback !== 'NA' && (
-                                      <div className="bg-green-50 p-2 rounded-lg border border-green-100">
-                                        <span className="block text-xs font-semibold text-green-800 uppercase tracking-wide">Cashback</span>
-                                        <span className="text-xs text-green-700">{(card.benefits as any).cashback}</span>
-                                      </div>
-                                    )}
-                                    {(card.benefits as any).rewardPoints !== 'NA' && (
-                                      <div className="bg-purple-50 p-2 rounded-lg border border-purple-100">
-                                        <span className="block text-xs font-semibold text-purple-800 uppercase tracking-wide">Rewards</span>
-                                        <span className="text-xs text-purple-700">{(card.benefits as any).rewardPoints}</span>
-                                      </div>
-                                    )}
-
-                                    {/* Lounge Access */}
-                                    <div className="col-span-2 bg-gray-50 p-2 rounded-lg border border-gray-100">
-                                      <span className="block text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1">Lounge Access</span>
-                                      <div className="grid grid-cols-3 gap-2 text-xs">
-                                        <div>
-                                          <span className="text-gray-500">National:</span>
-                                          <span className="ml-1 font-medium text-gray-900">{(card.benefits as any).lounge?.national || 'NA'}</span>
-                                        </div>
-                                        <div>
-                                          <span className="text-gray-500">Intl:</span>
-                                          <span className="ml-1 font-medium text-gray-900">{(card.benefits as any).lounge?.international || 'NA'}</span>
-                                        </div>
-                                        <div>
-                                          <span className="text-gray-500">Railway:</span>
-                                          <span className="ml-1 font-medium text-gray-900">{(card.benefits as any).lounge?.railway || 'NA'}</span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
+                            <div className="flex items-center space-x-2">
+                              <span className="font-mono text-sm text-gray-900">
+                                {(card as any).card_number ? maskCardNumber((card as any).card_number.slice(-4)) : 'N/A'}
+                              </span>
+                              {(card as any).card_number && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); copyToClipboard((card as any).card_number, `${card.id}-number`); }}
+                                  className="p-1 text-gray-400 hover:text-blue-600 rounded transition-colors"
+                                  title="Copy Full Number"
+                                >
+                                  {copiedField === `${card.id}-number` ? <CheckIcon className="h-4 w-4" /> : <ClipboardDocumentIcon className="h-4 w-4" />}
+                                </button>
+                              )}
                             </div>
                           </td>
                         )}
 
-                        {/* Bank Details - Only show when toggled */}
+                        {/* CVV Column */}
                         {showCardDetails && (
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              <div className="font-medium">{card.bank || 'N/A'}</div>
-                              <div className="text-xs text-gray-500 mt-1">{card.card_type}</div>
+                            <div className="flex items-center space-x-2">
+                              <span className="font-mono text-sm text-gray-900">{(card as any).cvv || 'N/A'}</span>
+                              {(card as any).cvv && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); copyToClipboard((card as any).cvv, `${card.id}-cvv`); }}
+                                  className="p-1 text-gray-400 hover:text-blue-600 rounded transition-colors"
+                                  title="Copy CVV"
+                                >
+                                  {copiedField === `${card.id}-cvv` ? <CheckIcon className="h-4 w-4" /> : <ClipboardDocumentIcon className="h-4 w-4" />}
+                                </button>
+                              )}
                             </div>
                           </td>
                         )}
 
-                        {activeTab === 'credit' && (
+                        {/* Expiry Column */}
+                        {showCardDetails && (
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">
-                              {showBalances ? `₹${(card.credit_limit || 0).toLocaleString()}` : '₹***,***'}
+                            <span className="font-mono text-sm text-gray-900">{(card as any).expiry_date || 'N/A'}</span>
+                          </td>
+                        )}
+
+                        {/* Benefits Column */}
+                        {showCardDetails && (
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-700 max-w-xs truncate" title={(card as any).use_on || 'N/A'}>
+                              {(card as any).use_on || 'N/A'}
                             </div>
                           </td>
                         )}
-                        {activeTab === 'credit' && (
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">
-                              {showBalances ? `₹${(card.current_balance || 0).toLocaleString()}` : '₹***,***'}
-                            </div>
-                            {showBalances && (card.credit_limit || 0) > 0 && (
-                              <div className="text-xs text-gray-500">
-                                {Math.round(utilization)}% utilization
+
+
+
+                        {
+                          activeTab === 'credit' && (
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">
+                                {showBalances ? `₹${(card.credit_limit || 0).toLocaleString()}` : '₹***,***'}
                               </div>
-                            )}
-                          </td>
-                        )}
-                        {activeTab === 'credit' && (
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-green-600">
-                              {showBalances ? `₹${availableCredit.toLocaleString()}` : '₹***,***'}
-                            </div>
-                          </td>
-                        )}
+                            </td>
+                          )
+                        }
+                        {
+                          activeTab === 'credit' && (
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">
+                                {showBalances ? `₹${(card.current_balance || 0).toLocaleString()}` : '₹***,***'}
+                              </div>
+                              {showBalances && (card.credit_limit || 0) > 0 && (
+                                <div className="text-xs text-gray-500">
+                                  {Math.round(utilization)}% utilization
+                                </div>
+                              )}
+                            </td>
+                          )
+                        }
+                        {
+                          activeTab === 'credit' && (
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-green-600">
+                                {showBalances ? `₹${availableCredit.toLocaleString()}` : '₹***,***'}
+                              </div>
+                            </td>
+                          )
+                        }
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center text-sm text-gray-900">
                             <CalendarDaysIcon className="h-4 w-4 text-gray-400 mr-1" />
