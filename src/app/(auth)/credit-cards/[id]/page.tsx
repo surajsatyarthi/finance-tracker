@@ -18,6 +18,7 @@ import {
     // type CreditCardStatement,
     // type CreditCardPayment
 } from '@/types/finance'
+import { formatDate } from '@/lib/dateUtils'
 
 interface CreditCardStatement {
     id: string
@@ -183,7 +184,7 @@ export default function CreditCardDetailPage() {
         )
     }
 
-    const formatCurrency = (amount: number) => `₹${amount.toLocaleString()}`
+    const formatCurrency = (amount: number | null | undefined) => `₹${(amount ?? 0).toLocaleString()}`
     const maskCardNumber = (lastFour: string) => `**** **** **** ${lastFour || 'XXXX'}`
 
     return (
@@ -363,7 +364,7 @@ export default function CreditCardDetailPage() {
                                                 <div key={txn.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                                                     <div>
                                                         <p className="font-medium text-gray-900">{txn.description}</p>
-                                                        <p className="text-sm text-gray-500">{txn.date} • {txn.category}</p>
+                                                        <p className="text-sm text-gray-500">{formatDate(txn.date)} • {txn.category}</p>
                                                     </div>
                                                     <p className="text-lg font-semibold text-gray-900">{formatCurrency(txn.amount)}</p>
                                                 </div>
@@ -395,7 +396,7 @@ export default function CreditCardDetailPage() {
                                             <tbody className="bg-white divide-y divide-gray-200">
                                                 {transactions.map(txn => (
                                                     <tr key={txn.id} className="hover:bg-gray-50">
-                                                        <td className="px-4 py-3 text-sm text-gray-900">{txn.date}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-900">{formatDate(txn.date)}</td>
                                                         <td className="px-4 py-3 text-sm text-gray-900">{txn.description}</td>
                                                         <td className="px-4 py-3 text-sm text-gray-500">{txn.category}</td>
                                                         <td className="px-4 py-3 text-sm font-medium text-gray-900">{formatCurrency(txn.amount)}</td>

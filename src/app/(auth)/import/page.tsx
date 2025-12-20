@@ -6,6 +6,7 @@ import { ArrowUpTrayIcon, DocumentTextIcon, CheckCircleIcon, ExclamationTriangle
 import GlassCard from '@/components/GlassCard'
 import { parseStatementCSV, ParsedTransaction } from '@/lib/statementParser'
 import { financeManager } from '@/lib/supabaseDataManager'
+import { formatDate } from '@/lib/dateUtils'
 
 export default function ImportPage() {
     useRequireAuth()
@@ -137,7 +138,7 @@ export default function ImportPage() {
                                     <tbody className="bg-white divide-y divide-gray-200">
                                         {parsedData.map((tx, idx) => (
                                             <tr key={idx} className={tx.status === 'matched' ? 'bg-blue-50/50' : 'hover:bg-gray-50'}>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tx.date}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(tx.date)}</td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{tx.description}</td>
                                                 <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${tx.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
                                                     {tx.type === 'income' ? '+' : '-'}₹{tx.amount.toLocaleString()}

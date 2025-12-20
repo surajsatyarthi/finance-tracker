@@ -17,6 +17,7 @@ export default function TransactionForm() {
     const [submitting, setSubmitting] = useState(false)
     const [accounts, setAccounts] = useState<BankAccount[]>([])
     const [categories, setCategories] = useState<Category[]>([])
+    const [creditCards, setCreditCards] = useState<any[]>([])
 
     const [type, setType] = useState<'income' | 'expense' | 'transfer'>('expense')
     const [formData, setFormData] = useState({
@@ -26,18 +27,20 @@ export default function TransactionForm() {
         categoryId: '',
         accountId: '',
         toAccountId: '', // For transfers
-        paymentMethod: 'upi'
+        paymentMethod: 'cash'
     })
 
     useEffect(() => {
         async function loadData() {
             try {
-                const [accs, cats] = await Promise.all([
+                const [accs, cats, cards] = await Promise.all([
                     financeManager.getAccounts(),
-                    financeManager.getCategories()
+                    financeManager.getCategories(),
+                    financeManager.getCreditCards()
                 ])
                 setAccounts(accs)
                 setCategories(cats)
+                setCreditCards(cards)
                 if (accs.length > 0) {
                     setFormData(prev => ({ ...prev, accountId: accs[0].id }))
                 }
@@ -153,20 +156,28 @@ export default function TransactionForm() {
                 // For now, I will implement standard Income/Expense. Transfer might be tricky without verifiable backend logic.
                 // I'll stick to Income/Expense form first.
             } else {
+                const categoryName = getCategoryName(formData.categoryId);
+                console.log('Submitting transaction:', {
+                    categoryId: formData.categoryId,
+                    categoryName: categoryName,
+                    description: formData.description
+                });
+
                 await financeManager.createTransaction({
                     amount: parseFloat(formData.amount),
                     type: type,
                     description: formData.description,
                     date: formData.date,
-                    category: getCategoryName(formData.categoryId), // Passing Name to subcategory field
+                    category: categoryName || formData.categoryId, // Fallback to ID if name not found
                     payment_method: formData.paymentMethod,
                     account_id: formData.accountId
                 })
             }
             showNotification('Transaction added', 'success')
             setFormData(prev => ({ ...prev, amount: '', description: '' }))
-        } catch (e) {
-            showNotification('Error adding transaction', 'error')
+        } catch (e: any) {
+            console.error('Transaction error:', e)
+            showNotification(`Error adding transaction: ${e.message || 'Unknown error'}`, 'error')
         } finally {
             setSubmitting(false)
         }
@@ -179,7 +190,7 @@ export default function TransactionForm() {
                 setType(types[index] as any)
             }}>
                 <Tab.List className="flex space-x-1 rounded-xl bg-blue-900/20 p-1 mb-6">
-                    <Tab className={({ selected }) => classNames('w-full rounded-lg py-2.5 text-sm font-medium leading-5', selected ? 'bg-white shadow text-blue-700' : 'text-blue-100 hover:bg-white/[0.12] hover:text-white')}>
+                    <Tab className={({ selected }) => classNames('w-full rounded-lg py-2.5 text-sm font-medium leading-5', selected ? 'bg-white shadow text-red-600' : 'text-blue-100 hover:bg-white/[0.12] hover:text-white')}>
                         <div className="flex items-center justify-center space-x-2">
                             <ArrowDownIcon className="w-5 h-5" /> <span>Expense</span>
                         </div>
@@ -195,44 +206,61 @@ export default function TransactionForm() {
                     <Tab.Panel>
                         {/* Expense Form */}
                         <form onSubmit={submitWithCategoryName} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
-                                <input type="number" required className="glass-input w-full px-4 py-2 rounded-lg" value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} placeholder="0.00" />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                                    <select className="glass-input w-full px-4 py-2 rounded-lg" value={formData.categoryId} onChange={e => setFormData({ ...formData, categoryId: e.target.value })} required>
-                                        <option value="">Select Category</option>
-                                        {/* Filter for expense categories */}
-                                        {categories.filter(c => c.type === 'expense').map(c => (
-                                            <option key={c.id} value={c.id}>{c.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Account</label>
-                                    <select className="glass-input w-full px-4 py-2 rounded-lg" value={formData.accountId} onChange={e => setFormData({ ...formData, accountId: e.target.value })} required>
-                                        {accounts.map(a => <option key={a.id} value={a.id}>{a.name} (₹{a.balance})</option>)}
-                                    </select>
-                                </div>
-                            </div>
+                            {/* 1. Date - First */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
                                 <input type="date" required className="glass-input w-full px-4 py-2 rounded-lg" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
                             </div>
+
+                            {/* 2. Payment Method - Second */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+                                <select className="glass-input w-full px-4 py-2 rounded-lg" value={formData.paymentMethod} onChange={e => setFormData({ ...formData, paymentMethod: e.target.value })}>
+                                    <option value="cash">Cash</option>
+                                    <option value="upi">UPI</option>
+                                    <option value="card">Credit Card</option>
+                                </select>
+                            </div>
+
+                            {/* 3. Account/Credit Card - Conditional based on payment method */}
+                            {formData.paymentMethod !== 'cash' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        {formData.paymentMethod === 'card' ? 'Credit Card' : 'Paid From'}
+                                    </label>
+                                    <select className="glass-input w-full px-4 py-2 rounded-lg" value={formData.accountId} onChange={e => setFormData({ ...formData, accountId: e.target.value })} required>
+                                        <option value="">Select {formData.paymentMethod === 'card' ? 'Credit Card' : 'Account'}</option>
+                                        {formData.paymentMethod === 'card'
+                                            ? creditCards.filter(c => c.creditLimit && c.creditLimit > 0).map(c => <option key={c.id} value={c.id}>{c.name} (Limit: ₹{c.creditLimit?.toLocaleString()})</option>)
+                                            : accounts.map(a => <option key={a.id} value={a.id}>{a.name} (₹{a.balance?.toLocaleString()})</option>)
+                                        }
+                                    </select>
+                                </div>
+                            )}
+
+                            {/* 4. Amount */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                                <input type="number" required className="glass-input w-full px-4 py-2 rounded-lg" value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} placeholder="0.00" />
+                            </div>
+
+                            {/* 5. Category */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                                <select className="glass-input w-full px-4 py-2 rounded-lg" value={formData.categoryId} onChange={e => setFormData({ ...formData, categoryId: e.target.value })} required>
+                                    <option value="">Select Category</option>
+                                    {categories.filter(c => c.type === 'expense').map(c => (
+                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* 6. Description */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                                 <input type="text" className="glass-input w-full px-4 py-2 rounded-lg" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="What was this for?" />
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
-                                <select className="glass-input w-full px-4 py-2 rounded-lg" value={formData.paymentMethod} onChange={e => setFormData({ ...formData, paymentMethod: e.target.value })}>
-                                    <option value="upi">UPI</option>
-                                    <option value="card">Card</option>
-                                    <option value="cash">Cash</option>
-                                </select>
-                            </div>
+
                             <button type="submit" disabled={submitting} className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 transition shadow-lg disabled:opacity-50">
                                 {submitting ? 'Saving...' : 'Add Expense'}
                             </button>

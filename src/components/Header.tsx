@@ -27,7 +27,7 @@ export default function Header() {
 
   return (
     <>
-      <header className="fixed top-0 inset-x-0 z-30 bg-white border-b border-neutral-200 shadow-sm h-16">
+      <header className="bg-white border-b border-neutral-200 shadow-sm h-16">
         <div className="flex items-center justify-between h-full px-4 sm:px-6 lg:px-8">
 
           {/* Left: Hamburger + Brand */}

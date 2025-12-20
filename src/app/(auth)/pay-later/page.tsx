@@ -23,6 +23,7 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline'
 import Link from 'next/link'
+import { formatDate } from '@/lib/dateUtils'
 
 export default function PayLaterPage() {
   const { user } = useRequireAuth()
@@ -458,7 +459,7 @@ export default function PayLaterPage() {
                         <div className="flex items-center justify-center space-x-2">
                           <CalendarIcon className="h-4 w-4 text-gray-500" />
                           <span className="text-sm text-gray-600">
-                            {new Date(account.nextDueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                            {formatDate(account.nextDueDate)}
                           </span>
                         </div>
                         <p className={`text-xs font-medium mt-1 ${daysUntilDue < 0 ? 'text-red-600' : daysUntilDue <= 3 ? 'text-orange-600' : 'text-blue-600'
@@ -491,8 +492,8 @@ export default function PayLaterPage() {
                   <div className="w-full bg-gray-200 rounded-full h-1.5">
                     <div
                       className={`h-1.5 rounded-full transition-all duration-300 ${utilization <= 30 ? 'bg-green-500' :
-                          utilization <= 60 ? 'bg-yellow-500' :
-                            utilization <= 80 ? 'bg-orange-500' : 'bg-red-500'
+                        utilization <= 60 ? 'bg-yellow-500' :
+                          utilization <= 80 ? 'bg-orange-500' : 'bg-red-500'
                         }`}
                       style={{ width: `${Math.min(utilization, 100)}%` }}
                     ></div>

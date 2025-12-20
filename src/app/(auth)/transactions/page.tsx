@@ -227,11 +227,13 @@ export default function TransactionsPage() {
                                         <div className="flex-1">
                                             <p className="text-sm font-medium text-gray-900">{transaction.description}</p>
                                             <p className="text-xs text-gray-500">
-                                                {new Date(transaction.date).toLocaleDateString(undefined, {
-                                                    year: 'numeric',
-                                                    month: 'short',
-                                                    day: 'numeric'
-                                                })} • {transaction.category}
+                                                {(() => {
+                                                    const d = new Date(transaction.date)
+                                                    const day = d.getDate().toString().padStart(2, '0')
+                                                    const month = (d.getMonth() + 1).toString().padStart(2, '0')
+                                                    const year = d.getFullYear()
+                                                    return `${day}/${month}/${year}`
+                                                })()} • {transaction.category}
                                             </p>
                                         </div>
                                     </div>

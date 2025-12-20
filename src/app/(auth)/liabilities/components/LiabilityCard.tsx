@@ -1,6 +1,7 @@
 
 import { FuturePayable } from '@/types/finance'
 import { CalendarDaysIcon, ExclamationTriangleIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
+import { formatDate } from '@/lib/dateUtils'
 
 interface LiabilityCardProps {
     liability: FuturePayable
@@ -49,7 +50,7 @@ export default function LiabilityCard({ liability }: LiabilityCardProps) {
 
             <div className="mt-4 pt-4 border-t border-gray-200/60 flex justify-between items-center">
                 <div className="text-sm text-gray-500">
-                    Due Date: <span className="font-medium text-gray-900">{dueDateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                    Due Date: <span className="font-medium text-gray-900">{formatDate(liability.dueDate)}</span>
                 </div>
                 <button className="px-3 py-1.5 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors">
                     View Details

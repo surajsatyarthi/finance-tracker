@@ -18,6 +18,7 @@ import {
 } from '@heroicons/react/24/outline'
 import GlassCard from '@/components/GlassCard'
 import { useNotification } from '@/contexts/NotificationContext'
+import { formatDate } from '@/lib/dateUtils'
 
 // Modal Component for Adding/Editing EMI
 const EMIModal = ({ isOpen, onClose, onSave, loading }: any) => {
@@ -310,7 +311,7 @@ export default function EMITracker() {
 
               <div className="flex justify-between text-sm text-gray-600">
                 <span>Tenure: {emi.emisPaid || 0} / {emi.tenureMonths} Months</span>
-                <span>Next Due: {emi.nextDueDate ? new Date(emi.nextDueDate).toLocaleDateString() : 'N/A'}</span>
+                <span>Next Due: {emi.nextDueDate ? formatDate(emi.nextDueDate) : 'N/A'}</span>
               </div>
 
               {/* Progress Bar */}

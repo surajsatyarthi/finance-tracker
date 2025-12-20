@@ -28,7 +28,8 @@ export default function AccountsPage() {
   const fetchAccounts = async () => {
     try {
       const data = await financeManager.getAccounts()
-      setAccounts(data)
+      // Sort by balance descending (highest first)
+      setAccounts(data.sort((a, b) => b.balance - a.balance))
     } catch (error) {
       console.error('Error fetching accounts:', error)
     } finally {
