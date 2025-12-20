@@ -142,7 +142,7 @@ export default function UploadStatementPage() {
                                 className="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none p-2.5 touch-manipulation"
                             />
                             <p className="mt-2 text-sm text-gray-500">
-                                Currently supports: ICICI Bank statements (Amazon Pay, Adani One)
+                                Supports: ICICI, YES Bank, Indusind, RBL, SBI, Axis, HDFC
                             </p>
                         </div>
 
