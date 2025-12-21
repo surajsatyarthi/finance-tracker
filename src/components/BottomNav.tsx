@@ -12,7 +12,8 @@ import {
   CreditCardIcon,
   PresentationChartLineIcon,
   PlusIcon,
-  ChatBubbleLeftRightIcon
+  ChatBubbleLeftRightIcon,
+  DocumentArrowUpIcon
 } from '@heroicons/react/24/outline'
 
 import { useState, useEffect } from 'react'
@@ -28,6 +29,7 @@ const items = [
   { name: 'Loans', href: '/loans', icon: ArrowTrendingDownIcon },
   { name: 'Savings', href: '/savings-fds', icon: FlagIcon },
   { name: 'Cards', href: '/credit-cards', icon: CreditCardIcon },
+  { name: 'Analyzer', href: '/statements/upload', icon: DocumentArrowUpIcon },
   { name: 'Payables', href: '/liabilities', icon: ArrowTrendingDownIcon },
   { name: 'Analytics', href: '/analytics', icon: PresentationChartLineIcon },
 ]
