@@ -249,7 +249,7 @@ export default function TransactionForm() {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                                 <select className="glass-input w-full px-4 py-2 rounded-lg" value={formData.categoryId} onChange={e => setFormData({ ...formData, categoryId: e.target.value })} required>
                                     <option value="">Select Category</option>
-                                    {categories.filter(c => c.type === 'expense').map(c => (
+                                    {categories.filter(c => c.type === 'expense').sort((a, b) => a.name.localeCompare(b.name)).map(c => (
                                         <option key={c.id} value={c.id}>{c.name}</option>
                                     ))}
                                 </select>
@@ -269,36 +269,57 @@ export default function TransactionForm() {
                     <Tab.Panel>
                         {/* Income Form */}
                         <form onSubmit={submitWithCategoryName} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
-                                <input type="number" required className="glass-input w-full px-4 py-2 rounded-lg" value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} placeholder="0.00" />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                                    <select className="glass-input w-full px-4 py-2 rounded-lg" value={formData.categoryId} onChange={e => setFormData({ ...formData, categoryId: e.target.value })} required>
-                                        <option value="">Select Category</option>
-                                        {/* Filter for income categories */}
-                                        {categories.filter(c => c.type === 'income').map(c => (
-                                            <option key={c.id} value={c.id}>{c.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Deposit To</label>
-                                    <select className="glass-input w-full px-4 py-2 rounded-lg" value={formData.accountId} onChange={e => setFormData({ ...formData, accountId: e.target.value })} required>
-                                        {accounts.map(a => <option key={a.id} value={a.id}>{a.name} (₹{a.balance})</option>)}
-                                    </select>
-                                </div>
-                            </div>
+                            {/* 1. Date - First */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
                                 <input type="date" required className="glass-input w-full px-4 py-2 rounded-lg" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
                             </div>
+
+                            {/* 2. Payment Method - Second */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+                                <select className="glass-input w-full px-4 py-2 rounded-lg" value={formData.paymentMethod} onChange={e => setFormData({ ...formData, paymentMethod: e.target.value })}>
+                                    <option value="cash">Cash</option>
+                                    <option value="upi">UPI</option>
+                                    <option value="bank_transfer">Bank Transfer</option>
+                                </select>
+                            </div>
+
+                            {/* 3. Deposit To Account - Conditional (hide for cash) */}
+                            {formData.paymentMethod !== 'cash' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Deposit To</label>
+                                    <select className="glass-input w-full px-4 py-2 rounded-lg" value={formData.accountId} onChange={e => setFormData({ ...formData, accountId: e.target.value })} required>
+                                        <option value="">Select Account</option>
+                                        {accounts.map(a => <option key={a.id} value={a.id}>{a.name} (₹{a.balance?.toLocaleString()})</option>)}
+                                    </select>
+                                </div>
+                            )}
+
+                            {/* 4. Amount */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                                <input type="number" required className="glass-input w-full px-4 py-2 rounded-lg" value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} placeholder="0.00" />
+                            </div>
+
+                            {/* 5. Category */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                                <select className="glass-input w-full px-4 py-2 rounded-lg" value={formData.categoryId} onChange={e => setFormData({ ...formData, categoryId: e.target.value })} required>
+                                    <option value="">Select Category</option>
+                                    {/* Filter for income categories and sort alphabetically */}
+                                    {categories.filter(c => c.type === 'income').sort((a, b) => a.name.localeCompare(b.name)).map(c => (
+                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* 6. Description */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                                 <input type="text" className="glass-input w-full px-4 py-2 rounded-lg" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Source of income" />
                             </div>
+
                             <button type="submit" disabled={submitting} className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition shadow-lg disabled:opacity-50">
                                 {submitting ? 'Saving...' : 'Add Income'}
                             </button>
