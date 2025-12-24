@@ -274,13 +274,24 @@ export default function Dashboard() {
         const start = new Date(now.getFullYear(), now.getMonth() + offset, 1)
         const end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0)
 
-        // Sum payables in this month
-        const outflows = payables
+        // Sum payables (card EMIs) in this month
+        const cardPayments = payables
           .filter(p => {
             const d = new Date(p.dueDate)
             return d >= start && d <= end && p.status !== 'paid'
           })
           .reduce((sum, p) => sum + p.amount, 0)
+
+        // Sum loan EMIs in this month
+        const loanEMIs = loans
+          .filter((l: any) => {
+            if (!l.next_emi_date || !l.is_active) return false
+            const nextEmi = new Date(l.next_emi_date)
+            return nextEmi >= start && nextEmi <= end
+          })
+          .reduce((sum: number, l: any) => sum + (Number(l.emi_amount) || 0), 0)
+
+        const outflows = cardPayments + loanEMIs
 
         return {
           label: start.toLocaleString('en-IN', { month: 'short' }),
