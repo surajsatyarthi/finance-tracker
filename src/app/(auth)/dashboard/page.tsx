@@ -333,43 +333,12 @@ export default function Dashboard() {
         return d >= now && d <= in30 && p.status !== 'paid'
       })
 
-      // 2. Credit card statement dues
-      const upcomingCardDues = cards
-        .filter((card: any) => {
-          if (!card.current_balance || card.current_balance <= 0) return false
-          if (!card.due_date) return false
 
-          // Calculate actual due date for current month
-          const currentMonth = now.getMonth()
-          const currentYear = now.getFullYear()
-          const dueDay = card.due_date
+      // Note: Credit card statement dues are NOT included in upcoming payments
+      // because we don't track statement generation dates - only due_date (day of month)
+      // Card balances are already visible in the Credit Cards section
 
-          // Due date is in current month or next month
-          let dueDate = new Date(currentYear, currentMonth, dueDay)
-          if (dueDate < now) {
-            dueDate = new Date(currentYear, currentMonth + 1, dueDay)
-          }
-
-          return dueDate >= now && dueDate <= in30
-        })
-        .map((card: any) => ({
-          source: card.name,
-          amount: card.current_balance,
-          dueDate: (() => {
-            const currentMonth = now.getMonth()
-            const currentYear = now.getFullYear()
-            const dueDay = card.due_date
-            let dueDate = new Date(currentYear, currentMonth, dueDay)
-            if (dueDate < now) {
-              dueDate = new Date(currentYear, currentMonth + 1, dueDay)
-            }
-            return dueDate.toISOString()
-          })(),
-          status: 'pending',
-          type: 'Card Statement'
-        }))
-
-      const upcomingList = [...upcomingEMIs, ...upcomingCardDues]
+      const upcomingList = [...upcomingEMIs]
       const upcomingAmount = upcomingList.reduce((sum, p) => sum + p.amount, 0)
 
       // Ratios
