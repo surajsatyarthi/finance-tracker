@@ -334,7 +334,7 @@ export default function Dashboard() {
       })
 
       // 2. Credit card statement dues
-      const upcomingCardDues = creditCards
+      const upcomingCardDues = cards
         .filter((card: any) => {
           if (!card.current_balance || card.current_balance <= 0) return false
           if (!card.due_date) return false
