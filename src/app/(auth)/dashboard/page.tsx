@@ -915,6 +915,15 @@ export default function Dashboard() {
           </GlassCard>
         </div>
 
+        {/* Floating Action Button */}
+        <Link
+          href="/transactions/add"
+          className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg hover:shadow-xl flex items-center justify-center transition-all duration-200 z-50 group"
+          aria-label="Add Transaction"
+        >
+          <PlusIcon className="h-7 w-7 group-hover:scale-110 transition-transform" />
+        </Link>
+
       </div>
     </div>
   )
