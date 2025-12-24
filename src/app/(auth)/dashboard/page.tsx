@@ -68,6 +68,7 @@ interface DashboardStats {
   partitionSplit: { bi: number; pi: number; be: number; pe: number }
   projection: { months: any[]; startLiquidity: number; path: { points: number[] } }
   upcoming: { count: number; amount: number }
+  upcomingList: any[]
   ratios: { monthlyEmi: number; savingsRate: number; debtService: number; liquidityRatio: number }
   reminders: any[]
 }
@@ -91,6 +92,7 @@ export default function Dashboard() {
     partitionSplit: { bi: 0, pi: 0, be: 0, pe: 0 },
     projection: { months: [], startLiquidity: 0, path: { points: [] } },
     upcoming: { count: 0, amount: 0 },
+    upcomingList: [],
     ratios: { monthlyEmi: 0, savingsRate: 0, debtService: 0, liquidityRatio: 0 },
     reminders: []
   })
@@ -435,6 +437,7 @@ export default function Dashboard() {
         partitionSplit: { bi, pi, pe, be },
         projection: { months, startLiquidity: totalAssets, path },
         upcoming: { count: upcomingList.length, amount: upcomingAmount },
+        upcomingList,
         ratios: { monthlyEmi, savingsRate, debtService, liquidityRatio },
         reminders
       })
@@ -677,16 +680,7 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* ... (Ratios cards) keeping existing calls */}
-          <GlassCard>
-            <div className="flex items-center">
-              <ArrowTrendingDownIcon className="h-8 w-8 text-orange-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Upcoming in 30 days</p>
-                <p className="text-2xl font-bold text-gray-900">₹{stats.upcoming.amount.toLocaleString()}</p>
-                <p className="text-sm text-gray-500">{stats.upcoming.count} items</p>
-              </div>
-            </div>
-          </GlassCard>
+
 
           <GlassCard>
             <div className="flex items-center">
@@ -716,6 +710,54 @@ export default function Dashboard() {
             </div>
           </GlassCard>
         </div>
+
+        {/* Upcoming Payments Table */}
+        <GlassCard>
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Upcoming in 30 Days</h3>
+            <p className="text-sm text-gray-500">Total: ₹{stats.upcoming.amount.toLocaleString()} ({stats.upcoming.count} items)</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Days</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {stats.upcomingList?.sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()).map((item: any, idx: number) => {
+                  const dueDate = new Date(item.dueDate)
+                  const today = new Date()
+                  const daysUntil = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+
+                  return (
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${item.type === 'Card Statement' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                          }`}>
+                          {item.type || 'EMI'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{item.source}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-right text-gray-900">₹{item.amount.toLocaleString()}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                        {dueDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
+                        <span className={`font-medium ${daysUntil <= 7 ? 'text-red-600' : daysUntil <= 14 ? 'text-orange-600' : 'text-gray-600'}`}>
+                          {daysUntil} days
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}</tbody>
+            </table>
+          </div>
+        </GlassCard>
 
         {/* ... (Charts section) */}
         {/* Skipping large existing chunks for brevity, handled by replace_file_content smartly usually, but here I am replacing the main BODY */}
