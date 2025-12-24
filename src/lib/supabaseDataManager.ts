@@ -164,12 +164,6 @@ export class FinanceDataManager {
     if (!this.userId) await this.initialize()
     if (!this.userId) return []
 
-    // Check cache (only if year is provided, for simplicity)
-    if (year) {
-      const cached = this.getFromCache<Budget[]>(`budgets_${year}`)
-      if (cached) return cached
-    }
-
     let query = supabase
       .from('budgets')
       .select('*')
@@ -1542,13 +1536,33 @@ export class FinanceDataManager {
       })
     })
 
-    // Upsert in chunks
-    const chunkSize = 50
-    for (let i = 0; i < records.length; i += chunkSize) {
-      const chunk = records.slice(i, i + chunkSize)
-      const { error } = await supabase.from('budgets').upsert(chunk, { onConflict: 'user_id, month, year, category_name' as any })
-      if (error) {
-        logger.error('Bulk upsert failed', error)
+    // Insert/update records individually to handle conflicts properly
+    for (const record of records) {
+      // Check if budget exists
+      const { data: existing } = await supabase
+        .from('budgets')
+        .select('id')
+        .eq('user_id', record.user_id)
+        .eq('month', record.month)
+        .eq('year', record.year)
+        .eq('category_name', record.category_name)
+        .maybeSingle()
+
+      if (existing) {
+        // Update existing
+        await supabase
+          .from('budgets')
+          .update({
+            monthly_limit: record.monthly_limit,
+            updated_at: record.updated_at
+          })
+          .eq('id', existing.id)
+      } else {
+        // Insert new
+        const { error } = await supabase.from('budgets').insert(record)
+        if (error) {
+          logger.error('Budget insert failed', error)
+        }
       }
     }
 
