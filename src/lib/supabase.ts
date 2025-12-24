@@ -30,14 +30,20 @@ if (localMode || !supabaseUrl || !supabaseKey) {
       },
     } as unknown as SupabaseClient<Database>['auth'],
     from(_table: string) {
-      return {
+      const queryBuilder = {
         select: async () => ({ data: [], error: null }),
-        eq: () => ({ select: async () => ({ data: [], error: null }) }),
-        gte: () => ({ select: async () => ({ data: [], error: null }) }),
-        lte: () => ({ select: async () => ({ data: [], error: null }) }),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any
+        insert: () => ({ select: () => ({ single: async () => ({ data: {}, error: null }) }) }),
+        update: () => ({ select: () => ({ single: async () => ({ data: {}, error: null }) }) }),
+        delete: async () => ({ data: {}, error: null }),
+        eq: () => queryBuilder,
+        gte: () => queryBuilder,
+        lte: () => queryBuilder,
+        order: () => queryBuilder,
+        single: async () => ({ data: {}, error: null }),
+      }
+      return queryBuilder as any
     },
+    rpc: async (_name: string, _params: unknown) => ({ data: {}, error: null }),
   }
   supabase = mock as SupabaseClient<Database>
 } else {

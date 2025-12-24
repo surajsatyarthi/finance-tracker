@@ -122,8 +122,7 @@ export const getBusinessAccounts = async (): Promise<BusinessAccount[]> => {
       .from('accounts')
       .select('*')
       .eq('user_id', '00000000-0000-0000-0000-000000000001')
-// Temporarily disabled - business account filtering will work after migration
-      // .eq('account_type', 'business')
+      .eq('account_type', 'business')
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -156,8 +155,7 @@ export const getPersonalAccounts = async (): Promise<BusinessAccount[]> => {
       .from('accounts')
       .select('*')
       .eq('user_id', '00000000-0000-0000-0000-000000000001')
-// Temporarily disabled - account type filtering will work after migration
-      // .eq('account_type', 'personal')
+      .eq('account_type', 'personal')
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -233,28 +231,23 @@ export const calculateGST = async (
 
 // Business categories management
 export const getBusinessCategories = async (): Promise<BusinessCategory[]> => {
-  // Disabled until migration is applied
-  console.log('Business categories will be available after database migration')
-  return []
-  
-  // TODO: Enable after migration
-  // try {
-  //   const { data, error } = await supabase
-  //     .from('business_categories')
-  //     .select('*')
-  //     .eq('user_id', '00000000-0000-0000-0000-000000000001')
-  //     .order('name')
+  try {
+    const { data, error } = await supabase
+      .from('business_categories')
+      .select('*')
+      .eq('user_id', '00000000-0000-0000-0000-000000000001')
+      .order('name')
 
-  //   if (error) {
-  //     console.error('Error fetching business categories:', error)
-  //     return []
-  //   }
+    if (error) {
+      console.error('Error fetching business categories:', error)
+      return []
+    }
 
-  //   return data as BusinessCategory[]
-  // } catch (error) {
-  //   console.error('Error fetching business categories:', error)
-  //   return []
-  // }
+    return data as BusinessCategory[]
+  } catch (error) {
+    console.error('Error fetching business categories:', error)
+    return []
+  }
 }
 
 // Get business expense summary
@@ -298,28 +291,23 @@ export const getBusinessExpenseSummary = async (
 
 // GST return management
 export const getGSTReturns = async (): Promise<GSTReturn[]> => {
-  // Disabled until migration is applied
-  console.log('GST returns will be available after database migration')
-  return []
-  
-  // TODO: Enable after migration
-  // try {
-  //   const { data, error } = await supabase
-  //     .from('gst_returns')
-  //     .select('*')
-  //     .eq('user_id', '00000000-0000-0000-0000-000000000001')
-  //     .order('return_period', { ascending: false })
+  try {
+    const { data, error } = await supabase
+      .from('gst_returns')
+      .select('*')
+      .eq('user_id', '00000000-0000-0000-0000-000000000001')
+      .order('return_period', { ascending: false })
 
-  //   if (error) {
-  //     console.error('Error fetching GST returns:', error)
-  //     return []
-  //   }
+    if (error) {
+      console.error('Error fetching GST returns:', error)
+      return []
+    }
 
-  //   return data as GSTReturn[]
-  // } catch (error) {
-  //   console.error('Error fetching GST returns:', error)
-  //   return []
-  // }
+    return data as GSTReturn[]
+  } catch (error) {
+    console.error('Error fetching GST returns:', error)
+    return []
+  }
 }
 
 // Create or update GST return
@@ -332,44 +320,39 @@ export const createGSTReturn = async (returnData: {
   output_tax?: number
   input_tax_credit?: number
 }): Promise<{ success: boolean; gstReturn?: GSTReturn; error?: string }> => {
-  // Disabled until migration is applied
-  console.log('GST return creation will be available after database migration')
-  return { success: false, error: 'GST functionality requires database migration' }
-  
-  // TODO: Enable after migration
-  // try {
-  //   const taxLiability = (returnData.output_tax || 0) - (returnData.input_tax_credit || 0)
+  try {
+    const taxLiability = (returnData.output_tax || 0) - (returnData.input_tax_credit || 0)
     
-  //   const { data, error } = await supabase
-  //     .from('gst_returns')
-  //     .insert({
-  //       user_id: '00000000-0000-0000-0000-000000000001',
-  //       return_period: returnData.return_period,
-  //       return_type: returnData.return_type,
-  //       due_date: returnData.due_date,
-  //       total_sales: returnData.total_sales || 0,
-  //       total_purchases: returnData.total_purchases || 0,
-  //       output_tax: returnData.output_tax || 0,
-  //       input_tax_credit: returnData.input_tax_credit || 0,
-  //       tax_liability: taxLiability,
-  //       status: 'pending'
-  //     })
-  //     .select()
-  //     .single()
+    const { data, error } = await supabase
+      .from('gst_returns')
+      .insert({
+        user_id: '00000000-0000-0000-0000-000000000001',
+        return_period: returnData.return_period,
+        return_type: returnData.return_type,
+        due_date: returnData.due_date,
+        total_sales: returnData.total_sales || 0,
+        total_purchases: returnData.total_purchases || 0,
+        output_tax: returnData.output_tax || 0,
+        input_tax_credit: returnData.input_tax_credit || 0,
+        tax_liability: taxLiability,
+        status: 'pending'
+      })
+      .select()
+      .single()
 
-  //   if (error) {
-  //     console.error('Error creating GST return:', error)
-  //     return { success: false, error: error.message }
-  //   }
+    if (error) {
+      console.error('Error creating GST return:', error)
+      return { success: false, error: error.message }
+    }
 
-  //   return { success: true, gstReturn: data as GSTReturn }
-  // } catch (error) {
-  //   console.error('Error creating GST return:', error)
-  //   return { 
-  //     success: false, 
-  //     error: error instanceof Error ? error.message : 'Unknown error occurred' 
-  //   }
-  // }
+    return { success: true, gstReturn: data as GSTReturn }
+  } catch (error) {
+    console.error('Error creating GST return:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    }
+  }
 }
 
 // Validate GST number
@@ -384,34 +367,29 @@ export type GSTRate = typeof GST_RATES[number]
 
 // Get upcoming GST return due dates
 export const getUpcomingGSTDueDates = async (): Promise<GSTReturn[]> => {
-  // Disabled until migration is applied
-  console.log('GST due dates will be available after database migration')
-  return []
-  
-  // TODO: Enable after migration
-  // try {
-  //   const today = new Date().toISOString().split('T')[0]
-  //   const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     
-  //   const { data, error } = await supabase
-  //     .from('gst_returns')
-  //     .select('*')
-  //     .eq('user_id', '00000000-0000-0000-0000-000000000001')
-  //     .eq('status', 'pending')
-  //     .gte('due_date', today)
-  //     .lte('due_date', thirtyDaysLater)
-  //     .order('due_date')
+    const { data, error } = await supabase
+      .from('gst_returns')
+      .select('*')
+      .eq('user_id', '00000000-0000-0000-0000-000000000001')
+      .eq('status', 'pending')
+      .gte('due_date', today)
+      .lte('due_date', thirtyDaysLater)
+      .order('due_date')
 
-  //   if (error) {
-  //     console.error('Error fetching upcoming GST due dates:', error)
-  //     return []
-  //   }
+    if (error) {
+      console.error('Error fetching upcoming GST due dates:', error)
+      return []
+    }
 
-  //   return data as GSTReturn[]
-  // } catch (error) {
-  //   console.error('Error fetching upcoming GST due dates:', error)
-  //   return []
-  // }
+    return data as GSTReturn[]
+  } catch (error) {
+    console.error('Error fetching upcoming GST due dates:', error)
+    return []
+  }
 }
 
 export default {
