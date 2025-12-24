@@ -298,28 +298,23 @@ export const getBusinessExpenseSummary = async (
 
 // GST return management
 export const getGSTReturns = async (): Promise<GSTReturn[]> => {
-  // Disabled until migration is applied
-  console.log('GST returns will be available after database migration')
-  return []
-  
-  // TODO: Enable after migration
-  // try {
-  //   const { data, error } = await supabase
-  //     .from('gst_returns')
-  //     .select('*')
-  //     .eq('user_id', '00000000-0000-0000-0000-000000000001')
-  //     .order('return_period', { ascending: false })
+  try {
+    const { data, error } = await supabase
+      .from('gst_returns')
+      .select('*')
+      .eq('user_id', '00000000-0000-0000-0000-000000000001')
+      .order('return_period', { ascending: false })
 
-  //   if (error) {
-  //     console.error('Error fetching GST returns:', error)
-  //     return []
-  //   }
+    if (error) {
+      console.error('Error fetching GST returns:', error)
+      return []
+    }
 
-  //   return data as GSTReturn[]
-  // } catch (error) {
-  //   console.error('Error fetching GST returns:', error)
-  //   return []
-  // }
+    return data as GSTReturn[]
+  } catch (error) {
+    console.error('Error fetching GST returns:', error)
+    return []
+  }
 }
 
 // Create or update GST return

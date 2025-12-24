@@ -522,6 +522,104 @@ export interface Database {
           }
         ]
       },
+      business_categories: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          description: string | null
+          is_deductible: boolean
+          gst_applicable: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          description?: string | null
+          is_deductible?: boolean
+          gst_applicable?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          description?: string | null
+          is_deductible?: boolean
+          gst_applicable?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_categories_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      },
+      gst_returns: {
+        Row: {
+          id: string
+          user_id: string
+          return_period: string
+          return_type: string
+          due_date: string
+          filed_date: string | null
+          status: string
+          total_sales: number
+          total_purchases: number
+          output_tax: number
+          input_tax_credit: number
+          tax_liability: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          return_period: string
+          return_type: string
+          due_date: string
+          filed_date?: string | null
+          status?: string
+          total_sales?: number
+          total_purchases?: number
+          output_tax?: number
+          input_tax_credit?: number
+          tax_liability?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          return_period?: string
+          return_type?: string
+          due_date?: string
+          filed_date?: string | null
+          status?: string
+          total_sales?: number
+          total_purchases?: number
+          output_tax?: number
+          input_tax_credit?: number
+          tax_liability?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gst_returns_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      },
       investments: {
         Row: {
           id: string

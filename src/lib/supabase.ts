@@ -7,6 +7,37 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 let supabase: SupabaseClient<Database>
 
+// Simple mock builder for chaining
+const createMockBuilder = (data: any = [], error: any = null) => {
+  const builder: any = {
+    // Promise interface
+    then: (onfulfilled?: ((value: any) => any) | null, onrejected?: ((reason: any) => any) | null) => {
+      return Promise.resolve({ data, error }).then(onfulfilled, onrejected)
+    },
+    catch: (onrejected?: ((reason: any) => any) | null) => {
+      return Promise.resolve({ data, error }).catch(onrejected)
+    },
+    // Filter methods - return self for chaining
+    select: () => builder,
+    eq: () => builder,
+    gte: () => builder,
+    lte: () => builder,
+    order: () => builder,
+    limit: () => builder,
+    single: () => {
+        // Mock single return (return first item or null)
+        const singleData = Array.isArray(data) ? (data.length > 0 ? data[0] : null) : data;
+        // Return a promise that resolves to single result
+        return Promise.resolve({ data: singleData, error })
+    },
+    insert: () => {
+       // Return builder but next await will resolve to inserted data
+       return builder
+    }
+  }
+  return builder
+}
+
 if (localMode || !supabaseUrl || !supabaseKey) {
   const mock: Partial<SupabaseClient<Database>> = {
     auth: {
@@ -30,14 +61,13 @@ if (localMode || !supabaseUrl || !supabaseKey) {
       },
     } as unknown as SupabaseClient<Database>['auth'],
     from(_table: string) {
-      return {
-        select: async () => ({ data: [], error: null }),
-        eq: () => ({ select: async () => ({ data: [], error: null }) }),
-        gte: () => ({ select: async () => ({ data: [], error: null }) }),
-        lte: () => ({ select: async () => ({ data: [], error: null }) }),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any
+      return createMockBuilder([], null)
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rpc: (_name: string, _params: any) => {
+      // Mock RPC must return a thenable that is also chainable if needed, but usually RPC just returns data
+      return Promise.resolve({ data: null, error: null }) as any
+    }
   }
   supabase = mock as SupabaseClient<Database>
 } else {
