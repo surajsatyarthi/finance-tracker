@@ -180,9 +180,6 @@ export class FinanceDataManager {
       return []
     }
 
-    if (year) {
-      this.setCache(`budgets_${year}`, data)
-    }
     return data || []
   }
 
