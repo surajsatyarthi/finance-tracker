@@ -81,9 +81,13 @@ export const createBusinessAccount = async (accountData: {
         user_id: '00000000-0000-0000-0000-000000000001',
         name: accountData.account_name,
         type: 'current', // Business accounts are usually current accounts
-        balance: accountData.balance
-        // Note: Business fields will be available after migration is applied
-        // gst_number, business_name, business_address, pan_number
+        balance: accountData.balance,
+        // Business fields enabled after migration
+        gst_number: accountData.gst_number,
+        business_name: accountData.business_name,
+        business_address: accountData.business_address,
+        pan_number: accountData.pan_number,
+        account_type: 'business'
       })
       .select()
       .single()
@@ -93,15 +97,19 @@ export const createBusinessAccount = async (accountData: {
       return { success: false, error: error.message }
     }
 
-    // Map current schema to BusinessAccount interface until migration
+    // Map schema to BusinessAccount interface
     const businessAccount: BusinessAccount = {
       id: data.id,
       user_id: data.user_id,
       account_name: data.name,
       account_type: 'business',
       bank_name: data.type,
-      account_number: '', // Will be available after migration
+      account_number: '',
       balance: data.balance,
+      gst_number: data.gst_number || undefined,
+      business_name: data.business_name || undefined,
+      business_address: data.business_address || undefined,
+      pan_number: data.pan_number || undefined,
       created_at: data.created_at,
       updated_at: data.updated_at
     }
@@ -122,8 +130,7 @@ export const getBusinessAccounts = async (): Promise<BusinessAccount[]> => {
       .from('accounts')
       .select('*')
       .eq('user_id', '00000000-0000-0000-0000-000000000001')
-// Temporarily disabled - business account filtering will work after migration
-      // .eq('account_type', 'business')
+      .eq('account_type', 'business')
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -131,15 +138,19 @@ export const getBusinessAccounts = async (): Promise<BusinessAccount[]> => {
       return []
     }
 
-    // Map current schema to BusinessAccount interface until migration
+    // Map schema to BusinessAccount interface
     return data.map(account => ({
       id: account.id,
       user_id: account.user_id,
       account_name: account.name,
       account_type: 'business' as const,
       bank_name: account.type,
-      account_number: '', // Will be available after migration
+      account_number: '',
       balance: account.balance,
+      gst_number: account.gst_number || undefined,
+      business_name: account.business_name || undefined,
+      business_address: account.business_address || undefined,
+      pan_number: account.pan_number || undefined,
       created_at: account.created_at,
       updated_at: account.updated_at
     })) as BusinessAccount[]
@@ -156,8 +167,7 @@ export const getPersonalAccounts = async (): Promise<BusinessAccount[]> => {
       .from('accounts')
       .select('*')
       .eq('user_id', '00000000-0000-0000-0000-000000000001')
-// Temporarily disabled - account type filtering will work after migration
-      // .eq('account_type', 'personal')
+      .eq('account_type', 'personal')
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -165,14 +175,14 @@ export const getPersonalAccounts = async (): Promise<BusinessAccount[]> => {
       return []
     }
 
-    // Map current schema to BusinessAccount interface until migration  
+    // Map schema to BusinessAccount interface
     return data.map(account => ({
       id: account.id,
       user_id: account.user_id,
       account_name: account.name,
       account_type: 'personal' as const,
       bank_name: account.type,
-      account_number: '', // Will be available after migration
+      account_number: '',
       balance: account.balance,
       created_at: account.created_at,
       updated_at: account.updated_at
@@ -190,6 +200,7 @@ export const calculateGST = async (
   isInclusive: boolean = false
 ): Promise<GSTCalculation | null> => {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rpcCall = (supabase as typeof supabase & { 
       rpc: (name: string, params: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }> 
     })
@@ -233,28 +244,23 @@ export const calculateGST = async (
 
 // Business categories management
 export const getBusinessCategories = async (): Promise<BusinessCategory[]> => {
-  // Disabled until migration is applied
-  console.log('Business categories will be available after database migration')
-  return []
-  
-  // TODO: Enable after migration
-  // try {
-  //   const { data, error } = await supabase
-  //     .from('business_categories')
-  //     .select('*')
-  //     .eq('user_id', '00000000-0000-0000-0000-000000000001')
-  //     .order('name')
+  try {
+    const { data, error } = await supabase
+      .from('business_categories')
+      .select('*')
+      .eq('user_id', '00000000-0000-0000-0000-000000000001')
+      .order('name')
 
-  //   if (error) {
-  //     console.error('Error fetching business categories:', error)
-  //     return []
-  //   }
+    if (error) {
+      console.error('Error fetching business categories:', error)
+      return []
+    }
 
-  //   return data as BusinessCategory[]
-  // } catch (error) {
-  //   console.error('Error fetching business categories:', error)
-  //   return []
-  // }
+    return data as BusinessCategory[]
+  } catch (error) {
+    console.error('Error fetching business categories:', error)
+    return []
+  }
 }
 
 // Get business expense summary
@@ -263,6 +269,7 @@ export const getBusinessExpenseSummary = async (
   endDate?: string
 ): Promise<BusinessExpenseSummary | null> => {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rpcCall = (supabase as typeof supabase & { 
       rpc: (name: string, params: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }> 
     })
@@ -327,44 +334,39 @@ export const createGSTReturn = async (returnData: {
   output_tax?: number
   input_tax_credit?: number
 }): Promise<{ success: boolean; gstReturn?: GSTReturn; error?: string }> => {
-  // Disabled until migration is applied
-  console.log('GST return creation will be available after database migration')
-  return { success: false, error: 'GST functionality requires database migration' }
-  
-  // TODO: Enable after migration
-  // try {
-  //   const taxLiability = (returnData.output_tax || 0) - (returnData.input_tax_credit || 0)
+  try {
+    const taxLiability = (returnData.output_tax || 0) - (returnData.input_tax_credit || 0)
     
-  //   const { data, error } = await supabase
-  //     .from('gst_returns')
-  //     .insert({
-  //       user_id: '00000000-0000-0000-0000-000000000001',
-  //       return_period: returnData.return_period,
-  //       return_type: returnData.return_type,
-  //       due_date: returnData.due_date,
-  //       total_sales: returnData.total_sales || 0,
-  //       total_purchases: returnData.total_purchases || 0,
-  //       output_tax: returnData.output_tax || 0,
-  //       input_tax_credit: returnData.input_tax_credit || 0,
-  //       tax_liability: taxLiability,
-  //       status: 'pending'
-  //     })
-  //     .select()
-  //     .single()
+    const { data, error } = await supabase
+      .from('gst_returns')
+      .insert({
+        user_id: '00000000-0000-0000-0000-000000000001',
+        return_period: returnData.return_period,
+        return_type: returnData.return_type,
+        due_date: returnData.due_date,
+        total_sales: returnData.total_sales || 0,
+        total_purchases: returnData.total_purchases || 0,
+        output_tax: returnData.output_tax || 0,
+        input_tax_credit: returnData.input_tax_credit || 0,
+        tax_liability: taxLiability,
+        status: 'pending'
+      })
+      .select()
+      .single()
 
-  //   if (error) {
-  //     console.error('Error creating GST return:', error)
-  //     return { success: false, error: error.message }
-  //   }
+    if (error) {
+      console.error('Error creating GST return:', error)
+      return { success: false, error: error.message }
+    }
 
-  //   return { success: true, gstReturn: data as GSTReturn }
-  // } catch (error) {
-  //   console.error('Error creating GST return:', error)
-  //   return { 
-  //     success: false, 
-  //     error: error instanceof Error ? error.message : 'Unknown error occurred' 
-  //   }
-  // }
+    return { success: true, gstReturn: data as GSTReturn }
+  } catch (error) {
+    console.error('Error creating GST return:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    }
+  }
 }
 
 // Validate GST number
@@ -379,34 +381,29 @@ export type GSTRate = typeof GST_RATES[number]
 
 // Get upcoming GST return due dates
 export const getUpcomingGSTDueDates = async (): Promise<GSTReturn[]> => {
-  // Disabled until migration is applied
-  console.log('GST due dates will be available after database migration')
-  return []
-  
-  // TODO: Enable after migration
-  // try {
-  //   const today = new Date().toISOString().split('T')[0]
-  //   const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     
-  //   const { data, error } = await supabase
-  //     .from('gst_returns')
-  //     .select('*')
-  //     .eq('user_id', '00000000-0000-0000-0000-000000000001')
-  //     .eq('status', 'pending')
-  //     .gte('due_date', today)
-  //     .lte('due_date', thirtyDaysLater)
-  //     .order('due_date')
+    const { data, error } = await supabase
+      .from('gst_returns')
+      .select('*')
+      .eq('user_id', '00000000-0000-0000-0000-000000000001')
+      .eq('status', 'pending')
+      .gte('due_date', today)
+      .lte('due_date', thirtyDaysLater)
+      .order('due_date')
 
-  //   if (error) {
-  //     console.error('Error fetching upcoming GST due dates:', error)
-  //     return []
-  //   }
+    if (error) {
+      console.error('Error fetching upcoming GST due dates:', error)
+      return []
+    }
 
-  //   return data as GSTReturn[]
-  // } catch (error) {
-  //   console.error('Error fetching upcoming GST due dates:', error)
-  //   return []
-  // }
+    return data as GSTReturn[]
+  } catch (error) {
+    console.error('Error fetching upcoming GST due dates:', error)
+    return []
+  }
 }
 
 export default {

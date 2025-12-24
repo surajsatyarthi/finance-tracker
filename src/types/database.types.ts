@@ -19,6 +19,11 @@ export interface Database {
           balance: number
           currency: string
           is_active: boolean
+          account_type: string
+          gst_number: string | null
+          business_name: string | null
+          business_address: string | null
+          pan_number: string | null
           created_at: string
           updated_at: string
         }
@@ -30,6 +35,11 @@ export interface Database {
           balance?: number
           currency?: string
           is_active?: boolean
+          account_type?: string
+          gst_number?: string | null
+          business_name?: string | null
+          business_address?: string | null
+          pan_number?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -41,6 +51,11 @@ export interface Database {
           balance?: number
           currency?: string
           is_active?: boolean
+          account_type?: string
+          gst_number?: string | null
+          business_name?: string | null
+          business_address?: string | null
+          pan_number?: string | null
           created_at?: string
           updated_at?: string
         }

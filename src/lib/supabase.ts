@@ -8,14 +8,20 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 let supabase: SupabaseClient<Database>
 
 // Simple mock builder for chaining
-const createMockBuilder = (data: any = [], error: any = null) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const createMockBuilder = (initialData: any = [], error: any = null) => {
+  let currentData = initialData;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const builder: any = {
     // Promise interface
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     then: (onfulfilled?: ((value: any) => any) | null, onrejected?: ((reason: any) => any) | null) => {
-      return Promise.resolve({ data, error }).then(onfulfilled, onrejected)
+      return Promise.resolve({ data: currentData, error }).then(onfulfilled, onrejected)
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     catch: (onrejected?: ((reason: any) => any) | null) => {
-      return Promise.resolve({ data, error }).catch(onrejected)
+      return Promise.resolve({ data: currentData, error }).catch(onrejected)
     },
     // Filter methods - return self for chaining
     select: () => builder,
@@ -26,12 +32,21 @@ const createMockBuilder = (data: any = [], error: any = null) => {
     limit: () => builder,
     single: () => {
         // Mock single return (return first item or null)
-        const singleData = Array.isArray(data) ? (data.length > 0 ? data[0] : null) : data;
+        const singleData = Array.isArray(currentData) ? (currentData.length > 0 ? currentData[0] : null) : currentData;
         // Return a promise that resolves to single result
         return Promise.resolve({ data: singleData, error })
     },
-    insert: () => {
-       // Return builder but next await will resolve to inserted data
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    insert: (values: any) => {
+       // Mock insert by setting currentData to values (wrapped in array if needed)
+       const toInsert = Array.isArray(values) ? values : [values];
+       // Simulate that the DB now contains this (or returns this)
+       // We add 'id' if missing for testing purposes
+       const inserted = toInsert.map((item: any) => ({
+           id: 'mock-id-' + Math.random().toString(36).substr(2, 9),
+           ...item
+       }));
+       currentData = inserted;
        return builder
     }
   }
