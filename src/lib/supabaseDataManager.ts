@@ -1513,8 +1513,7 @@ export class FinanceDataManager {
           year,
           category_name: category,
           monthly_limit: limit,
-          spent_amount: 0, // recalculated elsewhere
-          remaining_amount: limit
+          spent_amount: 0 // recalculated elsewhere
         })
       if (error) throw error
     }
@@ -1532,12 +1531,11 @@ export class FinanceDataManager {
         if (limit > 0) {
           records.push({
             user_id: this.userId!,
-            month: index, // 0-11
+            month: index + 1, // 1-12 (fixed from 0-11)
             year: year,
             category_name: proj.category,
             monthly_limit: limit,
             spent_amount: 0,
-            remaining_amount: limit,
             updated_at: new Date().toISOString()
           })
         }
