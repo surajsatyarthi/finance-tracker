@@ -505,7 +505,7 @@ export default function Dashboard() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Net Worth</p>
                 <p className={`text-2xl font-bold ${netWorth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {`₹${Math.abs(netWorth).toLocaleString()}`}
+                  {netWorth >= 0 ? '+' : '-'}₹{Math.abs(netWorth).toLocaleString()}
                 </p>
                 <p className="text-sm text-gray-500">Assets minus liabilities</p>
               </div>
