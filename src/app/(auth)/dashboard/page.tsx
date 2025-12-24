@@ -334,54 +334,11 @@ export default function Dashboard() {
       })
 
 
-      // 2. Credit card statement dues  
-      // Show cards where statement is generated AND due date is within 30 days
-      const upcomingCardDues = cards
-        .filter((card: any) => {
-          if (!card.current_balance || card.current_balance <= 0) return false
-          if (!card.statement_date || !card.due_date) return false
+      // Credit card statement dues temporarily removed - will add back with proper data:
+      // Need: last_statement_amount (what's actually due), not current_balance (unbilled)
+      // User will provide actual amounts tomorrow
 
-          const today = now.getDate()
-          const currentMonth = now.getMonth()
-          const currentYear = now.getFullYear()
-
-          // Determine which cycle we're in
-          let statementDate, dueDate
-          if (today >= card.statement_date) {
-            // We're past this month's statement date - current cycle
-            statementDate = new Date(currentYear, currentMonth, card.statement_date)
-            dueDate = new Date(currentYear, currentMonth, card.due_date)
-          } else {
-            // We're before this month's statement date - last month's cycle
-            statementDate = new Date(currentYear, currentMonth - 1, card.statement_date)
-            dueDate = new Date(currentYear, currentMonth - 1, card.due_date)
-          }
-
-          // Only show if: statement generated & due date not passed & within 30 days
-          return now >= statementDate && dueDate >= now && dueDate <= in30
-        })
-        .map((card: any) => {
-          const today = now.getDate()
-          const currentMonth = now.getMonth()
-          const currentYear = now.getFullYear()
-
-          let dueDate
-          if (today >= card.statement_date) {
-            dueDate = new Date(currentYear, currentMonth, card.due_date)
-          } else {
-            dueDate = new Date(currentYear, currentMonth - 1, card.due_date)
-          }
-
-          return {
-            source: card.name,
-            amount: card.current_balance,
-            dueDate: dueDate.toISOString(),
-            status: 'pending',
-            type: 'Card Statement'
-          }
-        })
-
-      const upcomingList = [...upcomingEMIs, ...upcomingCardDues]
+      const upcomingList = [...upcomingEMIs]
       const upcomingAmount = upcomingList.reduce((sum, p) => sum + p.amount, 0)
 
       // Ratios
