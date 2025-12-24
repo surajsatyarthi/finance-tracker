@@ -72,3 +72,13 @@ This application is optimized for deployment on **Vercel**.
 ## 🔐 Security & Privacy
 - **Local Mode**: Can be run in offline/local mode by setting `NEXT_PUBLIC_LOCAL_MODE=true` (Data will not persist between sessions).
 - **Production Mode**: Uses Supabase for secure, persistent, encrypted cloud storage.
+
+## 📂 Project Structure
+
+To keep the project clean and maintainable, files are organized as follows:
+
+*   **`src/`**: Application source code (Next.js App Router, components, lib).
+*   **`supabase/migrations/`**: All SQL migration files and database queries.
+*   **`scripts/`**: Utility scripts (Python, Node.js) for data migration, verification, and icons.
+*   **`docs/`**: Project documentation, guides, and reports.
+*   **`public/`**: Static assets like images and manifest files.

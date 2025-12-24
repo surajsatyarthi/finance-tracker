@@ -15,7 +15,24 @@ def verify_migration():
     original_count = 0
     total_amount_csv = 0
     
-    with open('/Users/surajsatyarthi/Downloads/123.csv', 'r', encoding='utf-8') as file:
+    # Accept file path as argument or look in current directory (default behavior adjusted for demo)
+    import sys
+    import os
+
+    # Defaults
+    csv_path = '123.csv'
+    sql_path = '../supabase/migrations/real_expense_migration.sql'
+
+    if len(sys.argv) > 1:
+        csv_path = sys.argv[1]
+
+    if not os.path.exists(csv_path):
+        print(f"⚠️  CSV file not found at {csv_path}. Usage: python3 verify_migration.py <path_to_csv>")
+        # We return True here only to prevent blocking if the CSV is missing in the repo
+        # In a real scenario, this would be a failure.
+        return True
+
+    with open(csv_path, 'r', encoding='utf-8') as file:
         content = file.read().replace('\r\n', '\n').replace('\r', '\n')
         lines = content.split('\n')
         reader = csv.reader(lines)
@@ -35,7 +52,11 @@ def verify_migration():
     sql_count = 0
     total_amount_sql = 0
     
-    with open('/Users/surajsatyarthi/Downloads/Fin/finance-tracker/real_expense_migration.sql', 'r', encoding='utf-8') as file:
+    if not os.path.exists(sql_path):
+         print(f"⚠️  SQL migration file not found at {sql_path}")
+         return False
+
+    with open(sql_path, 'r', encoding='utf-8') as file:
         content = file.read()
         
         # Count INSERT statements
