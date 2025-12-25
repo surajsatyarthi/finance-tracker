@@ -5,8 +5,10 @@ import {
   PencilSquareIcon,
   CheckIcon,
   XMarkIcon,
-  ClipboardDocumentIcon
+  ClipboardDocumentIcon,
+  PlusIcon
 } from '@heroicons/react/24/outline'
+import Link from 'next/link'
 import { FinanceDataManager } from '@/lib/supabaseDataManager'
 import { BankAccount } from '@/types/finance'
 import { useRequireAuth } from '@/contexts/AuthContext'
@@ -282,6 +284,14 @@ export default function AccountsPage() {
           )}
         </div>
       </div>
+
+      {/* Floating Add Transaction Button */}
+      <Link
+        href="/expenses/add"
+        className="fixed bottom-8 right-8 w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 z-50"
+      >
+        <PlusIcon className="h-6 w-6" />
+      </Link>
     </div>
   )
 }
