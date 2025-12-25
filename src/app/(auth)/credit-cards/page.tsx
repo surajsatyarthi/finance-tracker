@@ -1,56 +1,47 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useRequireAuth } from '@/contexts/AuthContext'
 import {
   CreditCardIcon,
-  EyeIcon,
-  EyeSlashIcon,
-  CalendarDaysIcon,
-  BanknotesIcon,
-  MagnifyingGlassIcon,
   ClipboardDocumentIcon,
-  CheckIcon
+  CheckIcon,
+  PlusIcon
 } from '@heroicons/react/24/outline'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { Database } from '@/types/database.types'
 
 type CreditCard = Database['public']['Tables']['credit_cards']['Row']
 
 export default function CreditCardsPage() {
-  const { user } = useRequireAuth() // Get authenticated user
-  const [activeTab, setActiveTab] = useState<'credit' | 'debit'>('credit')
-  const [showBalances, setShowBalances] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [benefitFilter, setBenefitFilter] = useState('All')
+  const { user } = useRequireAuth()
   const [creditCards, setCreditCards] = useState<CreditCard[]>([])
-  const [showCardDetails, setShowCardDetails] = useState(false)
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
-  // Fetch cards... (existing useEffect logic)
   useEffect(() => {
     if (!user) return
 
     const fetchCreditCards = async () => {
       try {
         setLoading(true)
-        setError(null)
 
-        const { data, error: fetchError } = await supabase
+        const { data, error } = await supabase
           .from('credit_cards')
           .select('*')
           .eq('user_id', user.id)
           .eq('is_active', true)
+          .neq('card_type', 'debit') // Exclude debit cards
           .order('name')
 
-        if (fetchError) throw fetchError
+        if (error) throw error
 
-        setCreditCards(data || [])
+        // Also filter out cards with credit_limit = 1 (debit cards)
+        const creditOnly = (data || []).filter(card => card.credit_limit !== 1)
+        setCreditCards(creditOnly)
       } catch (err) {
-        console.error('Error fetching from Supabase:', err)
-        setError('Failed to load cards')
+        console.error('Error fetching credit cards:', err)
       } finally {
         setLoading(false)
       }
@@ -59,467 +50,187 @@ export default function CreditCardsPage() {
     fetchCreditCards()
   }, [user])
 
-  // Filtered cards based on search AND active tab
-  const filteredCards = useMemo(() => {
-    return creditCards.filter(card => {
-      const matchesSearch = card.name.toLowerCase().includes(searchTerm.toLowerCase())
-      // Debit cards use card_type = 'debit' or credit_limit = 1
-      const isDebit = card.card_type === 'debit' || card.credit_limit === 1
-      const matchesTab = activeTab === 'debit' ? isDebit : !isDebit
-
-      // Benefits Filter
-      let matchesBenefit = true
-      if (benefitFilter !== 'All') {
-        const benefitsText = JSON.stringify(card.benefits || '').toLowerCase() + ' ' + ((card as any).use_on || '').toLowerCase()
-        matchesBenefit = benefitsText.includes(benefitFilter.toLowerCase())
-      }
-
-      return matchesSearch && matchesTab && matchesBenefit
-    })
-  }, [creditCards, searchTerm, activeTab, benefitFilter])
-
-  // Calculate summary stats
-  const summaryStats = useMemo(() => {
-    const totalLimit = creditCards.reduce((sum, card) => sum + (card.credit_limit || 0), 0)
-    const totalBalance = creditCards.reduce((sum, card) => sum + (card.current_balance || 0), 0)
-    const availableCredit = totalLimit - totalBalance
-    const utilization = totalLimit > 0 ? (totalBalance / totalLimit) * 100 : 0
-
-    return {
-      totalCards: creditCards.length,
-      activeCards: creditCards.filter(card => card.is_active).length,
-      totalLimit,
-      totalBalance,
-      availableCredit,
-      utilization
-    }
-  }, [creditCards])
-
-  const maskCardNumber = (lastFour: string | null) => `**** **** **** ${lastFour || 'XXXX'}`
-
-  // Copy to clipboard function
   const copyToClipboard = async (text: string, fieldName: string) => {
     try {
       await navigator.clipboard.writeText(text)
       setCopiedField(fieldName)
       setTimeout(() => setCopiedField(null), 2000)
     } catch (err) {
-      console.error('Failed to copy text: ', err)
+      console.error('Failed to copy:', err)
     }
   }
 
-  // Format due date
-  const formatDueDate = (dueDate: number | null) => {
-    if (!dueDate || dueDate === 0) return 'N/A'
-    return `${dueDate}${getDaySuffix(dueDate)} of month`
+  const formatCardNumber = (cardNum: string) => {
+    if (!cardNum) return 'N/A'
+    return cardNum.replace(/(.{4})/g, '$1 ').trim()
   }
 
-  const getDaySuffix = (day: number) => {
-    if (day >= 11 && day <= 13) return 'th'
-    switch (day % 10) {
-      case 1: return 'st'
-      case 2: return 'nd'
-      case 3: return 'rd'
-      default: return 'th'
-    }
+  const getTotalLiquidity = () => {
+    return creditCards.reduce((sum, card) => sum + ((card.credit_limit || 0) - (card.current_balance || 0)), 0)
   }
+
+  if (loading) return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+    </div>
+  )
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Credit Cards</h1>
-            <p className="text-gray-600 mt-2">Manage your credit cards and track usage</p>
-          </div>
-
-          <div className="flex items-center space-x-3">
-            {/* Toggle Balance Visibility */}
-            <button
-              onClick={() => setShowBalances(!showBalances)}
-              className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              {showBalances ? (
-                <EyeSlashIcon className="h-4 w-4 mr-2" />
-              ) : (
-                <EyeIcon className="h-4 w-4 mr-2" />
-              )}
-              {showBalances ? 'Hide' : 'Show'} Balances
-            </button>
-
-            {/* Toggle Card Details Visibility */}
-            <button
-              onClick={() => setShowCardDetails(!showCardDetails)}
-              className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              <CreditCardIcon className="h-4 w-4 mr-2" />
-              {showCardDetails ? 'Hide' : 'Show'} Card Details
-            </button>
+            <h1 className="text-2xl font-bold text-gray-900">Credit Cards</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Total Available Credit: ₹{getTotalLiquidity().toLocaleString('en-IN')}
+            </p>
           </div>
         </div>
-
-        {/* Summary Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <CreditCardIcon className="h-8 w-8 text-blue-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Cards</p>
-                <p className="text-2xl font-bold text-blue-600">{summaryStats.totalCards}</p>
-                <p className="text-sm text-gray-500">{summaryStats.activeCards} active</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <BanknotesIcon className="h-8 w-8 text-green-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Credit Limit</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {showBalances ? `₹${summaryStats.totalLimit.toLocaleString()}` : '₹***,***'}
-                </p>
-                <p className="text-sm text-gray-500">Total available</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <CalendarDaysIcon className="h-8 w-8 text-orange-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Current Balance</p>
-                <p className="text-2xl font-bold text-orange-600">
-                  {showBalances ? `₹${summaryStats.totalBalance.toLocaleString()}` : '₹***,***'}
-                </p>
-                <p className="text-sm text-gray-500">Outstanding amount</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className={`h-8 w-8 rounded-full flex items-center justify-center ${summaryStats.utilization > 70 ? 'bg-red-100 text-red-600' :
-                  summaryStats.utilization > 30 ? 'bg-yellow-100 text-yellow-600' :
-                    'bg-green-100 text-green-600'
-                  }`}>
-                  <span className="text-sm font-bold">{Math.round(summaryStats.utilization)}%</span>
-                </div>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Utilization</p>
-                <p className={`text-2xl font-bold ${summaryStats.utilization > 70 ? 'text-red-600' :
-                  summaryStats.utilization > 30 ? 'text-yellow-600' :
-                    'text-green-600'
-                  }`}>
-                  {Math.round(summaryStats.utilization)}%
-                </p>
-                <p className="text-sm text-gray-500">Credit usage</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex space-x-4 mb-6 border-b border-gray-200">
-          <button
-            onClick={() => setActiveTab('credit')}
-            className={`pb-2 px-4 text-sm font-medium transition-colors relative ${activeTab === 'credit'
-              ? 'text-blue-600 border-b-2 border-blue-600'
-              : 'text-gray-500 hover:text-gray-700'
-              }`}
-          >
-            Credit Cards
-            <span className="ml-2 bg-gray-100 text-gray-600 py-0.5 px-2 rounded-full text-xs">
-              {creditCards.filter(c => c.card_type !== 'debit' && c.credit_limit !== 1).length}
-            </span>
-          </button>
-          <button
-            onClick={() => setActiveTab('debit')}
-            className={`pb-2 px-4 text-sm font-medium transition-colors relative ${activeTab === 'debit'
-              ? 'text-blue-600 border-b-2 border-blue-600'
-              : 'text-gray-500 hover:text-gray-700'
-              }`}
-          >
-            Debit Cards
-            <span className="ml-2 bg-gray-100 text-gray-600 py-0.5 px-2 rounded-full text-xs">
-              {creditCards.filter(c => c.card_type === 'debit' || c.credit_limit === 1).length}
-            </span>
-          </button>
-        </div>
-
-        {/* Benefits Filter */}
-        <div className="mb-6 overflow-x-auto">
-          <div className="flex space-x-2 pb-2">
-            {['All', 'Travel', 'Dining', 'Shopping', 'Fuel', 'Movies', 'Groceries', 'UPI', 'Lounge'].map((category) => (
-              <button
-                key={category}
-                onClick={() => setBenefitFilter(category)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${benefitFilter === category
-                  ? 'bg-blue-100 text-blue-700 border border-blue-200 shadow-sm'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                  }`}
-              >
-                {category}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Search */}
-        <div className="mb-6">
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search credit cards..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-        </div>
-
-        {/* Loading State */}
-        {loading && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading credit cards...</p>
-          </div>
-        )}
-
-        {/* Error State */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">Error loading credit cards</h3>
-                <p className="text-sm text-red-700 mt-1">{error}</p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Credit Cards Table */}
-        {!loading && !error && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Credit Cards ({filteredCards.length})</h3>
-            </div>
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Card Name
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Limit
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Balance
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Available
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Card Number
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Expiry
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    CVV
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Due Date
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {creditCards.map(card => {
+                  const available = (card.credit_limit || 0) - (card.current_balance || 0)
+                  const utilization = (card.credit_limit || 0) > 0 ? ((card.current_balance || 0) / (card.credit_limit || 0)) * 100 : 0
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Card Details
-                    </th>
-
-                    {showCardDetails && (
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Card Number
-                      </th>
-                    )}
-                    {showCardDetails && (
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        CVV
-                      </th>
-                    )}
-                    {showCardDetails && (
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Expiry
-                      </th>
-                    )}
-                    {showCardDetails && (
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Benefits
-                      </th>
-                    )}
-
-                    {activeTab === 'credit' && (
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Credit Limit
-                      </th>
-                    )}
-                    {activeTab === 'credit' && (
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Current Balance
-                      </th>
-                    )}
-                    {activeTab === 'credit' && (
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Available Credit
-                      </th>
-                    )}
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Due Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Statement Date
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredCards.map((card) => {
-                    const availableCredit = (card.credit_limit || 0) - (card.current_balance || 0)
-                    const utilization = (card.credit_limit || 0) > 0 ? ((card.current_balance || 0) / (card.credit_limit || 0)) * 100 : 0
-
-                    return (
-                      <tr
-                        key={card.id}
-                        className="hover:bg-gray-50 transition-colors"
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <CreditCardIcon className="h-5 w-5 text-gray-400 mr-3" />
-                            <div>
-                              <div className="text-sm font-medium text-gray-900">{card.name}</div>
-                              <div className="text-sm text-gray-500">{(card as any).card_network || card.card_type}</div>
-                              {(card.annual_fee || 0) > 0 && (
-                                <div className="text-xs text-orange-600 mt-1">Fee: ₹{card.annual_fee}</div>
-                              )}
-                              {card.cashback_rate && (
-                                <div className="text-xs text-green-600 mt-1">{card.cashback_rate}% cashback</div>
-                              )}
-                            </div>
+                  return (
+                    <tr key={card.id} className="hover:bg-gray-50">
+                      {/* Card Name */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center space-x-3">
+                          <CreditCardIcon className="h-5 w-5 text-indigo-600" />
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{card.name}</div>
+                            <div className="text-xs text-gray-500">{(card as any).card_network || 'Credit Card'}</div>
                           </div>
-                        </td>
+                        </div>
+                      </td>
 
-                        {/* Card Number Column */}
-                        {showCardDetails && (
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center space-x-2">
-                              <span className="font-mono text-sm text-gray-900">
-                                {(card as any).card_number ? maskCardNumber((card as any).card_number.slice(-4)) : 'N/A'}
-                              </span>
-                              {(card as any).card_number && (
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); copyToClipboard((card as any).card_number, `${card.id}-number`); }}
-                                  className="p-1 text-gray-400 hover:text-blue-600 rounded transition-colors"
-                                  title="Copy Full Number"
-                                >
-                                  {copiedField === `${card.id}-number` ? <CheckIcon className="h-4 w-4" /> : <ClipboardDocumentIcon className="h-4 w-4" />}
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        )}
+                      {/* Credit Limit */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-900">₹{(card.credit_limit || 0).toLocaleString('en-IN')}</span>
+                      </td>
 
-                        {/* CVV Column */}
-                        {showCardDetails && (
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center space-x-2">
-                              <span className="font-mono text-sm text-gray-900">{(card as any).cvv || 'N/A'}</span>
-                              {(card as any).cvv && (
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); copyToClipboard((card as any).cvv, `${card.id}-cvv`); }}
-                                  className="p-1 text-gray-400 hover:text-blue-600 rounded transition-colors"
-                                  title="Copy CVV"
-                                >
-                                  {copiedField === `${card.id}-cvv` ? <CheckIcon className="h-4 w-4" /> : <ClipboardDocumentIcon className="h-4 w-4" />}
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        )}
+                      {/* Current Balance */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div>
+                          <span className="text-sm font-medium text-orange-600">₹{(card.current_balance || 0).toLocaleString('en-IN')}</span>
+                          <div className="text-xs text-gray-500">{Math.round(utilization)}% used</div>
+                        </div>
+                      </td>
 
-                        {/* Expiry Column */}
-                        {showCardDetails && (
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="font-mono text-sm text-gray-900">{(card as any).expiry_date || 'N/A'}</span>
-                          </td>
-                        )}
+                      {/* Available Credit */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="text-sm font-medium text-green-600">₹{available.toLocaleString('en-IN')}</span>
+                      </td>
 
-                        {/* Benefits Column */}
-                        {showCardDetails && (
-                          <td className="px-6 py-4">
-                            <div className="text-sm text-gray-700 max-w-xs truncate" title={(card as any).use_on || 'N/A'}>
-                              {(card as any).use_on || 'N/A'}
-                            </div>
-                          </td>
-                        )}
-
-
-
-                        {
-                          activeTab === 'credit' && (
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">
-                                {showBalances ? `₹${(card.credit_limit || 0).toLocaleString()}` : '₹***,***'}
-                              </div>
-                            </td>
-                          )
-                        }
-                        {
-                          activeTab === 'credit' && (
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">
-                                {showBalances ? `₹${(card.current_balance || 0).toLocaleString()}` : '₹***,***'}
-                              </div>
-                              {showBalances && (card.credit_limit || 0) > 0 && (
-                                <div className="text-xs text-gray-500">
-                                  {Math.round(utilization)}% utilization
-                                </div>
-                              )}
-                            </td>
-                          )
-                        }
-                        {
-                          activeTab === 'credit' && (
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-green-600">
-                                {showBalances ? `₹${availableCredit.toLocaleString()}` : '₹***,***'}
-                              </div>
-                            </td>
-                          )
-                        }
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center text-sm text-gray-900">
-                            <CalendarDaysIcon className="h-4 w-4 text-gray-400 mr-1" />
-                            {formatDueDate(card.due_date)}
+                      {/* Card Number */}
+                      <td className="px-4 py-4">
+                        {(card as any).card_number ? (
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs font-mono text-gray-700">{formatCardNumber((card as any).card_number)}</span>
+                            <button
+                              onClick={() => copyToClipboard((card as any).card_number, `card-${card.id}`)}
+                              className="p-1 text-gray-400 hover:text-indigo-600"
+                            >
+                              {copiedField === `card-${card.id}` ?
+                                <CheckIcon className="h-3 w-3" /> :
+                                <ClipboardDocumentIcon className="h-3 w-3" />
+                              }
+                            </button>
                           </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center text-sm text-gray-900">
-                            <CalendarDaysIcon className="h-4 w-4 text-gray-400 mr-1" />
-                            {card.statement_date ? `${card.statement_date}${getDaySuffix(card.statement_date)} of month` : 'N/A'}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
+                      </td>
 
-            {filteredCards.length === 0 && (
-              <div className="text-center py-12">
-                <CreditCardIcon className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">No credit cards found</h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  {searchTerm ? 'Try adjusting your search criteria.' : 'Get started by adding your first credit card.'}
-                </p>
-              </div>
-            )}
+                      {/* Expiry */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="text-xs font-mono text-gray-700">{(card as any).expiry_date || '-'}</span>
+                      </td>
+
+                      {/* CVV */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        {(card as any).cvv ? (
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs font-mono text-gray-700">{(card as any).cvv}</span>
+                            <button
+                              onClick={() => copyToClipboard((card as any).cvv, `cvv-${card.id}`)}
+                              className="p-1 text-gray-400 hover:text-indigo-600"
+                            >
+                              {copiedField === `cvv-${card.id}` ?
+                                <CheckIcon className="h-3 w-3" /> :
+                                <ClipboardDocumentIcon className="h-3 w-3" />
+                              }
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
+                      </td>
+
+                      {/* Due Date */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="text-xs text-gray-700">
+                          {card.due_date ? `${card.due_date}th of month` : '-'}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
-        )}
+
+          {creditCards.length === 0 && (
+            <div className="text-center py-12">
+              <CreditCardIcon className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No credit cards found</h3>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Floating Add Transaction Button */}
+      <Link
+        href="/expenses/add"
+        className="fixed bottom-8 right-8 w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 z-50"
+      >
+        <PlusIcon className="h-6 w-6" />
+      </Link>
     </div>
   )
 }
