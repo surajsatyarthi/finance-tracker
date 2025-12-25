@@ -270,21 +270,21 @@ export default function Dashboard() {
       const be = monthlyExpensesList.filter((t: any) => t.category === 'Business').reduce((s: number, t: any) => s + t.amount, 0)
       const pe = monthlyExpenses - be
 
-      // Projection (Simplified for Cloud MVP - mostly reusing payable logic)
+      // Projection (Comprehensive - includes ALL outflows)
       const now = new Date()
       const months = [0, 1, 2].map(offset => {
         const start = new Date(now.getFullYear(), now.getMonth() + offset, 1)
         const end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0)
 
-        // Sum payables (card EMIs) in this month
-        const cardPayments = payables
+        // 1. Sum payables (credit card EMIs) in this month
+        const cardEMIPayments = payables
           .filter(p => {
             const d = new Date(p.dueDate)
             return d >= start && d <= end && p.status !== 'paid'
           })
           .reduce((sum, p) => sum + p.amount, 0)
 
-        // Sum loan EMIs in this month
+        // 2. Sum loan EMIs in this month
         const loanEMIs = loans
           .filter((l: any) => {
             if (!l.next_emi_date || !l.is_active) return false
@@ -293,7 +293,18 @@ export default function Dashboard() {
           })
           .reduce((sum: number, l: any) => sum + (Number(l.emi_amount) || 0), 0)
 
-        const outflows = cardPayments + loanEMIs
+        // 3. Sum credit card statement dues (non-EMI) in this month
+        const creditCardStatementDues = cards
+          .filter((c: any) => {
+            if (!c.due_date || !c.last_statement_amount) return false
+            // Check if due date falls in this month
+            const dueDay = c.due_date
+            const dueDate = new Date(start.getFullYear(), start.getMonth(), dueDay)
+            return dueDate >= start && dueDate <= end && c.last_statement_amount > 0
+          })
+          .reduce((sum: number, c: any) => sum + (Number(c.last_statement_amount) || 0), 0)
+
+        const outflows = cardEMIPayments + loanEMIs + creditCardStatementDues
 
         return {
           label: start.toLocaleString('en-IN', { month: 'short' }),
