@@ -284,12 +284,26 @@ export default function Dashboard() {
           })
           .reduce((sum, p) => sum + p.amount, 0)
 
-        // 2. Sum loan EMIs in this month
+        // 2. Sum loan EMIs in this month (for ALL active loans)
         const loanEMIs = loans
           .filter((l: any) => {
-            if (!l.next_emi_date || !l.is_active) return false
-            const nextEmi = new Date(l.next_emi_date)
-            return nextEmi >= start && nextEmi <= end
+            if (!l.is_active || !l.emi_amount) return false
+
+            // If loan has already started (start_date is in the past or this month)
+            if (l.start_date) {
+              const loanStart = new Date(l.start_date)
+              if (loanStart > end) return false // Loan hasn't started yet
+            }
+
+            // If loan has next_emi_date, check if it's still ongoing
+            if (l.next_emi_date) {
+              const nextEmi = new Date(l.next_emi_date)
+              // Include loan if next EMI is this month or in the future
+              // (monthly recurring means there will be an EMI in this month too)
+              return nextEmi <= end // Loan is still active through this month
+            }
+
+            return true // Active loan with EMI amount
           })
           .reduce((sum: number, l: any) => sum + (Number(l.emi_amount) || 0), 0)
 
