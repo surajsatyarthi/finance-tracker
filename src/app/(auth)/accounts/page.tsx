@@ -27,7 +27,16 @@ export default function AccountsPage() {
   const fetchAccounts = async () => {
     try {
       const data = await financeManager.getAccounts()
-      setAccounts(data.sort((a, b) => b.balance - a.balance))
+      // Group by type: current first, then savings, then cash
+      const sorted = data.sort((a, b) => {
+        const typeOrder: Record<string, number> = { 'current': 0, 'savings': 1, 'cash': 2 }
+        const aOrder = typeOrder[a.type] ?? 3
+        const bOrder = typeOrder[b.type] ?? 3
+
+        if (aOrder !== bOrder) return aOrder - bOrder
+        return b.balance - a.balance // Within same type, highest balance first
+      })
+      setAccounts(sorted)
     } catch (error) {
       console.error('Error fetching accounts:', error)
     } finally {
