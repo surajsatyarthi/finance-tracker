@@ -37,7 +37,7 @@ interface ExpenseTransaction {
 type SortKey = 'date' | 'amount' | 'description' | 'payment_method'
 
 export default function Expenses() {
-  useRequireAuth() // Just call for authentication check
+  const { user } = useRequireAuth() // Get authenticated user
   const [expenses, setExpenses] = useState<ExpenseTransaction[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -50,13 +50,15 @@ export default function Expenses() {
 
   // Load expenses from Supabase
   useEffect(() => {
+    if (!user) return // Wait for user to be loaded
+
     const loadExpenses = async () => {
       try {
         const { supabase } = await import('@/lib/supabase')
         const { data, error } = await supabase
           .from('transactions')
           .select('*')
-          .eq('user_id', '00000000-0000-0000-0000-000000000001')
+          .eq('user_id', user.id) // Use actual authenticated user ID
           .eq('type', 'expense')
           .order('date', { ascending: false })
 
@@ -74,7 +76,7 @@ export default function Expenses() {
     }
 
     loadExpenses()
-  }, [])
+  }, [user])
 
   const uniquePaymentMethods = useMemo(() =>
     [...new Set(expenses.map(e => e.payment_method))].sort(),
