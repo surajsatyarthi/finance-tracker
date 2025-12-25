@@ -11,6 +11,7 @@ import { FinanceDataManager } from '@/lib/supabaseDataManager'
 import { BankAccount } from '@/types/finance'
 import { useRequireAuth } from '@/contexts/AuthContext'
 import { useNotification } from '@/contexts/NotificationContext'
+import { BankLogo } from '@/components/BankLogo'
 
 export default function AccountsPage() {
   const { user } = useRequireAuth()
@@ -125,7 +126,8 @@ export default function AccountsPage() {
                     <tr key={account.id} className="hover:bg-gray-50">
                       {/* Account Name */}
                       <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
+                        <div className="flex items-center space-x-3">
+                          <BankLogo bankName={account.name} size="md" />
                           <div>
                             <div className="text-sm font-medium text-gray-900">{account.name}</div>
                             <div className="text-xs text-gray-500 capitalize">{account.type}</div>
