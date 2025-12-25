@@ -69,6 +69,22 @@ export default function CreditCardsPage() {
     return creditCards.reduce((sum, card) => sum + ((card.credit_limit || 0) - (card.current_balance || 0)), 0)
   }
 
+  const getSummaryStats = () => {
+    const totalLimit = creditCards.reduce((sum, card) => sum + (card.credit_limit || 0), 0)
+    const totalUsed = creditCards.reduce((sum, card) => sum + (card.current_balance || 0), 0)
+    const utilization = totalLimit > 0 ? (totalUsed / totalLimit) * 100 : 0
+
+    return {
+      totalCards: creditCards.length,
+      totalLimit,
+      totalUsed,
+      available: totalLimit - totalUsed,
+      utilization
+    }
+  }
+
+  const stats = getSummaryStats()
+
   if (loading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
@@ -80,12 +96,60 @@ export default function CreditCardsPage() {
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Credit Cards</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              Total Available Credit: ₹{getTotalLiquidity().toLocaleString('en-IN')}
-            </p>
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-gray-900">Credit Cards</h1>
+          <p className="mt-1 text-sm text-gray-500">Manage your credit cards</p>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center">
+              <CreditCardIcon className="h-8 w-8 text-blue-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Total Cards</p>
+                <p className="text-2xl font-bold text-blue-600">{stats.totalCards}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center">
+              <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
+                <span className="text-green-600 text-sm font-bold">₹</span>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Total Limit</p>
+                <p className="text-2xl font-bold text-green-600">₹{stats.totalLimit.toLocaleString('en-IN')}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center">
+              <div className="h-8 w-8 bg-orange-100 rounded-full flex items-center justify-center">
+                <span className="text-orange-600 text-sm font-bold">₹</span>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Used</p>
+                <p className="text-2xl font-bold text-orange-600">₹{stats.totalUsed.toLocaleString('en-IN')}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center">
+              <div className={`h-8 w-8 rounded-full flex items-center justify-center ${stats.utilization > 70 ? 'bg-red-100' : stats.utilization > 30 ? 'bg-yellow-100' : 'bg-green-100'
+                }`}>
+                <span className={`text-sm font-bold ${stats.utilization > 70 ? 'text-red-600' : stats.utilization > 30 ? 'text-yellow-600' : 'text-green-600'
+                  }`}>{Math.round(stats.utilization)}%</span>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Utilization</p>
+                <p className={`text-2xl font-bold ${stats.utilization > 70 ? 'text-red-600' : stats.utilization > 30 ? 'text-yellow-600' : 'text-green-600'
+                  }`}>{Math.round(stats.utilization)}%</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -118,6 +182,9 @@ export default function CreditCardsPage() {
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Due Date
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Statement Date
                   </th>
                 </tr>
               </thead>
@@ -206,6 +273,13 @@ export default function CreditCardsPage() {
                       <td className="px-4 py-4 whitespace-nowrap">
                         <span className="text-xs text-gray-700">
                           {card.due_date ? `${card.due_date}th of month` : '-'}
+                        </span>
+                      </td>
+
+                      {/* Statement Date */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="text-xs text-gray-700">
+                          {card.statement_date ? `${card.statement_date}th of month` : '-'}
                         </span>
                       </td>
                     </tr>
