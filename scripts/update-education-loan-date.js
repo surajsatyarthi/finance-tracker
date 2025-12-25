@@ -11,13 +11,9 @@ const userId = '8a7ce6b7-eec8-401a-a94e-46685e18a218';
 (async () => {
     console.log('\n=== UPDATING EDUCATION LOAN EMI DATE ===\n');
 
-    // Update education loan next_emi_date to 18th instead of 20th
     const { data, error } = await supabase
         .from('loans')
-        .update({
-            next_emi_date: '2025-01-18',
-            remaining_emis: 84 // Also set remaining EMIs
-        })
+        .update({ next_emi_date: '2025-01-18' })
         .eq('user_id', userId)
         .ilike('name', '%education%')
         .select();
@@ -27,11 +23,10 @@ const userId = '8a7ce6b7-eec8-401a-a94e-46685e18a218';
         process.exit(1);
     }
 
-    console.log('✅ Updated education loan:');
-    console.log(`  EMI Due Date: 18th of each month`);
-    console.log(`  Next EMI: January 18, 2025`);
-    console.log(`  Total EMIs: 84 (7 years)`);
-    console.log(`  Monthly EMI: ₹29,361`);
+    console.log('✅ Updated education loan EMI date');
+    console.log('  From: 20th of each month');
+    console.log('  To: 18th of each month');
+    console.log('  Next EMI: January 18, 2025');
     console.log('');
 
     process.exit(0);
