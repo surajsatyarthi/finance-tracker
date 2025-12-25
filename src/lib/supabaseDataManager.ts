@@ -121,7 +121,14 @@ export class FinanceDataManager {
             type: acc.type || 'savings',
             balance: acc.balance,
             currency: acc.currency || 'INR',
-            lastUpdated: acc.updated_at
+            lastUpdated: acc.updated_at,
+            // Card and account details
+            card_number: acc.card_number || undefined,
+            card_cvv: acc.card_cvv || undefined,
+            card_expiry_month: acc.card_expiry_month || undefined,
+            card_expiry_year: acc.card_expiry_year || undefined,
+            account_number: acc.account_number || undefined,
+            ifsc_code: acc.ifsc_code || undefined
           })
         }
       })
