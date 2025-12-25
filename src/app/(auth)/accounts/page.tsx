@@ -5,7 +5,11 @@ import {
   BanknotesIcon,
   CreditCardIcon,
   PencilSquareIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  EyeIcon,
+  EyeSlashIcon,
+  ClipboardDocumentIcon,
+  CheckIcon
 } from '@heroicons/react/24/outline'
 import { FinanceDataManager } from '@/lib/supabaseDataManager'
 import { BankAccount } from '@/types/finance'
@@ -18,6 +22,8 @@ export default function AccountsPage() {
   const { showNotification } = useNotification()
   const [accounts, setAccounts] = useState<BankAccount[]>([])
   const [loading, setLoading] = useState(true)
+  const [showCardDetails, setShowCardDetails] = useState<string | null>(null)
+  const [copiedField, setCopiedField] = useState<string | null>(null)
 
   // Edit State
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -58,6 +64,25 @@ export default function AccountsPage() {
   const formatCurrency = (amount: number, currency: string) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: currency, maximumFractionDigits: 0 }).format(amount)
 
+  const formatCardNumber = (cardNumber: string) => {
+    return cardNumber.replace(/(\d{4})(?=\d)/g, '$1 ')
+  }
+
+  const copyToClipboard = async (text: string, field: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedField(field)
+      showNotification('Copied to clipboard!', 'success')
+      setTimeout(() => setCopiedField(null), 2000)
+    } catch (err) {
+      showNotification('Failed to copy', 'error')
+    }
+  }
+
+  const toggleCardDetails = (accountId: string) => {
+    setShowCardDetails(prev => prev === accountId ? null : accountId)
+  }
+
   const getTotalLiquidity = () => accounts.reduce((sum, acc) => sum + acc.balance, 0)
 
   if (loading) return (
@@ -85,52 +110,166 @@ export default function AccountsPage() {
         {/* Accounts List */}
         <div className="space-y-4">
           {accounts.map(account => (
-            <GlassCard key={account.id} className="flex flex-col sm:flex-row justify-between items-center p-6">
-              <div className="flex items-center space-x-4 mb-4 sm:mb-0 w-full sm:w-auto">
-                <div className="p-3 bg-blue-100 rounded-full text-blue-600">
-                  {account.type === 'cash' ? <BanknotesIcon className="h-6 w-6" /> : <CreditCardIcon className="h-6 w-6" />}
+            <GlassCard key={account.id} className="p-6">
+              {/* Main Account Info */}
+              <div className="flex flex-col sm:flex-row justify-between items-center">
+                <div className="flex items-center space-x-4 mb-4 sm:mb-0 w-full sm:w-auto">
+                  <div className="p-3 bg-blue-100 rounded-full text-blue-600">
+                    {account.type === 'cash' ? <BanknotesIcon className="h-6 w-6" /> : <CreditCardIcon className="h-6 w-6" />}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">{account.name}</h3>
+                    <p className="text-sm text-gray-500 capitalize">{account.type} • {account.currency}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{account.name}</h3>
-                  <p className="text-sm text-gray-500 capitalize">{account.type} • {account.currency}</p>
+
+                <div className="flex items-center space-x-6 w-full sm:w-auto justify-between sm:justify-end">
+                  {editingId === account.id ? (
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="number"
+                        className="w-32 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                        value={editBalance}
+                        onChange={(e) => setEditBalance(e.target.value)}
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => handleUpdateBalance(account.id)}
+                        className="p-2 bg-green-100 text-green-700 rounded-full hover:bg-green-200"
+                      >
+                        <ArrowPathIcon className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="text-sm text-gray-500 hover:text-gray-700 px-2"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-4">
+                      <span className="text-xl font-bold text-gray-900">{formatCurrency(account.balance, account.currency)}</span>
+                      <button
+                        onClick={() => { setEditingId(account.id); setEditBalance(account.balance.toString()); }}
+                        className="p-2 text-gray-400 hover:text-indigo-600 transition-colors"
+                      >
+                        <PencilSquareIcon className="h-5 w-5" />
+                      </button>
+                      {account.type !== 'cash' && (account as any).card_number && (
+                        <button
+                          onClick={() => toggleCardDetails(account.id)}
+                          className="p-2 text-gray-400 hover:text-indigo-600 transition-colors"
+                          title="View card details"
+                        >
+                          {showCardDetails === account.id ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="flex items-center space-x-6 w-full sm:w-auto justify-between sm:justify-end">
-                {editingId === account.id ? (
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="number"
-                      className="w-32 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
-                      value={editBalance}
-                      onChange={(e) => setEditBalance(e.target.value)}
-                      autoFocus
-                    />
-                    <button
-                      onClick={() => handleUpdateBalance(account.id)}
-                      className="p-2 bg-green-100 text-green-700 rounded-full hover:bg-green-200"
-                    >
-                      <ArrowPathIcon className="h-5 w-5" />
-                    </button>
-                    <button
-                      onClick={() => setEditingId(null)}
-                      className="text-sm text-gray-500 hover:text-gray-700 px-2"
-                    >
-                      Cancel
-                    </button>
+              {/* Card Details (Expandable) */}
+              {showCardDetails === account.id && account.type !== 'cash' && (account as any).card_number && (
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg p-6 text-white shadow-lg">
+                    <p className="text-xs uppercase tracking-wider mb-4 opacity-90">Debit Card Details (Encrypted +1)</p>
+
+                    {/* Card Number */}
+                    <div className="mb-4">
+                      <p className="text-xs opacity-75 mb-1">Card Number</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-lg font-mono tracking-wider">
+                          {formatCardNumber((account as any).card_number)}
+                        </span>
+                        <button
+                          onClick={() => copyToClipboard((account as any).card_number, `card-${account.id}`)}
+                          className="p-2 hover:bg-white/20 rounded transition-colors"
+                        >
+                          {copiedField === `card-${account.id}` ?
+                            <CheckIcon className="h-4 w-4" /> :
+                            <ClipboardDocumentIcon className="h-4 w-4" />
+                          }
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Expiry */}
+                      {(account as any).card_expiry_month && (
+                        <div>
+                          <p className="text-xs opacity-75 mb-1">Valid Thru</p>
+                          <p className="text-sm font-mono">
+                            {String((account as any).card_expiry_month).padStart(2, '0')}/{String((account as any).card_expiry_year).slice(-2)}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* CVV */}
+                      {(account as any).card_cvv && (
+                        <div>
+                          <p className="text-xs opacity-75 mb-1">CVV</p>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm font-mono">{(account as any).card_cvv}</span>
+                            <button
+                              onClick={() => copyToClipboard((account as any).card_cvv, `cvv-${account.id}`)}
+                              className="p-1 hover:bg-white/20 rounded transition-colors"
+                            >
+                              {copiedField === `cvv-${account.id}` ?
+                                <CheckIcon className="h-3 w-3" /> :
+                                <ClipboardDocumentIcon className="h-3 w-3" />
+                              }
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Account Number & IFSC */}
+                    <div className="mt-6 pt-4 border-t border-white/20 space-y-3">
+                      {(account as any).account_number && (
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="text-xs opacity-75">Account Number</p>
+                            <p className="text-sm font-mono mt-1">{(account as any).account_number}</p>
+                          </div>
+                          <button
+                            onClick={() => copyToClipboard((account as any).account_number, `acc-${account.id}`)}
+                            className="p-2 hover:bg-white/20 rounded transition-colors"
+                          >
+                            {copiedField === `acc-${account.id}` ?
+                              <CheckIcon className="h-4 w-4" /> :
+                              <ClipboardDocumentIcon className="h-4 w-4" />
+                            }
+                          </button>
+                        </div>
+                      )}
+
+                      {(account as any).ifsc_code && (
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="text-xs opacity-75">IFSC Code</p>
+                            <p className="text-sm font-mono mt-1">{(account as any).ifsc_code}</p>
+                          </div>
+                          <button
+                            onClick={() => copyToClipboard((account as any).ifsc_code, `ifsc-${account.id}`)}
+                            className="p-2 hover:bg-white/20 rounded transition-colors"
+                          >
+                            {copiedField === `ifsc-${account.id}` ?
+                              <CheckIcon className="h-4 w-4" /> :
+                              <ClipboardDocumentIcon className="h-4 w-4" />
+                            }
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <p className="mt-4 text-xs opacity-60 italic">
+                      ⚠️ Values shown are encrypted (+1). Subtract 1 from each digit when using.
+                    </p>
                   </div>
-                ) : (
-                  <div className="flex items-center space-x-4">
-                    <span className="text-xl font-bold text-gray-900">{formatCurrency(account.balance, account.currency)}</span>
-                    <button
-                      onClick={() => { setEditingId(account.id); setEditBalance(account.balance.toString()); }}
-                      className="p-2 text-gray-400 hover:text-indigo-600 transition-colors"
-                    >
-                      <PencilSquareIcon className="h-5 w-5" />
-                    </button>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
             </GlassCard>
           ))}
 
