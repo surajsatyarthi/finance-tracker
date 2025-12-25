@@ -34,7 +34,7 @@ export default function CreditCardsPage() {
           .eq('user_id', user.id)
           .eq('is_active', true)
           .neq('card_type', 'debit') // Exclude debit cards
-          .order('name')
+          .order('credit_limit', { ascending: false })
 
         if (error) throw error
 
