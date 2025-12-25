@@ -15,6 +15,13 @@ export interface BankAccount {
     balance: number
     currency: string
     lastUpdated: string
+    // Card and account details (optional)
+    card_number?: string
+    card_cvv?: string
+    card_expiry_month?: number
+    card_expiry_year?: number
+    account_number?: string
+    ifsc_code?: string
 }
 
 export interface LiquidityData {
