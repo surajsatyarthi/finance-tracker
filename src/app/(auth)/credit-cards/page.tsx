@@ -216,7 +216,7 @@ export default function CreditCardsPage() {
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div>
                           <span className="text-sm font-medium text-orange-600">₹{(card.current_balance || 0).toLocaleString('en-IN')}</span>
-                          <div className="text-xs text-gray-500">{Math.round(utilization)}% used</div>
+                          <div className="text-xs text-gray-500">{utilization.toFixed(2)}% used</div>
                         </div>
                       </td>
 
