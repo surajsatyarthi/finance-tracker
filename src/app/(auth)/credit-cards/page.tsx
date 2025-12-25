@@ -11,6 +11,7 @@ import {
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { Database } from '@/types/database.types'
+import { BankLogo } from '@/components/BankLogo'
 
 type CreditCard = Database['public']['Tables']['credit_cards']['Row']
 
@@ -198,7 +199,7 @@ export default function CreditCardsPage() {
                       {/* Card Name */}
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center space-x-3">
-                          <CreditCardIcon className="h-5 w-5 text-indigo-600" />
+                          <BankLogo bankName={card.name} size="md" />
                           <div>
                             <div className="text-sm font-medium text-gray-900">{card.name}</div>
                             <div className="text-xs text-gray-500">{(card as any).card_network || 'Credit Card'}</div>
