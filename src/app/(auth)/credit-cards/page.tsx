@@ -143,12 +143,12 @@ export default function CreditCardsPage() {
               <div className={`h-8 w-8 rounded-full flex items-center justify-center ${stats.utilization > 70 ? 'bg-red-100' : stats.utilization > 30 ? 'bg-yellow-100' : 'bg-green-100'
                 }`}>
                 <span className={`text-sm font-bold ${stats.utilization > 70 ? 'text-red-600' : stats.utilization > 30 ? 'text-yellow-600' : 'text-green-600'
-                  }`}>{Math.round(stats.utilization)}%</span>
+                  }`}>{stats.utilization.toFixed(2)}%</span>
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Utilization</p>
                 <p className={`text-2xl font-bold ${stats.utilization > 70 ? 'text-red-600' : stats.utilization > 30 ? 'text-yellow-600' : 'text-green-600'
-                  }`}>{Math.round(stats.utilization)}%</p>
+                  }`}>{stats.utilization.toFixed(2)}%</p>
               </div>
             </div>
           </div>
