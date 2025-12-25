@@ -95,14 +95,6 @@ export default function AccountsPage() {
           </div>
         </div>
 
-        {/* Encryption Notice */}
-        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <p className="text-sm text-amber-800">
-            <strong>🔐 Security Notice:</strong> All card numbers, CVVs, and account numbers are encrypted with +1 offset.
-            Subtract 1 from each digit when using. Example: Shown 9102 = Real 8091
-          </p>
-        </div>
-
         {/* Accounts Table */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
