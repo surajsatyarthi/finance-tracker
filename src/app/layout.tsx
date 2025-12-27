@@ -5,6 +5,7 @@ import { AuthProvider } from '../contexts/AuthContext';
 import { NotificationProvider } from '../contexts/NotificationContext';
 import { PrivacyProvider } from '../contexts/PrivacyContext';
 import PWARegister from '../components/PWARegister';
+import { RootErrorBoundary } from '../components/ErrorBoundary';
 
 const lato = Lato({
   variable: "--font-lato",
@@ -39,16 +40,18 @@ export default function RootLayout({
         className={`${lato.variable} ${jetbrainsMono.variable} font-sans antialiased`}
         style={{ fontFamily: 'var(--font-lato), sans-serif' }}
       >
-        <AuthProvider>
-          <NotificationProvider>
-            <PrivacyProvider>
-              <div className="min-h-screen">
-                <PWARegister />
-                {children}
-              </div>
-            </PrivacyProvider>
-          </NotificationProvider>
-        </AuthProvider>
+        <RootErrorBoundary>
+          <AuthProvider>
+            <NotificationProvider>
+              <PrivacyProvider>
+                <div className="min-h-screen">
+                  <PWARegister />
+                  {children}
+                </div>
+              </PrivacyProvider>
+            </NotificationProvider>
+          </AuthProvider>
+        </RootErrorBoundary>
       </body>
     </html>
   );
