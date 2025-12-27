@@ -108,6 +108,21 @@ export class FinanceDataManager {
 
       if (error) throw error
 
+      // Fetch debit cards separately
+      const { data: debitCards } = await supabase
+        .from('debit_cards')
+        .select('*')
+        .eq('user_id', this.userId)
+        .eq('is_active', true)
+
+      // Create a map of debit cards by linked account ID
+      const debitCardMap = new Map()
+      debitCards?.forEach(card => {
+        if (card.linked_account_id) {
+          debitCardMap.set(card.linked_account_id, card)
+        }
+      })
+
       let cashBalance = 0
       const bankAccounts: BankAccount[] = []
 
@@ -115,6 +130,7 @@ export class FinanceDataManager {
         if (acc.type === 'cash') {
           cashBalance += acc.balance
         } else {
+          const debitCard = debitCardMap.get(acc.id)
           bankAccounts.push({
             id: acc.id,
             name: acc.name,
@@ -122,15 +138,14 @@ export class FinanceDataManager {
             balance: acc.balance,
             currency: acc.currency || 'INR',
             lastUpdated: acc.updated_at,
-            // Card and account details - these don't exist on accounts table
-            // Only credit_cards table has these fields
-            // card_number: acc.card_number || undefined,
-            // card_cvv: acc.card_cvv || undefined,
-            // card_expiry_month: acc.card_expiry_month || undefined,
-            // card_expiry_year: acc.card_expiry_year || undefined,
-            // account_number: acc.account_number || undefined,
-            // ifsc_code: acc.ifsc_code || undefined,
-            // customer_id: acc.customer_id || undefined
+            // Include debit card details if available
+            card_number: debitCard?.card_number || undefined,
+            card_cvv: debitCard?.cvv || undefined,
+            card_expiry_month: debitCard?.expiry_month || undefined,
+            card_expiry_year: debitCard?.expiry_year || undefined,
+            account_number: acc.account_number || undefined,
+            ifsc_code: acc.ifsc_code || undefined,
+            customer_id: acc.customer_id || undefined
           })
         }
       })
