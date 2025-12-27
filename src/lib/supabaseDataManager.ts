@@ -1952,10 +1952,9 @@ export class FinanceDataManager {
         { name: 'Miscellaneous', type: 'expense' as const, parent: null, color: '#F38181' },
         { name: 'Loan', type: 'expense' as const, parent: null, color: '#FFB6B9' },
         // Income categories
-        { name: 'Salary', type: 'income' as const, parent: null, color: '#10B981' },
-        { name: 'Freelance', type: 'income' as const, parent: null, color: '#059669' },
-        { name: 'Business', type: 'income' as const, parent: null, color: '#047857' },
-        { name: 'Other Income', type: 'income' as const, parent: null, color: '#065F46' },
+        { name: 'Business', type: 'income' as const, parent: null, color: '#10B981' },
+        { name: 'Salary', type: 'income' as const, parent: null, color: '#059669' },
+        { name: 'Other Income', type: 'income' as const, parent: null, color: '#047857' },
       ]
 
       const { error } = await supabase.from('categories').insert(
