@@ -14,6 +14,19 @@ import { BankAccount } from '@/types/finance'
 import { useRequireAuth } from '@/contexts/AuthContext'
 import { useNotification } from '@/contexts/NotificationContext'
 import { BankLogo } from '@/components/BankLogo'
+// Personal use app - all data displayed clearly (no masking)
+
+// Helper: Add +1 to each digit for display (screenshot security)
+const offsetForDisplay = (value: string | null): string => {
+  if (!value) return '-'
+  return value.split('').map(char => {
+    if (/\d/.test(char)) {
+      const num = parseInt(char)
+      return ((num + 1) % 10).toString()
+    }
+    return char
+  }).join('')
+}
 
 export default function AccountsPage() {
   const { user } = useRequireAuth()
@@ -118,6 +131,7 @@ export default function AccountsPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expiry</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CVV</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account #</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer ID</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IFSC</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -167,14 +181,15 @@ export default function AccountsPage() {
                         )}
                       </td>
 
-                      {/* Card Number */}
+                      {/* Card Number - Full Display */}
                       <td className="px-4 py-4">
                         {acc.card_number ? (
                           <div className="flex items-center space-x-2">
-                            <span className="text-xs font-mono text-gray-700">{formatCardNumber(acc.card_number)}</span>
+                            <span className="text-xs font-mono text-gray-700">{offsetForDisplay(acc.card_number)}</span>
                             <button
                               onClick={() => copyToClipboard(acc.card_number, `card-${account.id}`)}
                               className="p-1 text-gray-400 hover:text-indigo-600"
+                              title="Copy card number"
                             >
                               {copiedField === `card-${account.id}` ?
                                 <CheckIcon className="h-3 w-3" /> :
@@ -198,14 +213,15 @@ export default function AccountsPage() {
                         )}
                       </td>
 
-                      {/* CVV */}
+                      {/* CVV - Full Display (Personal Use) */}
                       <td className="px-4 py-4 whitespace-nowrap">
                         {acc.card_cvv ? (
                           <div className="flex items-center space-x-2">
-                            <span className="text-xs font-mono text-gray-700">{acc.card_cvv}</span>
+                            <span className="text-xs font-mono text-gray-700">{offsetForDisplay(acc.card_cvv)}</span>
                             <button
                               onClick={() => copyToClipboard(acc.card_cvv, `cvv-${account.id}`)}
                               className="p-1 text-gray-400 hover:text-indigo-600"
+                              title="Copy CVV"
                             >
                               {copiedField === `cvv-${account.id}` ?
                                 <CheckIcon className="h-3 w-3" /> :
@@ -222,7 +238,7 @@ export default function AccountsPage() {
                       <td className="px-4 py-4">
                         {acc.account_number ? (
                           <div className="flex items-center space-x-2">
-                            <span className="text-xs font-mono text-gray-700">{acc.account_number}</span>
+                            <span className="text-xs font-mono text-gray-700">{offsetForDisplay(acc.account_number)}</span>
                             <button
                               onClick={() => copyToClipboard(acc.account_number, `acc-${account.id}`)}
                               className="p-1 text-gray-400 hover:text-indigo-600"
@@ -233,6 +249,15 @@ export default function AccountsPage() {
                               }
                             </button>
                           </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
+                      </td>
+
+                      {/* Customer ID */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        {acc.customer_id ? (
+                          <span className="text-xs font-mono text-gray-700">{acc.customer_id}</span>
                         ) : (
                           <span className="text-xs text-gray-400">-</span>
                         )}

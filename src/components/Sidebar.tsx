@@ -17,7 +17,9 @@ import {
     WalletIcon,
     DocumentMagnifyingGlassIcon,
     PresentationChartLineIcon,
-    DocumentArrowUpIcon
+    DocumentArrowUpIcon,
+    ArrowsRightLeftIcon,
+    ChartPieIcon
 } from '@heroicons/react/24/outline'
 
 interface SidebarProps {
@@ -38,7 +40,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Summary', href: '/summary', icon: DocumentMagnifyingGlassIcon },
         { name: 'Goals', href: '/goals', icon: FlagIcon },
         { name: 'Loans', href: '/loans', icon: ArrowTrendingDownIcon },
-        { name: 'Savings & FDs', href: '/savings-fds', icon: FlagIcon },
+        { name: 'Fixed Deposits', href: '/fixed-deposits', icon: BanknotesIcon },
+        { name: 'Transactions', href: '/transactions', icon: ArrowsRightLeftIcon },
+        { name: 'Analytics', href: '/analytics', icon: ChartPieIcon },
         { name: 'Credit Cards', href: '/credit-cards', icon: CreditCardIcon },
         { name: 'Analyze Statement', href: '/statements/upload', icon: DocumentArrowUpIcon },
         { name: 'Future Payables', href: '/liabilities', icon: ArrowTrendingDownIcon },

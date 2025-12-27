@@ -6,7 +6,6 @@ export const initialLiquidity = [
     { name: 'SBI', type: 'savings', balance: 62.98, currency: 'INR' },
     { name: 'CBI', type: 'savings', balance: 652.28, currency: 'INR' },
     { name: 'Jupiter', type: 'savings', balance: 163.80, currency: 'INR' },
-    { name: 'Slice', type: 'wallet', balance: 86835.00, currency: 'INR' },
     { name: 'Kotak', type: 'savings', balance: 715.00, currency: 'INR' },
     { name: 'Tide', type: 'current', balance: 190.80, currency: 'INR' },
     { name: 'DCB', type: 'savings', balance: 0.00, currency: 'INR' },
