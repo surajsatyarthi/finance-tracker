@@ -128,14 +128,21 @@ export default function Dashboard() {
 
       try {
         // Fetch current counts to decide what to seed
-        const [existingAccounts, existingGoals, existingCards] = await Promise.all([
+        const [existingAccounts, existingGoals, existingCards, existingCategories] = await Promise.all([
           financeManager.getAccounts(),
           financeManager.getGoals(),
-          financeManager.getCreditCards()
+          financeManager.getCreditCards(),
+          financeManager.getCategories()
         ])
 
         const promises = []
         let seeded = false
+
+        // 0. Seed Categories FIRST (critical for transactions)
+        if (existingCategories.length === 0) {
+          promises.push(financeManager.seedCategories())
+          seeded = true
+        }
 
         // 1. Seed Accounts if empty
         if (existingAccounts.length === 0) {

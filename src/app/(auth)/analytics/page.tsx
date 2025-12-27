@@ -87,6 +87,34 @@ export default function AnalyticsPage() {
 
     if (loading) return <div className="p-8 text-center text-gray-500">Loading Analytics...</div>
 
+    // Empty state
+    if (!data || data.length === 0) {
+        return (
+            <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+                <div className="max-w-7xl mx-auto">
+                    <h1 className="text-2xl font-bold text-gray-900 mb-8">Financial Analytics</h1>
+                    <GlassCard className="p-12 text-center">
+                        <div className="text-gray-400 mb-4">
+                            <svg className="mx-auto h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Transaction Data</h3>
+                        <p className="text-gray-600 mb-6">
+                            Add some transactions to see your spending analytics and insights.
+                        </p>
+                        <a
+                            href="/expenses/add"
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        >
+                            Add Your First Transaction
+                        </a>
+                    </GlassCard>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
             <div className="max-w-7xl mx-auto space-y-8">

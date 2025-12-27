@@ -1897,6 +1897,60 @@ export class FinanceDataManager {
     return { success: true }
   }
 
+  async seedCategories() {
+    if (!this.userId) await this.initialize()
+    
+    // Check if categories already exist
+    const existing = await this.getCategories()
+    if (existing.length > 0) {
+      logger.info('Categories already seeded, skipping')
+      return { success: true, message: 'Categories already exist' }
+    }
+
+    try {
+      const categories = [
+        // Parent categories
+        { name: 'Food', type: 'expense' as const, parent: null, color: '#FF6B6B' },
+        { name: 'Transport', type: 'expense' as const, parent: null, color: '#4ECDC4' },
+        { name: 'Data & WiFi', type: 'expense' as const, parent: null, color: '#95E1D3' },
+        { name: 'Self Growth', type: 'expense' as const, parent: null, color: '#F38181' },
+        { name: 'Health', type: 'expense' as const, parent: null, color: '#AA96DA' },
+        { name: 'Grooming', type: 'expense' as const, parent: null, color: '#FCBAD3' },
+        { name: 'Clothing', type: 'expense' as const, parent: null, color: '#FFFFD2' },
+        { name: 'Insurance', type: 'expense' as const, parent: null, color: '#A8D8EA' },
+        { name: 'Subscriptions', type: 'expense' as const, parent: null, color: '#AA96DA' },
+        { name: 'Credit Card Charges', type: 'expense' as const, parent: null, color: '#FF6B6B' },
+        { name: 'Shopping', type: 'expense' as const, parent: null, color: '#4ECDC4' },
+        { name: 'Donations', type: 'expense' as const, parent: null, color: '#95E1D3' },
+        { name: 'Miscellaneous', type: 'expense' as const, parent: null, color: '#F38181' },
+        { name: 'Loan', type: 'expense' as const, parent: null, color: '#FFB6B9' },
+        // Income categories
+        { name: 'Salary', type: 'income' as const, parent: null, color: '#10B981' },
+        { name: 'Freelance', type: 'income' as const, parent: null, color: '#059669' },
+        { name: 'Business', type: 'income' as const, parent: null, color: '#047857' },
+        { name: 'Other Income', type: 'income' as const, parent: null, color: '#065F46' },
+      ]
+
+      const { error } = await supabase.from('categories').insert(
+        categories.map(cat => ({
+          user_id: this.userId!,
+          name: cat.name,
+          type: cat.type,
+          color: cat.color,
+          parent_category_id: null
+        }))
+      )
+
+      if (error) throw error
+
+      logger.info('Categories seeded successfully')
+      return { success: true, message: `${categories.length} categories created` }
+    } catch (error) {
+      logger.error('Failed to seed categories', error)
+      return { success: false, error: 'Failed to seed categories' }
+    }
+  }
+
   // --- Backup / Export ---
   async exportUserData() {
     if (!this.userId) await this.initialize()
