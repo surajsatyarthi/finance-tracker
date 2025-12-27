@@ -61,34 +61,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             <div className={`fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-2xl transform transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <div className="flex flex-col h-full">
 
-                    {/* Header */}
-                    <div className="flex items-center justify-between p-6 border-b border-gray-100/50">
-                        <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600">
-                            Finance Tracker
-                        </span>
-                        <button onClick={onClose} className="p-2 -mr-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-900 transition-colors">
+                    {/* Close Button */}
+                    <div className="flex items-center justify-end p-4 border-b border-gray-100/50">
+                        <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-900 transition-colors">
                             <XMarkIcon className="h-6 w-6" />
                         </button>
                     </div>
-
-                    {/* User Info */}
-                    {user && (
-                        <div className="px-6 py-4 bg-gradient-to-br from-indigo-50/50 to-violet-50/50">
-                            <div className="flex items-center space-x-3">
-                                <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
-                                    {(user.user_metadata?.name || user.email || 'U')[0].toUpperCase()}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-bold text-gray-900 truncate">
-                                        {user.user_metadata?.name || 'Hello!'}
-                                    </p>
-                                    <p className="text-xs text-gray-500 truncate">
-                                        {user.email}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
 
                     {/* Navigation Links */}
                     <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
