@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { budgetProjections2025 } from '@/lib/budgetData'
+import { supabase } from '@/lib/supabase'
 
 // 13 months: Dec 2025 to Dec 2026
 const monthColumns = [
@@ -20,12 +20,69 @@ const monthColumns = [
   { month: 'December', year: 2026 },
 ]
 
+interface BudgetRecord {
+  id: string
+  category_name: string
+  monthly_limit: number
+  year: number
+  month: number
+}
+
+interface CategoryData {
+  category: string
+  limits: number[] // 12 months (Jan-Dec)
+}
+
 export default function BudgetPage() {
   const [loading, setLoading] = useState(true)
+  const [budgetData, setBudgetData] = useState<CategoryData[]>([])
 
   useEffect(() => {
-    // Simulate loading
-    setTimeout(() => setLoading(false), 500)
+    const fetchBudgetData = async () => {
+      try {
+        // Fetch all budget records
+        const { data: budgets, error } = await supabase
+          .from('budgets')
+          .select('*')
+          .order('category_name')
+        
+        if (error) throw error
+        
+        // Group by category and organize by month
+        const categoryMap = new Map<string, number[]>()
+        
+        budgets?.forEach((record: BudgetRecord) => {
+          if (!categoryMap.has(record.category_name)) {
+            // Initialize with 12 months (Jan-Dec 2026), all zeros
+            categoryMap.set(record.category_name, Array(12).fill(0))
+          }
+          
+          const limits = categoryMap.get(record.category_name)!
+          
+          // Map month (1-12) to array index (0-11)
+          // month 1 = January = index 0
+          // month 12 = December = index 11
+          const monthIndex = record.month - 1
+          if (monthIndex >= 0 && monthIndex < 12) {
+            limits[monthIndex] = record.monthly_limit
+          }
+        })
+        
+        // Convert to array format
+        const categoryData: CategoryData[] = Array.from(categoryMap.entries()).map(([category, limits]) => ({
+          category,
+          limits
+        }))
+        
+        setBudgetData(categoryData)
+      } catch (error) {
+        console.error('Error fetching budget data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchBudgetData()
   }, [])
 
   // Get 13-month values for each category (Dec 2025 + Jan-Dec 2026)
@@ -55,7 +112,7 @@ export default function BudgetPage() {
     const categoryMonthlyValues: Record<string, number[]> = {}
     let grandTotal = 0
 
-    budgetProjections2025.forEach(item => {
+    budgetData.forEach(item => {
       const values = get13MonthValues(item.limits)
       categoryMonthlyValues[item.category] = values
 
@@ -69,7 +126,7 @@ export default function BudgetPage() {
     })
 
     return { monthlyTotals, grandTotal, categoryTotals, categoryMonthlyValues }
-  }, [])
+  }, [budgetData])
 
   const formatCurrency = (amount: number) => {
     if (amount === 0) return '0'
@@ -121,7 +178,7 @@ export default function BudgetPage() {
             </thead>
 
             <tbody className="text-gray-900">
-              {budgetProjections2025.map((item, rowIdx) => {
+              {budgetData.map((item, rowIdx) => {
                 const isParentRow = isParent(item.category)
                 const rowTotal = categoryTotals[item.category]
                 const monthlyValues = categoryMonthlyValues[item.category] || []
@@ -179,7 +236,7 @@ export default function BudgetPage() {
           </div>
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <p className="text-sm text-gray-500">Categories</p>
-            <p className="text-2xl font-bold text-green-600">{budgetProjections2025.length}</p>
+            <p className="text-2xl font-bold text-green-600">{budgetData.length}</p>
           </div>
         </div>
       </div>

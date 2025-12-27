@@ -1255,41 +1255,51 @@ export class FinanceDataManager {
   // --- Goals & FDs ---
 
   async getFDs() {
-    // Map Goals to FDs where category = 'Fixed Deposit'
     if (!this.userId) await this.initialize()
-    const { data } = await supabase.from('goals').select('*').eq('user_id', this.userId!).eq('category', 'Fixed Deposit')
+    const { data } = await supabase
+      .from('fixed_deposits')
+      .select('*')
+      .eq('user_id', this.userId!)
+      .order('maturity_date', { ascending: true })
 
     if (!data) return []
 
-    return data.map(g => ({
-      id: g.id,
-      name: g.name,
-      amount: g.current_amount, // Principal
-      rate: parseFloat(g.priority) || 0, // Storing rate in priority field if numeric? Or abuse name?
-      // Actually 'priority' is text enum in DB check. 'high/med/low'. 
-      // Let's use metadata or description if available? DB schema had no notes.
-      // Abuse 'priority' for now or 'name'. 
-      // Let's store rate in name like "FD Name | 7.5%" and parse it out? Hacky but works without schema change.
-      // Better: Store in 'priority' as string "7.5".
-      startDate: g.created_at, // Use created_at as start
-      maturityDate: g.target_date,
-      autoRenew: false,
-      notes: ''
+    return data.map(fd => ({
+      id: fd.id,
+      name: fd.bank_name,
+      amount: fd.principal_amount,
+      rate: fd.interest_rate,
+      startDate: fd.start_date,
+      maturityDate: fd.maturity_date,
+      autoRenew: fd.auto_renew || false,
+      notes: fd.notes || ''
     }))
   }
 
   async storeFD(fd: any) {
     if (!this.userId) await this.initialize()
-    // Using Goals table
-    const { data, error } = await supabase.from('goals').insert({
+    
+    // Calculate maturity amount
+    const principal = parseFloat(fd.amount || 0)
+    const rate = parseFloat(fd.rate || 0)
+    const startDate = new Date(fd.startDate)
+    const maturityDate = new Date(fd.maturityDate)
+    const tenureMonths = Math.round((maturityDate.getTime() - startDate.getTime()) / (30.44 * 24 * 60 * 60 * 1000))
+    const tenureYears = tenureMonths / 12
+    const maturityAmount = principal * Math.pow(1 + (rate / 100), tenureYears)
+    
+    const { data, error } = await supabase.from('fixed_deposits').insert({
       user_id: this.userId!,
-      name: fd.name,
-      current_amount: fd.amount, // Principal
-      target_amount: fd.amount + (fd.amount * (fd.rate / 100)), // Maturity Value approx
-      target_date: fd.maturityDate,
-      category: 'Fixed Deposit',
-      priority: `${fd.rate}`, // Storing Rate here
-      is_completed: false
+      bank_name: fd.name,
+      principal_amount: principal,
+      interest_rate: rate,
+      tenure_months: tenureMonths,
+      start_date: fd.startDate,
+      maturity_date: fd.maturityDate,
+      maturity_amount: maturityAmount,
+      auto_renew: fd.autoRenew || false,
+      notes: fd.notes || '',
+      is_active: true
     }).select().single()
 
     if (error) throw error
@@ -1297,13 +1307,60 @@ export class FinanceDataManager {
   }
 
   async updateFD(id: string, updates: any) {
-    // Forward to goal update
-    const goalUpdates: any = {}
-    if (updates.amount) goalUpdates.current_amount = updates.amount
-    if (updates.maturityDate) goalUpdates.target_date = updates.maturityDate
-    if (updates.name) goalUpdates.name = updates.name
+    if (!this.userId) await this.initialize()
+    
+    const fdUpdates: any = {}
+    if (updates.name) fdUpdates.bank_name = updates.name
+    if (updates.amount) fdUpdates.principal_amount = parseFloat(updates.amount)
+    if (updates.rate) fdUpdates.interest_rate = parseFloat(updates.rate)
+    if (updates.startDate) fdUpdates.start_date = updates.startDate
+    if (updates.maturityDate) fdUpdates.maturity_date = updates.maturityDate
+    if (updates.autoRenew !== undefined) fdUpdates.auto_renew = updates.autoRenew
+    if (updates.notes) fdUpdates.notes = updates.notes
+    
+    // Recalculate if amount, rate, or dates changed
+    if (updates.amount || updates.rate || updates.startDate || updates.maturityDate) {
+      const { data: current } = await supabase
+        .from('fixed_deposits')
+        .select('*')
+        .eq('id', id)
+        .single()
+      
+      if (current) {
+        const principal = parseFloat(updates.amount || current.principal_amount)
+        const rate = parseFloat(updates.rate || current.interest_rate)
+        const startDate = new Date(updates.startDate || current.start_date)
+        const maturityDate = new Date(updates.maturityDate || current.maturity_date)
+        const tenureMonths = Math.round((maturityDate.getTime() - startDate.getTime()) / (30.44 * 24 * 60 * 60 * 1000))
+        const tenureYears = tenureMonths / 12
+        fdUpdates.maturity_amount = principal * Math.pow(1 + (rate / 100), tenureYears)
+        fdUpdates.tenure_months = tenureMonths
+      }
+    }
 
-    return this.updateGoal(id, goalUpdates)
+    const { data, error } = await supabase
+      .from('fixed_deposits')
+      .update(fdUpdates)
+      .eq('id', id)
+      .eq('user_id', this.userId!)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  }
+
+  async deleteFD(id: string) {
+    if (!this.userId) await this.initialize()
+    
+    const { error } = await supabase
+      .from('fixed_deposits')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', this.userId!)
+
+    if (error) throw error
+    return { success: true }
   }
 
   async deleteFD(id: string) {
