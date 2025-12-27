@@ -38,6 +38,7 @@ import {
 } from 'recharts'
 import { financeManager } from '@/lib/supabaseDataManager'
 import GlassCard from '@/components/GlassCard'
+import LoadingSkeleton from '@/components/LoadingSkeleton'
 import { formatDate, formatDateShort } from '@/lib/dateUtils'
 
 interface Transaction {
@@ -138,14 +139,12 @@ export default function Dashboard() {
 
         // 1. Seed Accounts if empty
         if (existingAccounts.length === 0) {
-          console.log('Seeding Accounts...')
           promises.push(financeManager.seedLiquidity(initialLiquidity))
           seeded = true
         }
 
         // 2. Seed Goals if empty
         if (existingGoals.length === 0) {
-          console.log('Seeding Goals...')
           promises.push(financeManager.seedGoals(initialGoals))
           seeded = true
         }
@@ -154,16 +153,14 @@ export default function Dashboard() {
         // Checks inside seedLoans for existence
         promises.push(financeManager.seedLoans(initialLoans))
 
-        // 3. Seed Credit Cards if empty, OR if data looks incomplete (Smart Repair)
-        // Check first card for 'benefits' column data presence
-        const needsRestock = existingCards.length === 0 || (existingCards.length > 0 && !existingCards[0].benefits)
-
-        if (needsRestock) {
-          console.log('Seeding/Updating Credit Cards with rich data...')
-          // This will upsert (update) existing cards with new rich data
-          promises.push(financeManager.seedCreditCards(initialCards))
-          seeded = true
-        }
+        // DISABLED: This was causing deleted cards to resurrect
+        // Auto-seed only runs on FIRST-TIME user setup, not every dashboard load
+        // User can manually add cards via UI
+        // const needsRestock = existingCards.length === 0 || (existingCards.length > 0 && !existingCards[0].benefits)
+        // if (needsRestock) {
+        //   promises.push(financeManager.seedCreditCards(initialCards))
+        //   seeded = true
+        // }
 
         // 4. Seed Budget (always try idempotent upsert if we seeded anything else, or just check?)
         // Let's seed budget if we seeded accounts, or just for safety.
@@ -628,6 +625,20 @@ export default function Dashboard() {
             </div>
           </GlassCard>
 
+
+          {/* 
+            PHASE 4 FIX (Dec 26, 2025): Monthly Savings Sign Display
+            
+            Previous Bug: Used Math.abs() which ALWAYS showed positive value
+            Example: Income ₹0, Expenses ₹1,762 → showed "+₹1,762" (WRONG - should be "-₹1,762")
+            
+            Fix: Conditionally prepend minus sign when monthlySavings < 0
+            - Green text + "₹" prefix when positive (income > expenses)
+            - Red text + "-₹" prefix when negative (expenses > income)
+            - Math.abs() still used for number formatting but sign is handled separately
+            
+            WARNING: Do NOT remove the conditional sign logic or negative values will display incorrectly
+          */}
           <GlassCard>
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -636,7 +647,7 @@ export default function Dashboard() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Monthly Savings</p>
                 <p className={`text-2xl font-bold ${monthlySavings >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {`₹${Math.abs(monthlySavings).toLocaleString()}`}
+                  {monthlySavings >= 0 ? '₹' : '-₹'}{Math.abs(monthlySavings).toLocaleString()}
                 </p>
                 <p className="text-sm text-gray-500">Income - Expenses</p>
               </div>

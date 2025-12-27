@@ -157,11 +157,6 @@ export default function TransactionForm() {
                 // I'll stick to Income/Expense form first.
             } else {
                 const categoryName = getCategoryName(formData.categoryId);
-                console.log('Submitting transaction:', {
-                    categoryId: formData.categoryId,
-                    categoryName: categoryName,
-                    description: formData.description
-                });
 
                 await financeManager.createTransaction({
                     amount: parseFloat(formData.amount),

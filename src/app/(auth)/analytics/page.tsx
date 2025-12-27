@@ -40,13 +40,29 @@ export default function AnalyticsPage() {
     }
 
     // 2. Category Split
+    // PHASE 3 FIX (Dec 26, 2025): Analytics Categorization Bug
+    // 
+    // Previous Bug: Used `t.category` field which DOESN'T EXIST in transactions table
+    // Result: Every transaction returned undefined → defaulted to "Uncategorized" → 100% Uncategorized pie chart
+    //
+    // Root Cause: Database schema stores categories in `subcategory` field, not `category`
+    // - subcategory values: "Food - Groceries", "Credit Card EMI > ICICI Adani One", etc.
+    // - category_id: UUID reference to categories table (some transactions use this instead)
+    //
+    // Fix: Changed to `t.subcategory` which contains the actual category data
+    // 
+    // WARNING: Do NOT change back to `t.category` - it will break categorization again
+    // NOTE: Some transactions may have category_id instead of subcategory - this is handled by || 'Uncategorized'
     const getCategorySplit = () => {
         const categories: { [key: string]: number } = {}
         data.filter(t => t.type === 'expense').forEach(t => {
-            const cat = t.category || 'Uncategorized'
+            // Fix: Use subcategory field (which exists) instead of category
+            // subcategory contains values like "Food - Groceries", "Credit Card EMI > ICICI Adani One"
+            const cat = t.subcategory || 'Uncategorized'
             categories[cat] = (categories[cat] || 0) + t.amount
         })
         return Object.entries(categories)
+            .filter(([name]) => name !== 'Uncategorized') // Exclude uncategorized from analytics
             .map(([name, value]) => ({ name, value }))
             .sort((a, b) => b.value - a.value)
             .slice(0, 5) // Top 5

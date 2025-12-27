@@ -22,6 +22,7 @@ export interface BankAccount {
     card_expiry_year?: number
     account_number?: string
     ifsc_code?: string
+    customer_id?: string
 }
 
 export interface LiquidityData {

@@ -128,7 +128,8 @@ export class FinanceDataManager {
             card_expiry_month: acc.card_expiry_month || undefined,
             card_expiry_year: acc.card_expiry_year || undefined,
             account_number: acc.account_number || undefined,
-            ifsc_code: acc.ifsc_code || undefined
+            ifsc_code: acc.ifsc_code || undefined,
+            customer_id: acc.customer_id || undefined
           })
         }
       })
