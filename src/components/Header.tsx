@@ -12,6 +12,7 @@ import Sidebar from './Sidebar'
 
 export default function Header() {
   const pathname = usePathname()
+  const { user } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
 
@@ -24,6 +25,9 @@ export default function Header() {
   // Failsafe: Hide if on a public page
   const isPublicPage = pathname === '/' || pathname === '/login' || pathname?.startsWith('/login?') || pathname?.startsWith('/login/')
   if (isPublicPage) return null
+
+  // Critical: Only show header if user is authenticated
+  if (!user) return null
 
   return (
     <>

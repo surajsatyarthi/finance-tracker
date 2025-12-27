@@ -18,6 +18,7 @@ import {
 
 import { useState, useEffect } from 'react'
 import FeedbackModal from './FeedbackModal'
+import { useAuth } from '../contexts/AuthContext'
 
 const items = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
@@ -36,6 +37,7 @@ const items = [
 
 export default function BottomNav() {
   const pathname = usePathname()
+  const { user } = useAuth()
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
 
@@ -48,6 +50,9 @@ export default function BottomNav() {
   // Failsafe: Hide if on a public page
   const isPublicPage = pathname === '/' || pathname === '/login' || pathname?.startsWith('/login?') || pathname?.startsWith('/login/')
   if (isPublicPage) return null
+
+  // Critical: Only show bottom nav if user is authenticated
+  if (!user) return null
 
   return (
     <>
