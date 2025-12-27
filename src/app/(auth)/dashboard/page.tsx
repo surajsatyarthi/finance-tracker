@@ -18,6 +18,7 @@ import Link from 'next/link' // Existing
 import { initialLiquidity } from '@/lib/liquidityData'
 import { initialGoals } from '@/lib/goalsData'
 import { initialCards } from '@/lib/cardsData'
+import { initialDebitCards } from '@/lib/debitCardsData'
 import { budgetProjections2025 } from '@/lib/budgetData'
 import { initialLoans } from '@/lib/loansData'
 import { useNotification } from '@/contexts/NotificationContext'
@@ -163,6 +164,13 @@ export default function Dashboard() {
         // Now safe - will only seed for first-time users, never overwrites existing cards
         if (existingCards.length === 0) {
           promises.push(financeManager.seedCreditCards(initialCards))
+          seeded = true
+        }
+
+        // Seed debit cards for first-time users
+        const { data: existingDebitCards } = await financeManager.getDebitCards()
+        if (!existingDebitCards || existingDebitCards.length === 0) {
+          promises.push(financeManager.seedDebitCards(initialDebitCards))
           seeded = true
         }
 

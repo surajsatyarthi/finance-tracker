@@ -437,6 +437,22 @@ export class FinanceDataManager {
     }))
   }
 
+  async getDebitCards() {
+    if (!this.userId) await this.initialize()
+    const { data, error } = await supabase
+      .from('debit_cards')
+      .select('*')
+      .eq('user_id', this.userId!)
+      .eq('is_active', true)
+
+    if (error) {
+      logger.error('Error fetching debit cards', error)
+      return { data: [], error }
+    }
+
+    return { data, error: null }
+  }
+
   async storeCreditCard(card: any) {
     if (!this.userId) await this.initialize()
     const { data, error } = await supabase.from('credit_cards').insert({
@@ -1598,6 +1614,52 @@ export class FinanceDataManager {
     }
     
     logger.info('Credit cards seeded successfully (first-time user)', { count: cards.length })
+    return { success: true }
+  }
+
+  async seedDebitCards(cards: any[]) {
+    if (!this.userId) await this.initialize()
+
+    // Check if user already has debit cards - if yes, skip seeding
+    const { data: existingCards, error: checkError } = await supabase
+      .from('debit_cards')
+      .select('id')
+      .eq('user_id', this.userId!)
+      .limit(1)
+
+    if (checkError) {
+      logger.error('Error checking existing debit cards', checkError)
+      return { success: false, error: 'Failed to check existing debit cards' }
+    }
+
+    if (existingCards && existingCards.length > 0) {
+      logger.info('Debit cards already exist, skipping seed')
+      return { success: true, message: 'Debit cards already exist' }
+    }
+
+    // Only insert if truly no cards exist (first-time user)
+    for (const c of cards) {
+      // Parse expiry MM/YY to month and year
+      const [month, year] = c.expiry.split('/')
+      const expiryMonth = parseInt(month)
+      const expiryYear = parseInt(year) + 2000 // Convert 28 to 2028
+
+      const cardData = {
+        user_id: this.userId!,
+        name: c.name,
+        bank: c.bank,
+        card_number: c.number, // Store as-is (will be encrypted with +1 offset in DB)
+        last_four_digits: c.number.slice(-4),
+        expiry_month: expiryMonth,
+        expiry_year: expiryYear,
+        cvv: c.cvv,
+        is_active: true
+      }
+
+      await supabase.from('debit_cards').insert(cardData)
+    }
+    
+    logger.info('Debit cards seeded successfully (first-time user)', { count: cards.length })
     return { success: true }
   }
 
