@@ -513,7 +513,60 @@ export default function Dashboard() {
           <p className="text-neutral-600">Here&apos;s an overview of your financial portfolio</p>
         </div>
 
-
+        {/* Quick Actions - Moved to Top */}
+        <GlassCard className="mb-8">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-gray-900">
+                Quick Actions
+              </h3>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Link
+                href="/accounts"
+                className="flex items-center p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                <div className="p-2 bg-gray-100 rounded-lg mr-3">
+                  <div className="icon-golden-card">
+                    <BuildingLibraryIcon className="h-5 w-5 icon-white" />
+                  </div>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Accounts</p>
+                  <p className="text-sm text-gray-500">(10)</p>
+                </div>
+              </Link>
+              <Link
+                href="/budget"
+                className="flex items-center p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                <div className="p-2 bg-gray-100 rounded-lg mr-3">
+                  <div className="icon-golden-card">
+                    <ChartBarIcon className="h-5 w-5 icon-white" />
+                  </div>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Budget</p>
+                  <p className="text-sm text-gray-500">(12)</p>
+                </div>
+              </Link>
+              <Link
+                href="/goals"
+                className="flex items-center p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                <div className="p-2 bg-gray-100 rounded-lg mr-3">
+                  <div className="icon-golden-card">
+                    <TargetIcon className="h-5 w-5 icon-white" />
+                  </div>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Goals</p>
+                  <p className="text-sm text-gray-500">(15)</p>
+                </div>
+              </Link>
+            </div>
+          </div>
+        </GlassCard>
 
 
         {/* Professional Financial Metrics */}
@@ -793,112 +846,50 @@ export default function Dashboard() {
           <p className="text-xs text-gray-500 mt-4">Start Liquidity: ₹{stats.projection.startLiquidity.toLocaleString()}</p>
         </GlassCard>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
-          {/* Quick Actions and Recent Transactions */}
-          {/* ... Quick Actions */}
-          <GlassCard>
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  Quick Actions
-                </h3>
-              </div>
-              {/* ... Links ... */}
-              <div className="grid grid-cols-2 gap-4">
-                <Link
-                  href="/accounts"
-                  className="flex items-center p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-                >
-                  {/* ... */}
-                  <div className="p-2 bg-gray-100 rounded-lg mr-3">
-                    <div className="icon-golden-card">
-                      <BuildingLibraryIcon className="h-5 w-5 icon-white" />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">Accounts</p>
-                    <p className="text-sm text-gray-500">(10)</p>
-                  </div>
-                </Link>
-                <Link
-                  href="/budget"
-                  className="flex items-center p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-                >
-                  {/* ... */}
-                  <div className="p-2 bg-gray-100 rounded-lg mr-3">
-                    <div className="icon-golden-card">
-                      <ChartBarIcon className="h-5 w-5 icon-white" />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">Budget</p>
-                    <p className="text-sm text-gray-500">(12)</p>
-                  </div>
-                </Link>
-                <Link
-                  href="/goals"
-                  className="flex items-center p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-                >
-                  {/* ... */}
-                  <div className="p-2 bg-gray-100 rounded-lg mr-3">
-                    <div className="icon-golden-card">
-                      <TargetIcon className="h-5 w-5 icon-white" />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">Goals</p>
-                    <p className="text-sm text-gray-500">(15)</p>
-                  </div>
-                </Link>
-              </div>
+        {/* Recent Transactions */}
+        <GlassCard className="mb-8">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-gray-900 flex items-center">
+                <div className="icon-golden-card mr-2">
+                  <ChartBarIcon className="h-5 w-5 icon-white" />
+                </div>
+                Recent Transactions
+              </h3>
+              <Link
+                href="/activity"
+                className="text-sm font-medium text-success-600 hover:text-success-700"
+              >
+                View all
+              </Link>
             </div>
-          </GlassCard>
-
-          <GlassCard>
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-semibold text-gray-900 flex items-center">
-                  <div className="icon-golden-card mr-2">
-                    <ChartBarIcon className="h-5 w-5 icon-white" />
-                  </div>
-                  Recent Transactions
-                </h3>
-                <Link
-                  href="/activity"
-                  className="text-sm font-medium text-success-600 hover:text-success-700"
-                >
-                  View all
-                </Link>
-              </div>
-              {/* ... List ... */}
-              <div className="space-y-4">
-                {stats.recentTransactions.length > 0 ? (
-                  stats.recentTransactions.map((transaction) => (
-                    <div key={transaction.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-lg">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-900 truncate">
-                          {transaction.description || 'Transaction'}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {transaction.categories?.name} • {formatDate(transaction.date)}
-                        </p>
-                      </div>
-                      <div className={`text-sm font-semibold px-2 py-1 rounded ${transaction.type === 'income' ? 'text-success-700 bg-success-100' : 'text-error-700 bg-error-100'}`}>
-                        {transaction.type === 'income' ? '+' : '-'}₹{Number(transaction.amount).toLocaleString()}
-                      </div>
+            <div className="space-y-4">
+              {stats.recentTransactions.length > 0 ? (
+                stats.recentTransactions.map((transaction) => (
+                  <div key={transaction.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 truncate">
+                        {transaction.description || 'Transaction'}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {transaction.categories?.name} • {formatDate(transaction.date)}
+                      </p>
                     </div>
-                  ))
-                ) : (
-                  <div className="text-center py-8">
-                    <ChartBarIcon className="h-12 w-12 text-indigo-500 icon-indigo-shine mx-auto mb-4" />
-                    <p className="text-gray-600">No transactions yet</p>
-                    <p className="text-sm text-gray-500 mt-2">Start by adding your first transaction!</p>
+                    <div className={`text-sm font-semibold px-2 py-1 rounded ${transaction.type === 'income' ? 'text-success-700 bg-success-100' : 'text-error-700 bg-error-100'}`}>
+                      {transaction.type === 'income' ? '+' : '-'}₹{Number(transaction.amount).toLocaleString()}
+                    </div>
                   </div>
-                )}
-              </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <ChartBarIcon className="h-12 w-12 text-indigo-500 icon-indigo-shine mx-auto mb-4" />
+                  <p className="text-gray-600">No transactions yet</p>
+                  <p className="text-sm text-gray-500 mt-2">Start by adding your first transaction!</p>
+                </div>
+              )}
             </div>
-          </GlassCard>
-        </div>
+          </div>
+        </GlassCard>
 
         {/* Floating Action Button */}
         <Link
