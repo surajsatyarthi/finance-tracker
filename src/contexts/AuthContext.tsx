@@ -67,17 +67,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session ?? null)
       setUser(data.user ?? data.session?.user ?? null)
 
-      // Best-effort data migration from localStorage (if any remnants)
-      try {
-        const { FinanceDataManager } = await import('../lib/supabaseDataManager')
-        const mgr = FinanceDataManager.getInstance()
-        const init = await mgr.initialize()
-        if (init.success) {
-          await mgr.migrateFromLocalStorage()
-        }
-      } catch (e) {
-        console.warn('Migration skipped or failed:', e)
-      }
+      // Migration function removed - no longer using localStorage
+      // try {
+      //   const { FinanceDataManager } = await import('../lib/supabaseDataManager')
+      //   const mgr = FinanceDataManager.getInstance()
+      //   const init = await mgr.initialize()
+      //   if (init.success) {
+      //     await mgr.migrateFromLocalStorage()
+      //   }
+      // } catch (e) {
+      //   console.warn('Migration skipped or failed:', e)
+      // }
 
       return { error: null }
     } catch (error: unknown) {

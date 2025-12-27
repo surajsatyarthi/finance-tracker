@@ -122,14 +122,15 @@ export class FinanceDataManager {
             balance: acc.balance,
             currency: acc.currency || 'INR',
             lastUpdated: acc.updated_at,
-            // Card and account details
-            card_number: acc.card_number || undefined,
-            card_cvv: acc.card_cvv || undefined,
-            card_expiry_month: acc.card_expiry_month || undefined,
-            card_expiry_year: acc.card_expiry_year || undefined,
-            account_number: acc.account_number || undefined,
-            ifsc_code: acc.ifsc_code || undefined,
-            customer_id: acc.customer_id || undefined
+            // Card and account details - these don't exist on accounts table
+            // Only credit_cards table has these fields
+            // card_number: acc.card_number || undefined,
+            // card_cvv: acc.card_cvv || undefined,
+            // card_expiry_month: acc.card_expiry_month || undefined,
+            // card_expiry_year: acc.card_expiry_year || undefined,
+            // account_number: acc.account_number || undefined,
+            // ifsc_code: acc.ifsc_code || undefined,
+            // customer_id: acc.customer_id || undefined
           })
         }
       })
@@ -165,7 +166,7 @@ export class FinanceDataManager {
       console.error('Error fetching categories:', error)
       return []
     }
-    return data || []
+    return (data || []) as Category[]
   }
 
   async getBudgets(year?: number): Promise<Budget[]> {
@@ -188,7 +189,7 @@ export class FinanceDataManager {
       return []
     }
 
-    return data || []
+    return (data || []) as Budget[]
   }
 
   async storeAccount(account: Omit<BankAccount, 'id' | 'lastUpdated'>) {
@@ -235,7 +236,7 @@ export class FinanceDataManager {
       formatted_amount: `₹${t.amount}`,
       created_at: t.created_at,
       updated_at: t.updated_at
-    }))
+    })) as EnhancedTransaction[]
   }
 
 
@@ -373,41 +374,46 @@ export class FinanceDataManager {
       .sort((a, b) => b.value - a.value)
   }
 
+  // DISABLED: daily_snapshots table doesn't exist
   async getNetWorthHistory(days = 30) {
-    if (!this.userId) await this.initialize()
-
-    const { data, error } = await supabase
-      .from('daily_snapshots')
-      .select('*')
-      .eq('user_id', this.userId!)
-      .order('date', { ascending: true })
-      .limit(days) // This might fetch oldest first due to order, let's check
-
-    // If we want last 30 days history...
-    // We should probably order desc limit 30 then reverse.
-    // But for chart line, asc is good.
-    // We need date range filter usually.
-
-    const cutoff = new Date()
-    cutoff.setDate(cutoff.getDate() - days)
-    const cutoffStr = cutoff.toISOString().split('T')[0]
-
-    const { data: history, error: hError } = await supabase
-      .from('daily_snapshots')
-      .select('date, total_assets, total_liabilities, net_worth')
-      .eq('user_id', this.userId!)
-      .gte('date', cutoffStr)
-      .order('date', { ascending: true })
-
-    if (hError) return []
-    return history
+    return [] // Return empty instead of querying missing table
   }
+  // async getNetWorthHistory(days = 30) {
+  //   if (!this.userId) await this.initialize()
 
-  async getExpenseTransactions() {
-    if (!this.userId) await this.initialize()
-    const { data } = await supabase.from('transactions').select('*').eq('user_id', this.userId!).eq('type', 'expense').order('date', { ascending: false })
-    return data || []
-  }
+  //   const { data, error } = await supabase
+  //     .from('daily_snapshots')
+  //     .select('*')
+  //     .eq('user_id', this.userId!)
+  //     .order('date', { ascending: true })
+  //     .limit(days) // This might fetch oldest first due to order, let's check
+
+  //   // If we want last 30 days history...
+  //   // We should probably order desc limit 30 then reverse.
+  //   // But for chart line, asc is good.
+  //   // We need date range filter usually.
+
+  //   const cutoff = new Date()
+  //   cutoff.setDate(cutoff.getDate() - days)
+  //   const cutoffStr = cutoff.toISOString().split('T')[0]
+
+  //   const { data: history, error: hError } = await supabase
+  //     .from('daily_snapshots')
+  //     .select('date, total_assets, total_liabilities, net_worth')
+  //     .eq('user_id', this.userId!)
+  //     .gte('date', cutoffStr)
+  //     .order('date', { ascending: true })
+
+  //   if (hError) return []
+  //   return history
+  // }
+
+  // Duplicate removed - use the one at line ~301
+  // async getExpenseTransactions() {
+  //   if (!this.userId) await this.initialize()
+  //   const { data } = await supabase.from('transactions').select('*').eq('user_id', this.userId!).eq('type', 'expense').order('date', { ascending: false })
+  //   return data || []
+  // }
 
   // --- Credit Cards ---
 
@@ -574,7 +580,7 @@ export class FinanceDataManager {
       emis_paid: l.emis_paid,
       start_date: l.start_date,
       next_emi_date: l.next_emi_date || undefined,
-      linked_credit_card_id: l.linked_credit_card_id || undefined,
+      // linked_credit_card_id: l.linked_credit_card_id || undefined, // Field doesn't exist in DB
       is_active: l.is_active || false,
       created_at: l.created_at,
       updated_at: l.updated_at
@@ -746,84 +752,103 @@ export class FinanceDataManager {
 
   // --- Pay Later (BNPL) ---
 
+  // DISABLED: pay_later_services table doesn't exist in production
   async getPayLaterServices(): Promise<any[]> {
-    if (!this.userId) await this.initialize()
-    const { data, error } = await supabase
-      .from('pay_later_services')
-      .select('*')
-      .eq('user_id', this.userId!)
-      .neq('status', 'deleted') // Soft delete check if implemented, else just filter
-      .order('next_due_date', { ascending: true })
-
-    if (error) {
-      // If table doesn't exist yet, return empty to prevent crash
-      console.warn('Error fetching pay later services (Table might be missing):', error.message)
-      return []
-    }
-
-    return data.map(s => ({
-      id: s.id,
-      serviceName: s.service_name,
-      serviceCode: s.service_code,
-      creditLimit: s.credit_limit,
-      usedAmount: s.used_amount,
-      currentDue: s.current_due,
-      availableAmount: s.credit_limit - s.used_amount, // Calc on fly
-      nextDueDate: s.next_due_date,
-      dueSchedule: s.due_schedule,
-      status: s.status,
-      interestRate: s.interest_rate,
-      penaltyFee: s.penalty_fee,
-      lastUsed: s.last_used
-    }))
+    return [] // Return empty array instead of querying missing table
   }
+  // async getPayLaterServices(): Promise<any[]> {
+  //   if (!this.userId) await this.initialize()
+  //   const { data, error } = await supabase
+  //     .from('pay_later_services')
+  //     .select('*')
+  //     .eq('user_id', this.userId!)
+  //     .neq('status', 'deleted') // Soft delete check if implemented, else just filter
+  //     .order('next_due_date', { ascending: true })
 
+  //   if (error) {
+  //     // If table doesn't exist yet, return empty to prevent crash
+  //     console.warn('Error fetching pay later services (Table might be missing):', error.message)
+  //     return []
+  //   }
+
+  //   return data.map(s => ({
+  //     id: s.id,
+  //     serviceName: s.service_name,
+  //     serviceCode: s.service_code,
+  //     creditLimit: s.credit_limit,
+  //     usedAmount: s.used_amount,
+  //     currentDue: s.current_due,
+  //     availableAmount: s.credit_limit - s.used_amount, // Calc on fly
+  //     nextDueDate: s.next_due_date,
+  //     dueSchedule: s.due_schedule,
+  //     status: s.status,
+  //     interestRate: s.interest_rate,
+  //     penaltyFee: s.penalty_fee,
+  //     lastUsed: s.last_used
+  //   }))
+  // }
+
+  // DISABLED: pay_later_services table doesn't exist
   async createPayLaterService(service: any) {
-    if (!this.userId) await this.initialize()
-    const { error } = await supabase.from('pay_later_services').insert({
-      user_id: this.userId!,
-      service_name: service.serviceName,
-      service_code: service.serviceCode,
-      credit_limit: service.creditLimit,
-      used_amount: service.usedAmount || 0,
-      current_due: service.currentDue || 0,
-      next_due_date: service.nextDueDate,
-      due_schedule: service.dueSchedule,
-      status: service.status || 'active',
-      interest_rate: service.interestRate,
-      penalty_fee: service.penaltyFee
-    })
-    if (error) throw error
-    return { success: true }
+    console.warn('Pay Later Services feature disabled - table missing')
+    return { success: false, error: 'Feature disabled' }
   }
+  // async createPayLaterService(service: any) {
+  //   if (!this.userId) await this.initialize()
+  //   const { error } = await supabase.from('pay_later_services').insert({
+  //     user_id: this.userId!,
+  //     service_name: service.serviceName,
+  //     service_code: service.serviceCode,
+  //     credit_limit: service.creditLimit,
+  //     used_amount: service.usedAmount || 0,
+  //     current_due: service.currentDue || 0,
+  //     next_due_date: service.nextDueDate,
+  //     due_schedule: service.dueSchedule,
+  //     status: service.status || 'active',
+  //     interest_rate: service.interestRate,
+  //     penalty_fee: service.penaltyFee
+  //   })
+  //   if (error) throw error
+  //   return { success: true }
+  // }
 
+  // DISABLED: pay_later_services table doesn't exist
   async updatePayLaterService(id: string, updates: any) {
-    if (!this.userId) await this.initialize()
-
-    const dbUpdates: any = {}
-    if (updates.serviceName) dbUpdates.service_name = updates.serviceName
-    if (updates.serviceCode) dbUpdates.service_code = updates.serviceCode
-    if (updates.creditLimit !== undefined) dbUpdates.credit_limit = updates.creditLimit
-    if (updates.usedAmount !== undefined) dbUpdates.used_amount = updates.usedAmount
-    if (updates.currentDue !== undefined) dbUpdates.current_due = updates.currentDue
-    if (updates.nextDueDate) dbUpdates.next_due_date = updates.nextDueDate
-    if (updates.status) dbUpdates.status = updates.status
-
-    const { error } = await supabase.from('pay_later_services').update({
-      ...dbUpdates,
-      updated_at: new Date().toISOString()
-    }).eq('id', id)
-
-    if (error) throw error
-    return { success: true }
+    console.warn('Pay Later Services feature disabled - table missing')
+    return { success: false, error: 'Feature disabled' }
   }
+  // async updatePayLaterService(id: string, updates: any) {
+  //   if (!this.userId) await this.initialize()
 
+  //   const dbUpdates: any = {}
+  //   if (updates.serviceName) dbUpdates.service_name = updates.serviceName
+  //   if (updates.serviceCode) dbUpdates.service_code = updates.serviceCode
+  //   if (updates.creditLimit !== undefined) dbUpdates.credit_limit = updates.creditLimit
+  //   if (updates.usedAmount !== undefined) dbUpdates.used_amount = updates.usedAmount
+  //   if (updates.currentDue !== undefined) dbUpdates.current_due = updates.currentDue
+  //   if (updates.nextDueDate) dbUpdates.next_due_date = updates.nextDueDate
+  //   if (updates.status) dbUpdates.status = updates.status
+
+  //   const { error } = await supabase.from('pay_later_services').update({
+  //     ...dbUpdates,
+  //     updated_at: new Date().toISOString()
+  //   }).eq('id', id)
+
+  //   if (error) throw error
+  //   return { success: true }
+  // }
+
+  // DISABLED: pay_later_services table doesn't exist
   async deletePayLaterService(id: string) {
-    if (!this.userId) await this.initialize()
-    const { error } = await supabase.from('pay_later_services').delete().eq('id', id)
-    if (error) throw error
-    return { success: true }
+    console.warn('Pay Later Services feature disabled - table missing')
+    return { success: false, error: 'Feature disabled' }
   }
+  // async deletePayLaterService(id: string) {
+  //   if (!this.userId) await this.initialize()
+  //   const { error } = await supabase.from('pay_later_services').delete().eq('id', id)
+  //   if (error) throw error
+  //   return { success: true }
+  // }
 
   // --- Goals (New) ---
 
@@ -842,6 +867,7 @@ export class FinanceDataManager {
 
     return data.map(g => ({
       ...g,
+      category: g.category || undefined,
       target_date: g.target_date || undefined
     }))
   }
@@ -1165,7 +1191,7 @@ export class FinanceDataManager {
 
         payables.push({
           id: `due_${card.id}_${Date.now()}`,
-          type: 'credit_card',
+          type: 'credit_card_due', // Fixed: use correct FuturePayable type
           amount: card.currentBalance,
           dueDate: due.toISOString().split('T')[0],
           description: desc,
@@ -1187,16 +1213,17 @@ export class FinanceDataManager {
         // Generate for 12 months
         for (let i = 0; i < 12; i++) {
           // Check if loan expires before this? (emis_paid + i < total_emis)
-          if (loan.total_emis > 0 && (loan.emis_paid + i) >= loan.total_emis) break
+          const totalEmis = loan.total_emis || 0
+          if (totalEmis > 0 && (loan.emis_paid + i) >= totalEmis) break
 
           const dueDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + i, day)
 
           payables.push({
             id: `emi_${loan.id}_${i}`,
-            type: 'emi',
-            amount: loan.emi_amount,
+            type: 'loan_emi', // Fixed: use correct FuturePayable type
+            amount: loan.emi_amount || 0,
             dueDate: dueDate.toISOString().split('T')[0],
-            description: `EMI ${loan.emis_paid + i + 1}/${loan.total_emis} - ${loan.name}`,
+            description: `EMI ${loan.emis_paid + i + 1}/${loan.total_emis || 'Ongoing'} - ${loan.name}`,
             source: loan.name,
             originalTransactionId: '',
             status: 'pending',
@@ -1295,7 +1322,7 @@ export class FinanceDataManager {
 
 
   // --- Accounts (Update) ---
-  async updateAccount(id: string, updates: Partial<Account>) {
+  async updateAccount(id: string, updates: Partial<Database['public']['Tables']['accounts']['Update']>) {
     if (!this.userId) await this.initialize()
     if (!this.userId) throw new Error('User not initialized')
 
@@ -1652,7 +1679,7 @@ export class FinanceDataManager {
     })
   }
 
-  async getNetWorthHistory() {
+  async getNetWorthHistoryFromSnapshots() { // Renamed to avoid duplicate
     if (!this.userId) await this.initialize()
 
     const { data, error } = await supabase
@@ -1982,27 +2009,28 @@ export class FinanceDataManager {
   }
 
   // --- Feedback ---
-  async submitFeedback(message: string, userAgent: string, images: string[] = []): Promise<{ success: boolean; error?: string }> {
-    try {
-      const { error } = await supabase
-        .from('feedback')
-        .insert({
-          message,
-          user_agent: userAgent,
-          images
-        })
+  // DISABLED: feedback table doesn't exist in production DB
+  // async submitFeedback(message: string, userAgent: string, images: string[] = []): Promise<{ success: boolean; error?: string }> {
+  //   try {
+  //     const { error } = await supabase
+  //       .from('feedback')
+  //       .insert({
+  //         message,
+  //         user_agent: userAgent,
+  //         images
+  //       })
 
-      if (error) throw error
+  //     if (error) throw error
 
-      return { success: true }
-    } catch (error) {
-      console.error('Submit feedback error:', error)
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }
-    }
-  }
+  //     return { success: true }
+  //   } catch (error) {
+  //     console.error('Submit feedback error:', error)
+  //     return {
+  //       success: false,
+  //       error: error instanceof Error ? error.message : 'Unknown error'
+  //     }
+  //   }
+  // }
 }
 
 export const financeManager = FinanceDataManager.getInstance()

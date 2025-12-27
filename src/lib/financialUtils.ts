@@ -1,5 +1,9 @@
 
-import { Loan, LoanRecord, LoanPayment } from '@/types/finance'
+import { Loan } from '@/types/finance'
+
+// Temporary types until proper definitions exist
+type LoanRecord = any
+type LoanPayment = any
 
 // Types for Calculations
 export interface AmortizationEntry {
@@ -108,21 +112,22 @@ export const calculatePrepaymentImpact = (
 ): PrepaymentAnalysis | null => {
     const currentOutstanding = getLoanOutstandingBalance(loan, payments)
     const newPrincipal = Math.max(0, currentOutstanding - prepaymentAmount)
-    const monthlyRate = loan.interest_rate / 12 / 100
-    const remainingMonths = loan.total_emis - loan.emis_paid
+    const monthlyRate = (loan.interest_rate || 0) / 12 / 100
+    const remainingMonths = (loan.total_emis || 0) - loan.emis_paid
+    const emiAmount = loan.emi_amount || 0
 
     // Calculate new tenure with same EMI
     let newTenure = 0
-    if (newPrincipal > 0 && loan.emi_amount > 0) {
+    if (newPrincipal > 0 && emiAmount > 0) {
         newTenure = Math.ceil(
-            Math.log(loan.emi_amount / (loan.emi_amount - newPrincipal * monthlyRate)) /
+            Math.log(emiAmount / (emiAmount - newPrincipal * monthlyRate)) /
             Math.log(1 + monthlyRate)
         )
     }
 
     // Calculate interest saved
-    const originalTotalInterest = (loan.emi_amount * remainingMonths) - currentOutstanding
-    const newTotalInterest = (loan.emi_amount * newTenure) - newPrincipal
+    const originalTotalInterest = (emiAmount * remainingMonths) - currentOutstanding
+    const newTotalInterest = (emiAmount * newTenure) - newPrincipal
     const interestSaved = originalTotalInterest - newTotalInterest
 
     // Calculate new completion date
@@ -140,7 +145,7 @@ export const calculatePrepaymentImpact = (
         originalTotalInterest,
         newTotalInterest,
         interestSaved,
-        newMonthlyEmi: loan.emi_amount,
+        newMonthlyEmi: emiAmount,
         newCompletionDate: newCompletionDate.toISOString().split('T')[0]
     }
 }

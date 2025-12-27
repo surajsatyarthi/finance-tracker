@@ -207,7 +207,7 @@ export default function EMITracker() {
         type: 'expense',
         category: 'EMI', // Ensure category exists or string
         description: `EMI: ${emi.name}`,
-        paymentMethod: 'Credit Card', // Default or ask?
+        payment_method: 'Credit Card', // Fixed: snake_case
         date: new Date().toISOString(), // Today
       })
       showNotification('Example transaction posted', 'success')

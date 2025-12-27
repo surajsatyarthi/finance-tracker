@@ -400,7 +400,6 @@ export default function CreditCardDetailPage() {
                                                         <td className="px-4 py-3 text-sm text-gray-500">{txn.subcategory || 'Uncategorized'}</td>
                                                         <td className="px-4 py-3 text-sm font-medium text-gray-900">{formatCurrency(txn.amount)}</td>
                                                     </tr>
-                                                    </tr>
                                                 ))}
                                             </tbody>
                                         </table>

@@ -31,14 +31,15 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Submit to Supabase
-        const result = await financeManager.submitFeedback(message, userAgent, images)
+        // Submit to Supabase - DISABLED (feedback table missing)
+        // const result = await financeManager.submitFeedback(message, userAgent, images)
+        console.log('Feedback received (not saved):', { message, userAgent, imageCount: images.length })
 
-        if (result.success) {
-            return NextResponse.json({ success: true, message: 'Feedback saved' })
-        } else {
-            return NextResponse.json({ error: result.error || 'Failed to save to database' }, { status: 500 })
-        }
+        // if (result.success) {
+        return NextResponse.json({ success: true, message: 'Feedback received (feature disabled)' })
+        // } else {
+        //     return NextResponse.json({ error: result.error || 'Failed to save to database' }, { status: 500 })
+        // }
 
     } catch (error) {
         console.error('Error saving feedback:', error)

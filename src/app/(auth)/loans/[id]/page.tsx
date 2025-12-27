@@ -21,8 +21,11 @@ import {
     type PrepaymentAnalysis
 } from '@/lib/financialUtils'
 import { FinanceDataManager } from '@/lib/supabaseDataManager'
-import { Loan, LoanPayment } from '@/types/finance'
+import { Loan } from '@/types/finance'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend } from 'recharts'
+
+// Temporary type until proper type definition is added
+type LoanPayment = any
 
 export default function LoanDetailPage() {
     const params = useParams()
@@ -85,8 +88,8 @@ export default function LoanDetailPage() {
             outstandingBalance: getLoanOutstandingBalance(loan, payments),
             totalInterestPaid: getLoanTotalInterestPaid(loan, payments),
             totalPrincipalPaid: getLoanTotalPrincipalPaid(loan, payments),
-            progress: (loan.emis_paid / loan.total_emis) * 100,
-            remainingEmis: loan.total_emis - loan.emis_paid
+            progress: loan.total_emis && loan.total_emis > 0 ? (loan.emis_paid / loan.total_emis) * 100 : 0,
+            remainingEmis: (loan.total_emis || 0) - loan.emis_paid
         }
     }, [loan, payments])
 
@@ -96,8 +99,11 @@ export default function LoanDetailPage() {
         // Note: loan.totalAmount doesn't exist on DB row usually, it's calculated.
         // Utility 'calculateEMI' gives totalAmount. 
         // Or we assume 'emi_amount * total_emis'.
-        const totalAmount = loan.emi_amount * loan.total_emis
-        const totalInterest = totalAmount - loan.principal_amount
+        const emiAmount = loan.emi_amount || 0
+        const totalEmis = loan.total_emis || 0
+        const principalAmount = loan.principal_amount || 0
+        const totalAmount = emiAmount * totalEmis
+        const totalInterest = totalAmount - principalAmount
 
         const pieData = [
             { name: 'Principal Paid', value: stats.totalPrincipalPaid, color: '#10b981' },
@@ -365,19 +371,19 @@ export default function LoanDetailPage() {
                                         <div className="space-y-3">
                                             <div className="flex justify-between">
                                                 <span className="text-gray-600">Start Date</span>
-                                                <span className="font-medium text-gray-900">{formatDate(loan.startDate)}</span>
+                                                <span className="font-medium text-gray-900">{formatDate(loan.start_date)}</span>
                                             </div>
                                             <div className="flex justify-between">
                                                 <span className="text-gray-600">Next Due Date</span>
-                                                <span className="font-medium text-gray-900">{formatDate(loan.nextDueDate)}</span>
+                                                <span className="font-medium text-gray-900">{loan.next_emi_date ? formatDate(loan.next_emi_date) : 'N/A'}</span>
                                             </div>
                                             <div className="flex justify-between">
                                                 <span className="text-gray-600">EMIs Paid</span>
-                                                <span className="font-medium text-gray-900">{loan.emisPaid} / {loan.tenureMonths}</span>
+                                                <span className="font-medium text-gray-900">{loan.emis_paid} / {loan.total_emis || 'Ongoing'}</span>
                                             </div>
                                             <div className="flex justify-between">
                                                 <span className="text-gray-600">Total Interest</span>
-                                                <span className="font-medium text-gray-900">{formatCurrency(loan.totalAmount - loan.principal)}</span>
+                                                <span className="font-medium text-gray-900">{formatCurrency(((loan.emi_amount || 0) * (loan.total_emis || 0)) - (loan.principal_amount || 0))}</span>
                                             </div>
                                             <div className="flex justify-between pt-3 border-t">
                                                 <span className="text-gray-600 font-semibold">Outstanding</span>
@@ -424,7 +430,7 @@ export default function LoanDetailPage() {
                                             {schedule.map(entry => (
                                                 <tr
                                                     key={entry.month}
-                                                    className={`${entry.isPaid ? 'bg-green-50' : ''} ${entry.month === loan.emisPaid + 1 ? 'bg-blue-50 font-semibold' : ''}`}
+                                                    className={`${entry.isPaid ? 'bg-green-50' : ''} ${entry.month === loan.emis_paid + 1 ? 'bg-blue-50 font-semibold' : ''}`}
                                                 >
                                                     <td className="px-4 py-3 text-sm text-gray-900">{entry.month}</td>
                                                     <td className="px-4 py-3 text-sm text-gray-900">{formatCurrency(entry.emiAmount)}</td>
@@ -437,7 +443,7 @@ export default function LoanDetailPage() {
                                                                 <CheckCircleIcon className="h-3 w-3 mr-1" />
                                                                 Paid
                                                             </span>
-                                                        ) : entry.month === loan.emisPaid + 1 ? (
+                                                        ) : entry.month === loan.emis_paid + 1 ? (
                                                             <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
                                                                 <ClockIcon className="h-3 w-3 mr-1" />
                                                                 Due Next

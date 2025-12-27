@@ -12,15 +12,15 @@ export async function generateDailySummary(userId: string) {
     // 2. Calculations
     const totalAssets = liquidity.totalLiquidity
 
-    const totalLoanOutstanding = loans.reduce((sum, l) => sum + (l.currentBalance || 0), 0)
-    const totalCCOutstanding = cards.reduce((sum, c) => sum + (c.currentBalance || 0), 0)
+    const totalLoanOutstanding = loans.reduce((sum, l) => sum + (l.current_balance || 0), 0)
+    const totalCCOutstanding = cards.reduce((sum, c) => sum + (c.current_balance || 0), 0)
     const totalLiabilities = totalLoanOutstanding + totalCCOutstanding
 
     const netWorth = totalAssets - totalLiabilities
 
     const currentMonthEmis = loans
-        .filter(l => l.type === 'EMI' && l.isActive)
-        .reduce((sum, l) => sum + (l.monthlyAmount || 0), 0)
+        .filter(l => l.type === 'EMI' && l.is_active)
+        .reduce((sum, l) => sum + (l.emi_amount || 0), 0)
 
     // 3. Formatting
     const formatMoney = (amount: number) =>
@@ -48,8 +48,8 @@ export async function generateDailySummary(userId: string) {
     <ul>
       ${goals.map(g => `
         <li>
-          <strong>${g.name}:</strong> ${formatMoney(g.currentAmount)} / ${formatMoney(g.targetAmount)} 
-          (${Math.round((g.currentAmount / g.targetAmount) * 100)}%)
+          <strong>${g.name}:</strong> ${formatMoney(g.current_amount)} / ${formatMoney(g.target_amount)} 
+          (${Math.round((g.current_amount / g.target_amount) * 100)}%)
         </li>
       `).join('')}
     </ul>
@@ -69,7 +69,7 @@ Liabilities:
 - Monthly EMI: ${formatMoney(currentMonthEmis)}
 
 Goals:
-${goals.map(g => `- ${g.name}: ${Math.round((g.currentAmount / g.targetAmount) * 100)}%`).join('\n')}
+${goals.map(g => `- ${g.name}: ${Math.round((g.current_amount / g.target_amount) * 100)}%`).join('\n')}
   `
 
     return { html: emailHtml, text: textSummary }

@@ -140,7 +140,7 @@ export default function ReportsPage() {
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                     <XAxis dataKey="name" axisLine={false} tickLine={false} />
                                     <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `₹${val / 1000}k`} />
-                                    <Tooltip formatter={(value: number) => formatCurrency(value)} cursor={{ fill: '#f3f4f6' }} />
+                                    <Tooltip formatter={(value: number | undefined) => value !== undefined ? formatCurrency(value) : '₹0'} cursor={{ fill: '#f3f4f6' }} />
                                     <Legend iconType="circle" />
                                     <Bar dataKey="Income" fill="#10B981" radius={[4, 4, 0, 0]} maxBarSize={50} />
                                     <Bar dataKey="Expense" fill="#EF4444" radius={[4, 4, 0, 0]} maxBarSize={50} />
@@ -172,7 +172,7 @@ export default function ReportsPage() {
                                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                                 ))}
                                             </Pie>
-                                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                            <Tooltip formatter={(value: number | undefined) => value !== undefined ? formatCurrency(value) : '₹0'} />
                                         </PieChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -202,7 +202,7 @@ export default function ReportsPage() {
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                             <XAxis dataKey="date" axisLine={false} tickLine={false} />
                                             <YAxis domain={['auto', 'auto']} axisLine={false} tickLine={false} tickFormatter={(val) => `₹${val / 1000}k`} />
-                                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                            <Tooltip formatter={(value: number | undefined) => value !== undefined ? formatCurrency(value) : '₹0'} />
                                             <Line type="monotone" dataKey="value" stroke="#6366F1" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
                                         </LineChart>
                                     </ResponsiveContainer>

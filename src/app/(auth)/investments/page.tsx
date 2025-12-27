@@ -170,7 +170,7 @@ export default function InvestmentsPage() {
                                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                        <Tooltip formatter={(value: number | undefined) => value !== undefined ? formatCurrency(value) : '₹0'} />
                                         <Legend />
                                     </PieChart>
                                 </ResponsiveContainer>
