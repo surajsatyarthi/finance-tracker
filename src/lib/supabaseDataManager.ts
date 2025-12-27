@@ -1935,42 +1935,118 @@ export class FinanceDataManager {
     }
 
     try {
-      const categories = [
-        // Parent categories
-        { name: 'Food', type: 'expense' as const, parent: null, color: '#FF6B6B' },
-        { name: 'Transport', type: 'expense' as const, parent: null, color: '#4ECDC4' },
-        { name: 'Data & WiFi', type: 'expense' as const, parent: null, color: '#95E1D3' },
-        { name: 'Self Growth', type: 'expense' as const, parent: null, color: '#F38181' },
-        { name: 'Health', type: 'expense' as const, parent: null, color: '#AA96DA' },
-        { name: 'Grooming', type: 'expense' as const, parent: null, color: '#FCBAD3' },
-        { name: 'Clothing', type: 'expense' as const, parent: null, color: '#FFFFD2' },
-        { name: 'Insurance', type: 'expense' as const, parent: null, color: '#A8D8EA' },
-        { name: 'Subscriptions', type: 'expense' as const, parent: null, color: '#AA96DA' },
-        { name: 'Credit Card Charges', type: 'expense' as const, parent: null, color: '#FF6B6B' },
-        { name: 'Shopping', type: 'expense' as const, parent: null, color: '#4ECDC4' },
-        { name: 'Donations', type: 'expense' as const, parent: null, color: '#95E1D3' },
-        { name: 'Miscellaneous', type: 'expense' as const, parent: null, color: '#F38181' },
-        { name: 'Loan', type: 'expense' as const, parent: null, color: '#FFB6B9' },
+      // Step 1: Insert parent categories
+      const parentCategories = [
+        { name: 'Food', type: 'expense' as const, color: '#FF6B6B' },
+        { name: 'Transport', type: 'expense' as const, color: '#4ECDC4' },
+        { name: 'Data & WiFi', type: 'expense' as const, color: '#95E1D3' },
+        { name: 'Self Growth', type: 'expense' as const, color: '#F38181' },
+        { name: 'Health', type: 'expense' as const, color: '#AA96DA' },
+        { name: 'Grooming', type: 'expense' as const, color: '#FCBAD3' },
+        { name: 'Clothing', type: 'expense' as const, color: '#FFFFD2' },
+        { name: 'Insurance', type: 'expense' as const, color: '#A8D8EA' },
+        { name: 'Subscriptions', type: 'expense' as const, color: '#AA96DA' },
+        { name: 'Credit Card Charges', type: 'expense' as const, color: '#FF6B6B' },
+        { name: 'Shopping', type: 'expense' as const, color: '#4ECDC4' },
+        { name: 'Donations', type: 'expense' as const, color: '#95E1D3' },
+        { name: 'Miscellaneous', type: 'expense' as const, color: '#F38181' },
+        { name: 'Loan', type: 'expense' as const, color: '#FFB6B9' },
         // Income categories
-        { name: 'Business', type: 'income' as const, parent: null, color: '#10B981' },
-        { name: 'Salary', type: 'income' as const, parent: null, color: '#059669' },
-        { name: 'Other Income', type: 'income' as const, parent: null, color: '#047857' },
+        { name: 'Business', type: 'income' as const, color: '#10B981' },
+        { name: 'Salary', type: 'income' as const, color: '#059669' },
+        { name: 'Other Income', type: 'income' as const, color: '#047857' },
       ]
 
-      const { error } = await supabase.from('categories').insert(
-        categories.map(cat => ({
-          user_id: this.userId!,
-          name: cat.name,
-          type: cat.type,
-          color: cat.color,
-          parent_category_id: null
-        }))
-      )
+      const { data: insertedParents, error: parentError } = await supabase
+        .from('categories')
+        .insert(
+          parentCategories.map(cat => ({
+            user_id: this.userId!,
+            name: cat.name,
+            type: cat.type,
+            color: cat.color,
+            parent_category_id: null
+          }))
+        )
+        .select()
 
-      if (error) throw error
+      if (parentError) throw parentError
 
-      logger.info('Categories seeded successfully')
-      return { success: true, message: `${categories.length} categories created` }
+      // Step 2: Create a map of parent names to IDs
+      const parentMap: Record<string, string> = {}
+      insertedParents?.forEach(cat => {
+        parentMap[cat.name] = cat.id
+      })
+
+      // Step 3: Insert subcategories with parent references
+      const subcategories = [
+        // Food subcategories
+        { name: 'Groceries', parent: 'Food', color: '#FF6B6B' },
+        { name: 'Eating out', parent: 'Food', color: '#FF6B6B' },
+        { name: 'Swiggy', parent: 'Food', color: '#FF6B6B' },
+        { name: 'Dry fruits', parent: 'Food', color: '#FF6B6B' },
+        { name: 'Vegetables', parent: 'Food', color: '#FF6B6B' },
+        { name: 'Fruits', parent: 'Food', color: '#FF6B6B' },
+        { name: 'Snacks', parent: 'Food', color: '#FF6B6B' },
+        
+        // Transport subcategories
+        { name: 'Petrol', parent: 'Transport', color: '#4ECDC4' },
+        { name: 'Travel', parent: 'Transport', color: '#4ECDC4' },
+        { name: 'Bike Insurance', parent: 'Transport', color: '#4ECDC4' },
+        { name: 'Car Insurance', parent: 'Transport', color: '#4ECDC4' },
+        { name: 'Bike Pollution Certificate', parent: 'Transport', color: '#4ECDC4' },
+        { name: 'Car Pollution Certificate', parent: 'Transport', color: '#4ECDC4' },
+        
+        // Data & WiFi subcategories
+        { name: 'Jio', parent: 'Data & WiFi', color: '#95E1D3' },
+        { name: 'Airtel', parent: 'Data & WiFi', color: '#95E1D3' },
+        { name: 'WiFi', parent: 'Data & WiFi', color: '#95E1D3' },
+        
+        // Self Growth subcategories
+        { name: 'Books', parent: 'Self Growth', color: '#F38181' },
+        
+        // Health subcategories
+        { name: 'Chef', parent: 'Health', color: '#AA96DA' },
+        { name: 'Yoga instructor', parent: 'Health', color: '#AA96DA' },
+        { name: 'Supplements + Vitamins', parent: 'Health', color: '#AA96DA' },
+        { name: 'Medicine', parent: 'Health', color: '#AA96DA' },
+        { name: 'Fitness bootcamp', parent: 'Health', color: '#AA96DA' },
+        
+        // Grooming subcategories
+        { name: 'Haircut', parent: 'Grooming', color: '#FCBAD3' },
+        { name: 'Toiletries', parent: 'Grooming', color: '#FCBAD3' },
+        
+        // Subscriptions subcategories
+        { name: 'Youtube', parent: 'Subscriptions', color: '#AA96DA' },
+        { name: 'Google One', parent: 'Subscriptions', color: '#AA96DA' },
+        { name: 'Grok', parent: 'Subscriptions', color: '#AA96DA' },
+        { name: 'LinkedIn Premium', parent: 'Subscriptions', color: '#AA96DA' },
+        
+        // Loan subcategories
+        { name: 'Education Loan', parent: 'Loan', color: '#FFB6B9' },
+        
+        // Credit Card Charges subcategories
+        { name: 'Credit Card Monthly', parent: 'Credit Card Charges', color: '#FF6B6B' },
+        { name: 'Credit Card EMI', parent: 'Credit Card Charges', color: '#FF6B6B' },
+      ]
+
+      const { error: subError } = await supabase
+        .from('categories')
+        .insert(
+          subcategories.map(cat => ({
+            user_id: this.userId!,
+            name: cat.name,
+            type: 'expense' as const,
+            color: cat.color,
+            parent_category_id: parentMap[cat.parent]
+          }))
+        )
+
+      if (subError) throw subError
+
+      const totalCount = parentCategories.length + subcategories.length
+      logger.info(`Categories seeded successfully: ${totalCount} total (${parentCategories.length} parents, ${subcategories.length} subcategories)`)
+      return { success: true, message: `${totalCount} categories created` }
     } catch (error) {
       logger.error('Failed to seed categories', error)
       return { success: false, error: 'Failed to seed categories' }
