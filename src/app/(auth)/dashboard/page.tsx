@@ -160,14 +160,11 @@ export default function Dashboard() {
         // Checks inside seedLoans for existence
         promises.push(financeManager.seedLoans(initialLoans))
 
-        // DISABLED: This was causing deleted cards to resurrect
-        // Auto-seed only runs on FIRST-TIME user setup, not every dashboard load
-        // User can manually add cards via UI
-        // const needsRestock = existingCards.length === 0 || (existingCards.length > 0 && !existingCards[0].benefits)
-        // if (needsRestock) {
-        //   promises.push(financeManager.seedCreditCards(initialCards))
-        //   seeded = true
-        // }
+        // Now safe - will only seed for first-time users, never overwrites existing cards
+        if (existingCards.length === 0) {
+          promises.push(financeManager.seedCreditCards(initialCards))
+          seeded = true
+        }
 
         // 4. Seed Budget (always try idempotent upsert if we seeded anything else, or just check?)
         // Let's seed budget if we seeded accounts, or just for safety.

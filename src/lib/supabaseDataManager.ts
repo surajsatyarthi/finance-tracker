@@ -1535,14 +1535,25 @@ export class FinanceDataManager {
   async seedCreditCards(cards: any[]) { // Using any to avoid strict type mismatch with new fields
     if (!this.userId) await this.initialize()
 
-    for (const c of cards) {
-      const { data: existing } = await supabase
-        .from('credit_cards')
-        .select('id')
-        .eq('user_id', this.userId!)
-        .eq('name', c.name)
-        .maybeSingle()
+    // Check if user already has credit cards - if yes, skip seeding
+    const { data: existingCards, error: checkError } = await supabase
+      .from('credit_cards')
+      .select('id')
+      .eq('user_id', this.userId!)
+      .limit(1)
 
+    if (checkError) {
+      logger.error('Error checking existing credit cards', checkError)
+      return { success: false, error: 'Failed to check existing credit cards' }
+    }
+
+    if (existingCards && existingCards.length > 0) {
+      logger.info('Credit cards already exist, skipping seed')
+      return { success: true, message: 'Credit cards already exist' }
+    }
+
+    // Only insert if truly no cards exist (first-time user)
+    for (const c of cards) {
       // Convert "20 Aug" to 20 for due_date
       let dueDate = 1
       if (typeof c.paymentDate === 'string') {
@@ -1556,7 +1567,7 @@ export class FinanceDataManager {
         user_id: this.userId!,
         name: c.name,
         credit_limit: c.limit || 0,
-        current_balance: existing ? undefined : 0,
+        current_balance: 0,
         due_date: dueDate,
         statement_date: typeof c.statementDate === 'number' ? c.statementDate : parseInt(c.statementDate || '1'),
         last_four_digits: c.number.slice(-4),
@@ -1580,32 +1591,37 @@ export class FinanceDataManager {
           },
           waveOffLimit: c.waveOffLimit,
           renewalMonth: c.renewalMonth
-        },
-        updated_at: new Date().toISOString()
+        }
       }
 
-      if (existing) {
-        await supabase.from('credit_cards').update(cardData).eq('id', existing.id)
-      } else {
-        await supabase.from('credit_cards').insert(cardData)
-      }
+      await supabase.from('credit_cards').insert(cardData)
     }
+    
+    logger.info('Credit cards seeded successfully (first-time user)', { count: cards.length })
     return { success: true }
   }
 
   async seedLiquidity(accounts: { name: string; type: string; balance: number; currency: string }[]) {
     if (!this.userId) await this.initialize()
 
-    // Clean replacement: Delete all existing accounts and insert fresh
-    // This ensures exact match with the provided baseline data (Dec 19, 2025)
-
-    // Step 1: Delete all existing accounts for this user
-    await supabase
+    // Check if user already has accounts - if yes, skip seeding
+    const { data: existing, error: checkError } = await supabase
       .from('accounts')
-      .delete()
+      .select('id')
       .eq('user_id', this.userId!)
+      .limit(1)
 
-    // Step 2: Insert all new accounts with exact names as provided
+    if (checkError) {
+      logger.error('Error checking existing accounts', checkError)
+      return { success: false, error: 'Failed to check existing accounts' }
+    }
+
+    if (existing && existing.length > 0) {
+      logger.info('Accounts already exist, skipping seed')
+      return { success: true, message: 'Accounts already exist' }
+    }
+
+    // Only insert if truly no accounts exist (first-time user)
     for (const acc of accounts) {
       await supabase
         .from('accounts')
@@ -1619,7 +1635,7 @@ export class FinanceDataManager {
         })
     }
 
-    logger.info('Accounts seeded successfully', { count: accounts.length })
+    logger.info('Accounts seeded successfully (first-time user)', { count: accounts.length })
     return { success: true }
   }
 
