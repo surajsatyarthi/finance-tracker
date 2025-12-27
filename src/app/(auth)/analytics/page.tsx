@@ -131,7 +131,7 @@ export default function AnalyticsPage() {
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                     <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                                     <YAxis tick={{ fontSize: 12 }} />
-                                    <Tooltip formatter={(val: number) => `₹${val}`} />
+                                    <Tooltip formatter={(val: number | undefined) => val ? `₹${val}` : '₹0'} />
                                     <Area type="monotone" dataKey="amount" stroke="#6366f1" fill="#e0e7ff" />
                                 </AreaChart>
                             </ResponsiveContainer>
@@ -157,7 +157,7 @@ export default function AnalyticsPage() {
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
                                     </Pie>
-                                    <Tooltip formatter={(val: number) => `₹${val}`} />
+                                    <Tooltip formatter={(val: number | undefined) => val ? `₹${val}` : '₹0'} />
                                     <Legend />
                                 </PieChart>
                             </ResponsiveContainer>
@@ -173,7 +173,7 @@ export default function AnalyticsPage() {
                                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                     <XAxis type="number" hide />
                                     <YAxis dataKey="name" type="category" width={80} />
-                                    <Tooltip formatter={(val: number) => `₹${val}`} cursor={{ fill: 'transparent' }} />
+                                    <Tooltip formatter={(val: number | undefined) => val ? `₹${val}` : '₹0'} cursor={{ fill: 'transparent' }} />
                                     <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
                                         {getCashFlow().map((entry, index) => (
                                             <Cell key={`cell-${index}`} fill={entry.fill} />

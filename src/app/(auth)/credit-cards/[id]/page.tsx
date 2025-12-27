@@ -364,7 +364,7 @@ export default function CreditCardDetailPage() {
                                                 <div key={txn.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                                                     <div>
                                                         <p className="font-medium text-gray-900">{txn.description}</p>
-                                                        <p className="text-sm text-gray-500">{formatDate(txn.date)} • {txn.category}</p>
+                                                        <p className="text-sm text-gray-500">{formatDate(txn.date)} • {txn.subcategory || 'Uncategorized'}</p>
                                                     </div>
                                                     <p className="text-lg font-semibold text-gray-900">{formatCurrency(txn.amount)}</p>
                                                 </div>
@@ -390,7 +390,6 @@ export default function CreditCardDetailPage() {
                                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
                                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
                                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="bg-white divide-y divide-gray-200">
@@ -398,16 +397,9 @@ export default function CreditCardDetailPage() {
                                                     <tr key={txn.id} className="hover:bg-gray-50">
                                                         <td className="px-4 py-3 text-sm text-gray-900">{formatDate(txn.date)}</td>
                                                         <td className="px-4 py-3 text-sm text-gray-900">{txn.description}</td>
-                                                        <td className="px-4 py-3 text-sm text-gray-500">{txn.category}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-500">{txn.subcategory || 'Uncategorized'}</td>
                                                         <td className="px-4 py-3 text-sm font-medium text-gray-900">{formatCurrency(txn.amount)}</td>
-                                                        <td className="px-4 py-3 text-sm">
-                                                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${txn.status === 'paid' ? 'bg-green-100 text-green-800' :
-                                                                txn.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                                                    'bg-gray-100 text-gray-800'
-                                                                }`}>
-                                                                {txn.status}
-                                                            </span>
-                                                        </td>
+                                                    </tr>
                                                     </tr>
                                                 ))}
                                             </tbody>
