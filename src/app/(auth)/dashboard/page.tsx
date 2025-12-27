@@ -14,13 +14,6 @@ import {
 } from '@heroicons/react/24/outline'
 import Link from 'next/link' // Existing
 
-
-import { initialLiquidity } from '@/lib/liquidityData'
-import { initialGoals } from '@/lib/goalsData'
-import { initialCards } from '@/lib/cardsData'
-import { initialDebitCards } from '@/lib/debitCardsData'
-import { budgetProjections2025 } from '@/lib/budgetData'
-import { initialLoans } from '@/lib/loansData'
 import { useNotification } from '@/contexts/NotificationContext'
 // ... imports
 
@@ -122,80 +115,13 @@ export default function Dashboard() {
   const [refreshTrigger, setRefreshTrigger] = useState(0)
 
 
-  // Auto-seed data on mount (User Request for direct persistence)
+  // No auto-seeding needed - this is a personal app with real data in production database
+  // All accounts, cards, loans, categories are managed directly through the UI
   useEffect(() => {
-    const seedData = async () => {
-      if (!user) return
-
-      try {
-        // Fetch current counts to decide what to seed
-        const [existingAccounts, existingGoals, existingCards, existingCategories] = await Promise.all([
-          financeManager.getAccounts(),
-          financeManager.getGoals(),
-          financeManager.getCreditCards(),
-          financeManager.getCategories()
-        ])
-
-        const promises = []
-        let seeded = false
-
-        // 0. Seed Categories FIRST (critical for transactions)
-        if (existingCategories.length === 0) {
-          promises.push(financeManager.seedCategories())
-          seeded = true
-        }
-
-        // 1. Seed Accounts if empty
-        if (existingAccounts.length === 0) {
-          promises.push(financeManager.seedLiquidity(initialLiquidity))
-          seeded = true
-        }
-
-        // 2. Seed Goals if empty
-        if (existingGoals.length === 0) {
-          promises.push(financeManager.seedGoals(initialGoals))
-          seeded = true
-        }
-
-        // 3. Seed Loans if missing (Fix for Zero Outstanding Loan)
-        // Checks inside seedLoans for existence
-        promises.push(financeManager.seedLoans(initialLoans))
-
-        // Now safe - will only seed for first-time users, never overwrites existing cards
-        if (existingCards.length === 0) {
-          promises.push(financeManager.seedCreditCards(initialCards))
-          seeded = true
-        }
-
-        // Seed debit cards for first-time users
-        const { data: existingDebitCards } = await financeManager.getDebitCards()
-        if (!existingDebitCards || existingDebitCards.length === 0) {
-          promises.push(financeManager.seedDebitCards(initialDebitCards))
-          seeded = true
-        }
-
-        // 4. Seed Budget (always try idempotent upsert if we seeded anything else, or just check?)
-        // Let's seed budget if we seeded accounts, or just for safety.
-        // It's low cost upsert.
-        if (seeded) {
-          promises.push(financeManager.importYearlyBudget(2026, budgetProjections2025))
-        }
-
-        if (promises.length > 0) {
-          await Promise.all(promises)
-          setRefreshTrigger(prev => prev + 1)
-
-        }
-
-      } catch (e) {
-        console.error('Auto-seed failed', e)
-      }
-    }
-
-    // Slight delay to ensure auth is stable
+    // Just refresh data on mount
     const timer = setTimeout(() => {
-      seedData()
-    }, 1500)
+      setRefreshTrigger(prev => prev + 1)
+    }, 500)
 
     return () => clearTimeout(timer)
   }, [user, showNotification])

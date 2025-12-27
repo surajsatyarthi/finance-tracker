@@ -19,7 +19,6 @@ import {
 } from '@heroicons/react/24/outline'
 import Link from 'next/link'
 import { financeManager } from '@/lib/supabaseDataManager'
-import { initialCards } from '@/lib/cardsData'
 import GlassCard from '@/components/GlassCard'
 import { usePrivacy } from '@/contexts/PrivacyContext'
 import { useNotification } from '@/contexts/NotificationContext'
