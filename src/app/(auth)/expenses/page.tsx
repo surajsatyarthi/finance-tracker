@@ -13,6 +13,8 @@ import {
   PlusIcon
 } from '@heroicons/react/24/outline'
 import Link from 'next/link'
+import { findParentCategory, getColorForParent } from '@/lib/categoryColors'
+import CategoryLegend from '@/components/CategoryLegend'
 
 interface ExpenseTransaction {
   id: string
@@ -51,7 +53,6 @@ export default function Expenses() {
   // Load expenses from Supabase
   useEffect(() => {
     if (!user) return // Wait for user to be loaded
-
     const loadExpenses = async () => {
       try {
         const { supabase } = await import('@/lib/supabase')
@@ -125,7 +126,7 @@ export default function Expenses() {
     return filteredSorted.slice(start, start + pageSize)
   }, [filteredSorted, page, pageSize])
 
-  const totalPages = Math.ceil(filteredSorted.length / pageSize)
+  const totalPages = Math.max(1, Math.ceil(filteredSorted.length / pageSize))
 
   const summaryStats = useMemo(() => {
     const currentMonth = new Date().getMonth() + 1
@@ -133,8 +134,7 @@ export default function Expenses() {
 
     const currentMonthExpenses = expenses.filter(expense => {
       const expenseDate = new Date(expense.date)
-      return expenseDate.getMonth() + 1 === currentMonth &&
-        expenseDate.getFullYear() === currentYear
+      return expenseDate.getMonth() + 1 === currentMonth && expenseDate.getFullYear() === currentYear
     })
 
     return {
@@ -204,7 +204,7 @@ export default function Expenses() {
               Add Expense
             </Link>
           </div>
-
+            <CategoryLegend />
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -329,7 +329,7 @@ export default function Expenses() {
             </p>
           </div>
 
-          <div className="overflow-x-auto">
+            <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -340,34 +340,61 @@ export default function Expenses() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {paginatedExpenses.map((expense, index) => (
-                  <tr key={expense.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDate(expense.date)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">
-                        {expense.description || 'No description'}
-                      </div>
-                      {expense.subcategory && (
-                        <div className="text-sm text-gray-500">{expense.subcategory}</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        {getPaymentMethodIcon(expense.payment_method)}
-                        <span className="ml-2 text-sm text-gray-900 capitalize">
-                          {expense.payment_method.replace('_', ' ')}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <span className="text-sm font-bold text-red-600">
-                        {formatCurrency(expense.amount)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {
+                  // Group paginated expenses by parent category for colored headers
+                  (() => {
+                    const groups = new Map<string, ExpenseTransaction[]>()
+                    paginatedExpenses.forEach((exp) => {
+                      const candidate = exp.subcategory || exp.description || ''
+                      const parent = findParentCategory(candidate) || 'Other'
+                      if (!groups.has(parent)) groups.set(parent, [])
+                      groups.get(parent)!.push(exp)
+                    })
+
+                    const rows: any[] = []
+                    let gi = 0
+                    groups.forEach((items, parent) => {
+                      const color = getColorForParent(parent === 'Other' ? null : parent)
+                      // group header
+                      rows.push(
+                        <tr key={`group-${gi++}`} className={`${color.headerBg} font-semibold border-b ${color.headerBorder}`}>
+                          <td className={`sticky left-0 z-10 px-4 py-2 border-r ${color.headerBorder} ${color.headerText}`}>{parent}</td>
+                          <td colSpan={2} className={`px-3 py-2 ${color.headerText}`}></td>
+                          <td className={`px-4 py-2 text-right font-semibold bg-red-100 text-red-800 tabular-nums`}></td>
+                        </tr>
+                      )
+
+                      // children
+                      items.forEach((expense) => {
+                        rows.push(
+                          <tr key={expense.id} className={`bg-white hover:bg-gray-50 transition-colors border-b ${color.rowBorder}`}>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(expense.date)}</td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center">
+                                <span className={`inline-block w-3 h-3 rounded-full mr-3 ${color.dot}`}></span>
+                                <div>
+                                  <div className="text-sm font-medium text-gray-900">{expense.description || 'No description'}</div>
+                                  {expense.subcategory && <div className="text-sm text-gray-500">{expense.subcategory}</div>}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                {getPaymentMethodIcon(expense.payment_method)}
+                                <span className="ml-2 text-sm text-gray-900 capitalize">{expense.payment_method.replace('_', ' ')}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                              <span className="text-sm font-bold text-red-600">{formatCurrency(expense.amount)}</span>
+                            </td>
+                          </tr>
+                        )
+                      })
+                    })
+
+                    return rows
+                  })()
+                }
               </tbody>
             </table>
           </div>

@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
+import { parentCategories as PARENT_CATEGORIES, getColorForParent, findParentCategory } from '@/lib/categoryColors'
+import CategoryLegend from '@/components/CategoryLegend'
 
 // 12 months: Jan 2026 to Dec 2026
 const monthColumns = [
@@ -111,12 +113,7 @@ export default function BudgetPage() {
     return amount.toLocaleString('en-IN')
   }
 
-  // Parent categories (highlighted in yellow)
-  const parentCategories = [
-    'Loan', 'Transport', 'Data', 'Self Growth', 'Food', 'Grooming',
-    'Health', 'Clothing', 'Insurance', 'Subscriptions', 'Credit Card Monthly',
-    'Credit Card EMI', 'Shopping', 'Misc'
-  ]
+  const parentCategories = PARENT_CATEGORIES
 
   const isParent = (cat: string) => parentCategories.includes(cat)
 
@@ -134,6 +131,7 @@ export default function BudgetPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Budget (Jan 2026 - Dec 2026)</h1>
           <p className="text-gray-600">12-Month Budget Allocation</p>
+          <CategoryLegend />
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
@@ -156,33 +154,84 @@ export default function BudgetPage() {
             </thead>
 
             <tbody className="text-gray-900">
-              {budgetData.map((item, rowIdx) => {
-                const isParentRow = isParent(item.category)
-                const rowTotal = categoryTotals[item.category]
-                const monthlyValues = categoryMonthlyValues[item.category] || []
+              {/** Group categories into parents + subcategories **/}
+              {
+                // Build grouped structure where parent (from parentCategories) collects matching children
+                (() => {
+                  const groups: Array<{ parent: string; children: CategoryData[] }> = []
+                  const remaining = new Map(budgetData.map(d => [d.category, d]))
 
-                return (
-                  <tr
-                    key={item.category}
-                    className={`
-                      ${isParentRow ? 'bg-yellow-200 font-semibold' : rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
-                      hover:bg-gray-100 transition-colors border-b border-gray-200
-                    `}
-                  >
-                    <td className={`sticky left-0 z-10 px-4 py-2 border-r border-gray-200 text-gray-900 ${isParentRow ? 'bg-yellow-200' : rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                      {item.category}
-                    </td>
-                    {monthlyValues.map((limit, monthIdx) => (
-                      <td key={monthIdx} className="px-3 py-2 text-right border-r border-gray-200 tabular-nums text-gray-900">
-                        {formatCurrency(limit)}
-                      </td>
-                    ))}
-                    <td className="px-4 py-2 text-right font-semibold bg-red-100 text-red-800 tabular-nums">
-                      {formatCurrency(rowTotal)}
-                    </td>
-                  </tr>
-                )
-              })}
+                  // Collect children for known parent categories
+                  parentCategories.forEach(parent => {
+                    const children = budgetData.filter(item => {
+                      const cat = item.category
+                      return cat === parent || cat.startsWith(parent) || cat.includes(`${parent} -`) || cat.includes(`${parent}:`) || cat.includes(`${parent} `)
+                    })
+
+                    if (children.length) {
+                      children.forEach(c => remaining.delete(c.category))
+                      groups.push({ parent, children })
+                    }
+                  })
+
+                  // Add any remaining categories as individual groups
+                  Array.from(remaining.values()).forEach(item => {
+                    groups.push({ parent: item.category, children: [item] })
+                  })
+
+                  return groups.map((g, gIdx) => {
+                    // compute monthly sums for group
+                    const groupMonthly = Array(12).fill(0)
+                    g.children.forEach(ch => ch.limits.forEach((v, i) => groupMonthly[i] += v))
+                    const groupTotal = groupMonthly.reduce((s, v) => s + v, 0)
+
+                    const showAsParentHeader = g.children.length > 1 || parentCategories.includes(g.parent)
+                    const color = getColorForParent(g.parent)
+
+                    return (
+                      <tbody key={`group-${gIdx}`}>
+                        {showAsParentHeader && (
+                          <tr className={`${color.headerBg} font-semibold border-b ${color.headerBorder}`}>
+                            <td className={`sticky left-0 z-10 px-4 py-2 border-r ${color.headerBorder} ${color.headerText}`}> {g.parent} </td>
+                            {groupMonthly.map((m, mi) => (
+                              <td key={mi} className={`px-3 py-2 text-right border-r ${color.headerBorder} tabular-nums ${color.headerText}`}>{formatCurrency(m)}</td>
+                            ))}
+                            <td className={`px-4 py-2 text-right font-semibold bg-red-100 text-red-800 tabular-nums`}>{formatCurrency(groupTotal)}</td>
+                          </tr>
+                        )}
+
+                        {g.children.map((item, rowIdx) => {
+                          const monthlyValues = item.limits || []
+                          const rowTotal = (monthlyValues || []).reduce((s, v) => s + v, 0)
+                          const isParentRow = parentCategories.includes(item.category) && g.children.length === 1
+
+                          return (
+                            <tr key={item.category} className={`bg-white hover:bg-gray-50 transition-colors border-b ${color.rowBorder}`}>
+                              <td className={`sticky left-0 z-10 px-4 py-2 border-r ${color.rowBorder} text-gray-900`}>
+                                <div className="flex items-center">
+                                  {/* colored dot indicating category */}
+                                  <span className={`inline-block w-3 h-3 rounded-full mr-3 ${color.dot}`}></span>
+                                  {!showAsParentHeader ? (
+                                    <span>{item.category}</span>
+                                  ) : (
+                                    <div className="pl-2 text-sm">{item.category.replace(`${g.parent}`, '').replace(/^[-:\s]+/, '') || item.category}</div>
+                                  )}
+                                </div>
+                              </td>
+                              {monthlyValues.map((limit, monthIdx) => (
+                                <td key={monthIdx} className={`px-3 py-2 text-right border-r ${color.rowBorder} tabular-nums text-gray-900`}>
+                                  {formatCurrency(limit)}
+                                </td>
+                              ))}
+                              <td className="px-4 py-2 text-right font-semibold bg-red-100 text-red-800 tabular-nums">{formatCurrency(rowTotal)}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    )
+                  })
+                })()
+              }
 
               {/* Total Row */}
               <tr className="bg-yellow-300 font-bold border-t-2 border-yellow-500">

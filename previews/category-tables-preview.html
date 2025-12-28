@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Category Color Preview</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; background:#f7fafc; color:#111827; padding:24px }
+    h1{font-size:20px;margin:0 0 6px}
+    .card{background:white;border-radius:10px;padding:16px;margin-bottom:18px;box-shadow:0 1px 2px rgba(0,0,0,0.04);border:1px solid #e5e7eb}
+    .legend{display:flex;flex-wrap:wrap;gap:10px}
+    .swatch{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;background:#fff;border:1px solid #eee}
+    .dot{width:18px;height:18px;border-radius:4px;display:inline-block}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th, td{padding:10px;border:1px solid #e6e6e6;font-size:13px}
+    th{background:#fff7ed;font-weight:700;text-align:left}
+    .category-header{font-weight:700}
+    .dot-sm{width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:8px}
+    /* color palette (approx) */
+    .c-Loan{background:#fbd38d;border-color:#f6ad55}
+    .c-Transport{background:#7dd3fc;border-color:#38bdf8}
+    .c-Data{background:#c7b3ff;border-color:#a78bfa}
+    .c-Self\ Growth{background:#86efac;border-color:#34d399}
+    .c-Food{background:#ffb3c6;border-color:#fb7185}
+    .c-Grooming{background:#fbcfe8;border-color:#f472b6}
+    .c-Health{background:#d9f99d;border-color:#bef264}
+    .c-Clothing{background:#bcd3ff;border-color:#60a5fa}
+    .c-Subscriptions{background:#e6eef8;border-color:#c7d2fe}
+    .c-Credit{background:#fde68a;border-color:#facc15}
+    .c-Shopping{background:#f5c6ff;border-color:#e879f9}
+    .c-Misc{background:#e6e6e6;border-color:#cfcfcf}
+
+    .header-row{background:#fef3c7}
+    .total-col{background:#fee2e2;color:#991b1b;font-weight:700}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Legend</h1>
+    <p style="margin:4px 0 8px;color:#6b7280">Category → color mapping (preview)</p>
+    <div class="legend">
+      <div class="swatch"><span class="dot c-Loan"></span><div>Loan</div></div>
+      <div class="swatch"><span class="dot c-Transport"></span><div>Transport</div></div>
+      <div class="swatch"><span class="dot c-Data"></span><div>Data</div></div>
+      <div class="swatch"><span class="dot c-Self\ Growth"></span><div>Self Growth</div></div>
+      <div class="swatch"><span class="dot c-Food"></span><div>Food</div></div>
+      <div class="swatch"><span class="dot c-Grooming"></span><div>Grooming</div></div>
+      <div class="swatch"><span class="dot c-Health"></span><div>Health</div></div>
+      <div class="swatch"><span class="dot c-Clothing"></span><div>Clothing</div></div>
+      <div class="swatch"><span class="dot c-Subscriptions"></span><div>Subscriptions</div></div>
+      <div class="swatch"><span class="dot c-Credit"></span><div>Credit Card</div></div>
+      <div class="swatch"><span class="dot c-Shopping"></span><div>Shopping</div></div>
+      <div class="swatch"><span class="dot c-Misc"></span><div>Misc</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h1>Budget Table (sample)</h1>
+    <p style="margin:4px 0 8px;color:#6b7280">Parent headers colored; subcategories show colored dot.</p>
+    <table>
+      <thead>
+        <tr class="header-row">
+          <th>Category</th>
+          <th>Jan 2026</th>
+          <th>Feb 2026</th>
+          <th>Mar 2026</th>
+          <th class="total-col">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="c-Loan category-header"><td>Loan</td><td style="text-align:right">5,000</td><td style="text-align:right">5,000</td><td style="text-align:right">5,000</td><td class="total-col" style="text-align:right">15,000</td></tr>
+        <tr><td><span class="dot-sm" style="background:#f59e0b"></span> Home Loan EMI</td><td style="text-align:right">5,000</td><td style="text-align:right">5,000</td><td style="text-align:right">5,000</td><td style="text-align:right">15,000</td></tr>
+
+        <tr class="c-Data category-header"><td>DATA</td><td style="text-align:right">0</td><td style="text-align:right">0</td><td style="text-align:right">0</td><td class="total-col" style="text-align:right">0</td></tr>
+        <tr><td><span class="dot-sm" style="background:#7c3aed"></span> Data & WiFi › Airtel</td><td style="text-align:right">200</td><td style="text-align:right">200</td><td style="text-align:right">200</td><td style="text-align:right">600</td></tr>
+
+        <tr class="c-Food category-header"><td>FOOD</td><td style="text-align:right">3,000</td><td style="text-align:right">3,000</td><td style="text-align:right">3,000</td><td class="total-col" style="text-align:right">9,000</td></tr>
+        <tr><td><span class="dot-sm" style="background:#fb7185"></span> Food - Groceries</td><td style="text-align:right">2,000</td><td style="text-align:right">2,000</td><td style="text-align:right">2,000</td><td style="text-align:right">6,000</td></tr>
+        <tr><td><span class="dot-sm" style="background:#fb7185"></span> Food - Eating out</td><td style="text-align:right">1,000</td><td style="text-align:right">1,000</td><td style="text-align:right">1,000</td><td style="text-align:right">3,000</td></tr>
+
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h1>Expenses Table (grouped, sample)</h1>
+    <p style="margin:4px 0 8px;color:#6b7280">Parent headers are colored; rows have colored dot matching parent.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Description</th>
+          <th>Method</th>
+          <th class="total-col">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="c-Clothing category-header"><td> </td><td>Clothing</td><td></td><td></td></tr>
+        <tr><td>2026-01-02</td><td><span class="dot-sm" style="background:#4f46e5"></span> Shirt purchase</td><td>card</td><td style="text-align:right">₹1,200</td></tr>
+        <tr><td>2026-01-18</td><td><span class="dot-sm" style="background:#4f46e5"></span> Jeans</td><td>card</td><td style="text-align:right">₹2,000</td></tr>
+
+        <tr class="c-Data category-header"><td> </td><td>Data</td><td></td><td></td></tr>
+        <tr><td>2026-01-05</td><td><span class="dot-sm" style="background:#7c3aed"></span> Airtel recharge</td><td>upi</td><td style="text-align:right">₹199</td></tr>
+
+        <tr class="c-Food category-header"><td> </td><td>Food</td><td></td><td></td></tr>
+        <tr><td>2026-01-10</td><td><span class="dot-sm" style="background:#fb7185"></span> Groceries</td><td>card</td><td style="text-align:right">₹980</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p style="color:#6b7280">This is a static preview file generated from your project. Open feedback: tell me which colors you'd like stronger or if you want the legend compact.</p>
+</body>
+</html>
