@@ -37,16 +37,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: 'Income', href: '/income', icon: BanknotesIcon },
         { name: 'Expenses', href: '/expenses/add', icon: ArrowTrendingDownIcon },
         { name: 'Budget', href: '/budget', icon: ChartBarIcon },
-        { name: 'Summary', href: '/summary', icon: DocumentMagnifyingGlassIcon },
         { name: 'Goals', href: '/goals', icon: FlagIcon },
         { name: 'Loans', href: '/loans', icon: ArrowTrendingDownIcon },
-        { name: 'Fixed Deposits', href: '/fixed-deposits', icon: BanknotesIcon },
+        { name: 'Fixed Deposits', href: '/savings-fds', icon: BanknotesIcon },
         { name: 'Transactions', href: '/transactions', icon: ArrowsRightLeftIcon },
-        { name: 'Analytics', href: '/analytics', icon: ChartPieIcon },
+        { name: 'Analytics', href: '/analytics', icon: PresentationChartLineIcon },
         { name: 'Credit Cards', href: '/credit-cards', icon: CreditCardIcon },
         { name: 'Analyze Statement', href: '/statements/upload', icon: DocumentArrowUpIcon },
         { name: 'Future Payables', href: '/liabilities', icon: ArrowTrendingDownIcon },
-        { name: 'Analytics', href: '/analytics', icon: PresentationChartLineIcon },
     ]
 
     return (

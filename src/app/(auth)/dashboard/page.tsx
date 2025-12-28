@@ -41,6 +41,7 @@ interface Transaction {
   type: string
   description: string | null
   date: string
+  source?: string
   categories?: { name: string } | null
 }
 
@@ -196,7 +197,8 @@ export default function Dashboard() {
           type: t.type,
           description: t.description || '',
           date: t.date,
-          categories: t.category ? { name: t.category } : null
+          source: t.payment_method || '-',
+          categories: t.categories ? { name: t.categories.name } : null
         }))
 
       // Partition Split
@@ -205,60 +207,99 @@ export default function Dashboard() {
       const be = monthlyExpensesList.filter((t: any) => t.category === 'Business').reduce((s: number, t: any) => s + t.amount, 0)
       const pe = monthlyExpenses - be
 
-      // Projection (Comprehensive - includes ALL outflows)
+      // Helper: Calculate when a credit card transaction will be due
+      const calculateDueDate = (transactionDate: Date, statementDay: number, dueDay: number): Date => {
+        const txDay = transactionDate.getDate()
+        const txMonth = transactionDate.getMonth()
+        const txYear = transactionDate.getFullYear()
+        
+        // If transaction is before statement date, it's in THIS month's statement
+        if (txDay < statementDay) {
+          // Due in the SAME month (if due_date > statement_date) or NEXT month
+          if (dueDay > statementDay) {
+            return new Date(txYear, txMonth, dueDay)
+          } else {
+            return new Date(txYear, txMonth + 1, dueDay)
+          }
+        } else {
+          // Transaction is on/after statement date, it's in NEXT month's statement
+          // Due in the month AFTER next
+          if (dueDay > statementDay) {
+            return new Date(txYear, txMonth + 1, dueDay)
+          } else {
+            return new Date(txYear, txMonth + 2, dueDay)
+          }
+        }
+      }
+
+      // Get all credit card transactions (for non-EMI spending projection)
+      const allCreditCardTransactions = await financeManager.getCreditCardTransactions()
+
+      // Projection (Comprehensive - Formula: A + B + C + D - E)
       const now = new Date()
-      const months = [0, 1, 2].map(offset => {
+      const months = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(offset => {
         const start = new Date(now.getFullYear(), now.getMonth() + offset, 1)
         const end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0)
 
-        // 1. Sum payables (credit card EMIs) in this month
-        const cardEMIPayments = payables
-          .filter(p => {
-            const d = new Date(p.dueDate)
-            return d >= start && d <= end && p.status !== 'paid'
-          })
-          .reduce((sum, p) => sum + p.amount, 0)
-
-        // 2. Sum loan EMIs in this month (for ALL active loans)
+        // A: Loan EMIs (non-credit-card loans)
         const loanEMIs = loans
           .filter((l: any) => {
-            if (!l.is_active || !l.emi_amount) return false
-
-            // If loan has already started (start_date is in the past or this month)
-            if (l.start_date) {
-              const loanStart = new Date(l.start_date)
-              if (loanStart > end) return false // Loan hasn't started yet
-            }
-
-            // If loan has next_emi_date, check if it's still ongoing
-            if (l.next_emi_date) {
-              const nextEmi = new Date(l.next_emi_date)
-              // Include loan if next EMI is this month or in the future
-              // (monthly recurring means there will be an EMI in this month too)
-              return nextEmi <= end // Loan is still active through this month
-            }
-
-            return true // Active loan with EMI amount
+            if (!l.is_active || !l.emi_amount || l.type === 'credit_card') return false
+            if (l.start_date && new Date(l.start_date) > end) return false
+            if (l.next_emi_date && new Date(l.next_emi_date) > end) return false
+            return true
           })
           .reduce((sum: number, l: any) => sum + (Number(l.emi_amount) || 0), 0)
 
-        // 3. Sum credit card statement dues (non-EMI) in this month
-        const creditCardStatementDues = cards
-          .filter((c: any) => {
-            if (!c.due_date || !c.last_statement_amount) return false
-            // Check if due date falls in this month
-            const dueDay = c.due_date
-            const dueDate = new Date(start.getFullYear(), start.getMonth(), dueDay)
-            return dueDate >= start && dueDate <= end && c.last_statement_amount > 0
+        // B: Credit Card EMIs (from loans table)
+        const cardEMIPayments = loans
+          .filter((l: any) => {
+            if (!l.is_active || !l.emi_amount || l.type !== 'credit_card') return false
+            if (l.start_date && new Date(l.start_date) > end) return false
+            if (l.next_emi_date && new Date(l.next_emi_date) > end) return false
+            return true
           })
-          .reduce((sum: number, c: any) => sum + (Number(c.last_statement_amount) || 0), 0)
+          .reduce((sum: number, l: any) => sum + (Number(l.emi_amount) || 0), 0)
 
-        const outflows = cardEMIPayments + loanEMIs + creditCardStatementDues
+        // C: Budgeted expenses for this month (from budgets table)
+        const monthNum = start.getMonth() + 1
+        const yearNum = start.getFullYear()
+        const budgetedExpenses = dbBudgets
+          .filter(b => b.month === monthNum && b.year === yearNum)
+          .reduce((sum, b) => sum + (Number(b.monthly_limit) || 0), 0)
+
+        // D: Credit Card Bill Payments (non-EMI spending)
+        const creditCardBillPayments = allCreditCardTransactions
+          .filter((tx: any) => {
+            const card = cards.find((c: any) => c.id === tx.credit_card_id)
+            if (!card || !card.statement_date || !card.due_date) return false
+            
+            const txDate = new Date(tx.date)
+            const dueDate = calculateDueDate(txDate, card.statement_date, card.due_date)
+            return dueDate >= start && dueDate <= end
+          })
+          .reduce((sum: number, tx: any) => sum + (Number(tx.amount) || 0), 0)
+
+        // E: Credit Card EMI budgets (to avoid double counting B and C)
+        const ccEmiBudgets = dbBudgets
+          .filter(b => 
+            b.month === monthNum && 
+            b.year === yearNum && 
+            b.category_name && 
+            b.category_name.includes('Credit Card EMI')
+          )
+          .reduce((sum, b) => sum + (Number(b.monthly_limit) || 0), 0)
+
+        // Total: A + B + C + D - E
+        const outflows = loanEMIs + cardEMIPayments + budgetedExpenses + creditCardBillPayments - ccEmiBudgets
+
+        // Use current monthly income as projected inflows for future months
+        const inflows = offset === 0 ? monthlyIncome : monthlyIncome
 
         return {
           label: start.toLocaleString('en-IN', { month: 'short' }),
           outflows,
-          inflows: 0 // Placeholder
+          inflows
         }
       })
 
@@ -504,27 +545,19 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* ... (Welcome Header) */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-neutral-900 mb-2">
-            Welcome back, {user?.user_metadata?.name || user?.email?.split('@')[0] || 'User'}!
-          </h1>
-          <p className="text-neutral-600">Here&apos;s an overview of your financial portfolio</p>
-        </div>
-
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         {/* Quick Actions - Moved to Top */}
-        <GlassCard className="mb-8">
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-gray-900">
+        <GlassCard className="mb-4">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-gray-900">
                 Quick Actions
               </h3>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-3">
               <Link
                 href="/accounts"
-                className="flex items-center p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
               >
                 <div className="p-2 bg-gray-100 rounded-lg mr-3">
                   <div className="icon-golden-card">
@@ -538,7 +571,7 @@ export default function Dashboard() {
               </Link>
               <Link
                 href="/budget"
-                className="flex items-center p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
               >
                 <div className="p-2 bg-gray-100 rounded-lg mr-3">
                   <div className="icon-golden-card">
@@ -552,7 +585,7 @@ export default function Dashboard() {
               </Link>
               <Link
                 href="/goals"
-                className="flex items-center p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
               >
                 <div className="p-2 bg-gray-100 rounded-lg mr-3">
                   <div className="icon-golden-card">
@@ -569,12 +602,8 @@ export default function Dashboard() {
         </GlassCard>
 
 
-        {/* Professional Financial Metrics */}
-        {/* ... (Keep existing first row of cards) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* ... (Net Worth, Income, Expenses, Savings - NO CHANGES NEEDED HERE if not requested, but let's keep them clean) */}
-          {/* Copying existing lines 370-425 roughly, assume user wants ME to rewrite the file section correctly. */}
-          {/* Since I am using replace_file_content, I must be precise. I will target the specific card section below. */}
+        {/* Professional Financial Metrics - 3x3 Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
           <GlassCard>
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -616,7 +645,6 @@ export default function Dashboard() {
             </div>
           </GlassCard>
 
-
           {/* 
             PHASE 4 FIX (Dec 26, 2025): Monthly Savings Sign Display
             
@@ -644,10 +672,7 @@ export default function Dashboard() {
               </div>
             </div>
           </GlassCard>
-        </div>
 
-        {/* Second Row - Modified for Interactivity */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Link href="/loans" className="block transition-transform hover:scale-[1.02]">
             <GlassCard className="h-full cursor-pointer hover:shadow-md transition-all">
               <div className="flex items-center">
@@ -677,16 +702,6 @@ export default function Dashboard() {
               </div>
             </GlassCard>
           </div>
-        </div>
-
-        {/* ... Rest of the component (Tables, Charts, etc.) */}
-
-        {/* ... (Rest of existing content) */}
-        {/* Legacy Partition Cards Removed by Request */}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* ... (Ratios cards) keeping existing calls */}
-
 
           <GlassCard>
             <div className="flex items-center">
@@ -697,6 +712,7 @@ export default function Dashboard() {
               </div>
             </div>
           </GlassCard>
+
           <GlassCard>
             <div className="flex items-center">
               <BuildingLibraryIcon className="h-8 w-8 text-purple-600" />
@@ -706,6 +722,7 @@ export default function Dashboard() {
               </div>
             </div>
           </GlassCard>
+
           <GlassCard>
             <div className="flex items-center">
               <BanknotesIcon className="h-8 w-8 text-green-600" />
@@ -825,12 +842,12 @@ export default function Dashboard() {
             </div>
           </GlassCard>
         </div>
-        {/* ... (3-Month Projection & Quick Actions) */}
+        {/* ... (12-Month Projection & Quick Actions) */}
         <GlassCard className="mb-8">
           {/* ... Projection cards ... */}
-          <h3 className="text-xl font-semibold text-gray-900 mb-6">3-Month Projection</h3>
+          <h3 className="text-xl font-semibold text-gray-900 mb-6">12-Month Projection</h3>
           {/* ... */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {stats.projection.months.map((m, idx) => (
               <div key={m.label} className="rounded-lg border p-4">
                 <p className="text-sm text-gray-600">{m.label}</p>
@@ -847,10 +864,10 @@ export default function Dashboard() {
         </GlassCard>
 
         {/* Recent Transactions */}
-        <GlassCard className="mb-8">
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-gray-900 flex items-center">
+        <GlassCard className="mb-4">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                 <div className="icon-golden-card mr-2">
                   <ChartBarIcon className="h-5 w-5 icon-white" />
                 </div>
@@ -863,31 +880,50 @@ export default function Dashboard() {
                 View all
               </Link>
             </div>
-            <div className="space-y-4">
-              {stats.recentTransactions.length > 0 ? (
-                stats.recentTransactions.map((transaction) => (
-                  <div key={transaction.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-lg">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 truncate">
-                        {transaction.description || 'Transaction'}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {transaction.categories?.name} • {formatDate(transaction.date)}
-                      </p>
-                    </div>
-                    <div className={`text-sm font-semibold px-2 py-1 rounded ${transaction.type === 'income' ? 'text-success-700 bg-success-100' : 'text-error-700 bg-error-100'}`}>
-                      {transaction.type === 'income' ? '+' : '-'}₹{Number(transaction.amount).toLocaleString()}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-8">
-                  <ChartBarIcon className="h-12 w-12 text-indigo-500 icon-indigo-shine mx-auto mb-4" />
-                  <p className="text-gray-600">No transactions yet</p>
-                  <p className="text-sm text-gray-500 mt-2">Start by adding your first transaction!</p>
-                </div>
-              )}
-            </div>
+            {stats.recentTransactions.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {stats.recentTransactions.map((transaction) => (
+                      <tr key={transaction.id} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 text-sm text-gray-900">
+                          {transaction.description || 'Transaction'}
+                        </td>
+                        <td className="px-3 py-2 text-sm text-gray-600">
+                          {transaction.categories?.name || '-'}
+                        </td>
+                        <td className="px-3 py-2 text-sm text-gray-600 whitespace-nowrap">
+                          {formatDate(transaction.date)}
+                        </td>
+                        <td className="px-3 py-2 text-sm text-gray-600">
+                          {transaction.source || '-'}
+                        </td>
+                        <td className="px-3 py-2 text-sm font-semibold text-right whitespace-nowrap">
+                          <span className={transaction.type === 'income' ? 'text-success-700' : 'text-error-700'}>
+                            {transaction.type === 'income' ? '+' : '-'}₹{Number(transaction.amount).toLocaleString()}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <ChartBarIcon className="h-12 w-12 text-indigo-500 icon-indigo-shine mx-auto mb-4" />
+                <p className="text-gray-600">No transactions yet</p>
+                <p className="text-sm text-gray-500 mt-2">Start by adding your first transaction!</p>
+              </div>
+            )}
           </div>
         </GlassCard>
 

@@ -309,14 +309,24 @@ export class FinanceDataManager {
 
   async getIncomeTransactions() {
     if (!this.userId) await this.initialize()
-    const { data } = await supabase.from('transactions').select('*').eq('user_id', this.userId!).eq('type', 'income').order('date', { ascending: false })
+    const { data } = await supabase
+      .from('transactions')
+      .select('*, categories(name)')
+      .eq('user_id', this.userId!)
+      .eq('type', 'income')
+      .order('date', { ascending: false })
     return data || []
   }
 
   async getExpenseTransactions() {
     if (!this.userId) await this.initialize()
     // Fetch all for aggregation (limit might need adjustment for very large datasets)
-    const { data } = await supabase.from('transactions').select('*').eq('user_id', this.userId!).eq('type', 'expense').order('date', { ascending: false })
+    const { data } = await supabase
+      .from('transactions')
+      .select('*, categories(name)')
+      .eq('user_id', this.userId!)
+      .eq('type', 'expense')
+      .order('date', { ascending: false })
     return data || []
   }
 
@@ -508,14 +518,19 @@ export class FinanceDataManager {
   }
 
   // --- Credit Card Transactions ---
-  async getCreditCardTransactions(cardId: string) {
+  async getCreditCardTransactions(cardId?: string) {
     if (!this.userId) await this.initialize()
-    const { data, error } = await supabase
+    
+    let query = supabase
       .from('credit_card_transactions')
       .select('*')
-      .eq('credit_card_id', cardId)
       .eq('user_id', this.userId!)
-      .order('transaction_date', { ascending: false })
+    
+    if (cardId) {
+      query = query.eq('credit_card_id', cardId)
+    }
+    
+    const { data, error } = await query.order('transaction_date', { ascending: false })
 
     if (error) return []
     return data.map(t => ({

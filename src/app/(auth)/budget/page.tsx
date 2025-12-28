@@ -3,9 +3,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 
-// 13 months: Dec 2025 to Dec 2026
+// 12 months: Jan 2026 to Dec 2026
 const monthColumns = [
-  { month: 'December', year: 2025 },
   { month: 'January', year: 2026 },
   { month: 'February', year: 2026 },
   { month: 'March', year: 2026 },
@@ -85,39 +84,18 @@ export default function BudgetPage() {
     fetchBudgetData()
   }, [])
 
-  // Get 13-month values for each category (Dec 2025 + Jan-Dec 2026)
-  // Using 2025 projections: index 11 (Dec) for Dec 2025, then indices 0-11 for 2026
-  const get13MonthValues = (limits: number[]) => {
-    return [
-      limits[11], // Dec 2025
-      limits[0],  // Jan 2026
-      limits[1],  // Feb 2026
-      limits[2],  // Mar 2026
-      limits[3],  // Apr 2026
-      limits[4],  // May 2026
-      limits[5],  // Jun 2026
-      limits[6],  // Jul 2026
-      limits[7],  // Aug 2026
-      limits[8],  // Sep 2026
-      limits[9],  // Oct 2026
-      limits[10], // Nov 2026
-      limits[11], // Dec 2026
-    ]
-  }
-
-  // Calculate totals for 13 months
+  // Calculate totals for 12 months
   const { monthlyTotals, grandTotal, categoryTotals, categoryMonthlyValues } = useMemo(() => {
-    const monthlyTotals = Array(13).fill(0)
+    const monthlyTotals = Array(12).fill(0)
     const categoryTotals: Record<string, number> = {}
     const categoryMonthlyValues: Record<string, number[]> = {}
     let grandTotal = 0
 
     budgetData.forEach(item => {
-      const values = get13MonthValues(item.limits)
-      categoryMonthlyValues[item.category] = values
+      categoryMonthlyValues[item.category] = item.limits
 
       let total = 0
-      values.forEach((val, idx) => {
+      item.limits.forEach((val, idx) => {
         monthlyTotals[idx] += val
         total += val
         grandTotal += val
@@ -154,8 +132,8 @@ export default function BudgetPage() {
     <div className="min-h-screen bg-gray-50 py-6 px-4">
       <div className="max-w-full mx-auto">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Budget Dec 2025 - Dec 2026</h1>
-          <p className="text-gray-600">13-Month Budget Allocation</p>
+          <h1 className="text-2xl font-bold text-gray-900">Budget (Jan 2026 - Dec 2026)</h1>
+          <p className="text-gray-600">12-Month Budget Allocation</p>
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
@@ -227,12 +205,12 @@ export default function BudgetPage() {
         {/* Summary Cards */}
         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <p className="text-sm text-gray-500">13-Month Budget</p>
+            <p className="text-sm text-gray-500">12-Month Budget</p>
             <p className="text-2xl font-bold text-gray-900">₹{formatCurrency(grandTotal)}</p>
           </div>
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <p className="text-sm text-gray-500">Monthly Average</p>
-            <p className="text-2xl font-bold text-blue-600">₹{formatCurrency(Math.round(grandTotal / 13))}</p>
+            <p className="text-2xl font-bold text-blue-600">₹{formatCurrency(Math.round(grandTotal / 12))}</p>
           </div>
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <p className="text-sm text-gray-500">Categories</p>
