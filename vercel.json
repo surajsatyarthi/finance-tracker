@@ -6,16 +6,7 @@
     "silent": false,
     "autoJobCancelation": true
   },
-  "env": {
-    "NEXT_PUBLIC_SUPABASE_URL": {
-      "description": "Supabase project URL",
-      "required": true
-    },
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": {
-      "description": "Supabase anonymous/public key",
-      "required": true
-    }
-  },
+
   "headers": [
     {
       "source": "/(.*)",
