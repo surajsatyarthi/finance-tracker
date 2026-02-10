@@ -43,43 +43,57 @@
 
 ---
 
-## 🔄 WORKFLOW
+## 🔄 AUTOMATED WORKFLOW
 
 ```
-1. PM Protocol (Gates 1-7) ──► Strategic approval
+1. PM Protocol (Gates 1-7) ──► Strategic approval (Manual for personal apps)
            ↓
-2. Ralph Protocol (Gates 1-12) ──► Technical execution
+2. Ralph Protocol (Gates 1-12) ──► ✅ AUTOMATED (Git hooks + CI/CD)
            ↓
-3. QA Protocol (Gates 1-6) ──► Independent validation
+3. QA Protocol (Gates 1-6) ──► ✅ AUTOMATED (Pre-commit + CI)
            ↓
-4. CEO Final Sign-off ──► Ship to production
+4. CEO Final Sign-off ──► Ship to production (Auto-deploy on Vercel)
 ```
+
+**🤖 What's Automated:**
+- ✅ Pre-commit: Build + Lint + Test + Typecheck
+- ✅ Pre-push: Environment validation + All quality gates
+- ✅ GitHub Actions: Full CI/CD on every push
+- ✅ Vercel: Environment validation + Security headers
 
 ---
 
 ## 🚀 QUICK START
 
-### For New Projects (Automated Setup)
+### For New Projects (One-Time Setup)
 
 ```bash
 # 1. Copy alpha protocols to your project
-cp -r ~/Desktop/alpha/* /path/to/your-project/.agent/
+cp -r ~/Desktop/alpha/.agent /path/to/your-project/
 
 # 2. Run automated setup
 cd /path/to/your-project
 bash .agent/scripts/setup-enforcement.sh
 
-# 3. Done! Enforcement is now automatic
-git commit -m "test"  # Will trigger pre-commit checks
+# 3. Done! Everything is now automatic
+git commit -m "test"  # ✅ Pre-commit hook auto-runs
+git push origin main  # ✅ Pre-push validation auto-runs
 ```
 
-### For Daily Work
+### For Daily Work (100% Automated)
 
-1. **New Task?** → Run PM Protocol assessment first
-2. **PM Approved?** → Coder follows Ralph Protocol gates
-3. **Coder Done?** → Submit for QA validation
-4. **QA Passed?** → CEO reviews and approves
-5. **All Green?** → Ship it
+**No manual steps required!** Just code and commit:
+
+1. Write code
+2. `git add .`
+3. `git commit -m "message"` → ✅ Auto validates
+4. `git push origin main` → ✅ Auto validates + deploys
+
+**The system automatically:**
+- Runs quality gates before every commit
+- Validates environment before production push
+- Runs CI/CD on GitHub
+- Validates and deploys on Vercel
 
 ---
 

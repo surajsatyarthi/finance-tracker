@@ -1,6 +1,13 @@
 # 🔄 WORKFLOW DIAGRAM
 ## Complete Feature Journey Through All Protocols
 
+**🤖 AUTOMATION STATUS:**
+- ✅ Ralph Gates 5, 7, 8 → Automated via pre-commit hook
+- ✅ Ralph Gate 10 → Automated via Vercel
+- ✅ QA Gates 2, 3 → Automated via CI/CD
+- ✅ Environment validation → Automated on push to main
+- ⚠️ PM Protocol → Manual (not applicable for personal apps)
+
 ---
 
 ## THE COMPLETE FLOW
@@ -52,17 +59,19 @@
 │                          ↓                                                  │
 │  ┌────────────────── PHASE 3: EXECUTION ───────────────────┐                │
 │  │ G4: Implementation        — Execute approved plan       │                │
-│  │ G5: Security Audit        — FAANG P0 scan (12/12)       │                │
+│  │ G5: Security Audit        — FAANG P0 scan (12/12) 🤖    │                │
 │  │ G6: Performance Audit     — Lighthouse 90+              │                │
-│  │ G7: Code Quality          — lint, build, typecheck      │                │
-│  │ G8: TDD Proof             — Unit + E2E, 80%+ coverage   │                │
+│  │ G7: Code Quality          — lint, build, typecheck 🤖   │                │
+│  │ G8: TDD Proof             — Unit + E2E, 80%+ coverage 🤖│                │
 │  │ G9: Accessibility         — Axe scan, ARIA labels       │                │
 │  └─────────────────────────────────────────────────────────┘                │
+│  🤖 = Automated via pre-commit hook                                         │
 │                          ↓                                                  │
 │  ┌────────────────── PHASE 4: VERIFICATION ────────────────┐                │
-│  │ G10: Staging Deployment   — Deploy + smoke test         │                │
+│  │ G10: Staging Deployment   — Deploy + smoke test 🤖      │                │
 │  │ G11: Production Verify    — Live screenshots, 24h mon   │                │
 │  └─────────────────────────────────────────────────────────┘                │
+│  🤖 = Automated via Vercel + GitHub Actions                                 │
 │                          ↓                                                  │
 │  ┌────────────────── PHASE 5: DOCUMENTATION ───────────────┐                │
 │  │ G12: Walkthrough          — What, How, Rollback         │                │
