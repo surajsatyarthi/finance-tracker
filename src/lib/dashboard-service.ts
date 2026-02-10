@@ -20,13 +20,13 @@ export async function getDashboardMetrics(supabase: SupabaseClient, userId: stri
     transactionsRes,
     investmentsRes
   ] = await Promise.all([
-    supabase.from('accounts').select('*').eq('user_id', userId).eq('is_active', true),
-    supabase.from('credit_cards').select('*').eq('user_id', userId).eq('is_active', true),
-    supabase.from('loans').select('*').eq('user_id', userId).eq('is_active', true),
-    supabase.from('emis').select('*').eq('user_id', userId).is('deleted_at', null),
-    supabase.from('bnpls').select('*').eq('user_id', userId).is('deleted_at', null),
-    supabase.from('transactions').select('*').eq('user_id', userId).is('deleted_at', null),
-    supabase.from('investments').select('*').eq('user_id', userId).is('deleted_at', null)
+    supabase.from('accounts').select('*').eq('user_id', userId).eq('is_active', true).limit(10000),
+    supabase.from('credit_cards').select('*').eq('user_id', userId).eq('is_active', true).limit(10000),
+    supabase.from('loans').select('*').eq('user_id', userId).eq('is_active', true).limit(10000),
+    supabase.from('emis').select('*').eq('user_id', userId).is('deleted_at', null).limit(10000),
+    supabase.from('bnpls').select('*').eq('user_id', userId).is('deleted_at', null).limit(10000),
+    supabase.from('transactions').select('*').eq('user_id', userId).is('deleted_at', null).limit(10000),
+    supabase.from('investments').select('*').eq('user_id', userId).is('deleted_at', null).limit(10000)
   ])
 
   const accounts = (accountsRes.data || []) as Account[]

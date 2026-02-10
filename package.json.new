@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "alpha:validate": "node .agent/scripts/validate-protocol.js",
+    "alpha:collect": "node .agent/scripts/collect-evidence.js",
+    "alpha:enforce": "node .agent/scripts/enforce-gates.js",
+    "alpha:check": "npm run alpha:collect && npm run alpha:validate"
+  }
+}

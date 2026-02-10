@@ -25,7 +25,14 @@ function calculateUtilization(balance: number, limit: number): number {
 function getUtilizationColor(utilization: number): string {
   if (utilization >= 70) return 'text-red-600'
   if (utilization >= 30) return 'text-yellow-600'
+  if (utilization >= 30) return 'text-yellow-600'
   return 'text-green-600'
+}
+
+function getOrdinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd']
+  const v = n % 100
+  return s[(v - 20) % 10] || s[v] || s[0]
 }
 
 export default async function CreditCardsPage() {
@@ -45,6 +52,7 @@ export default async function CreditCardsPage() {
     .eq('user_id', user.id)
     .eq('is_active', true)
     .order('credit_limit', { ascending: false })
+    .limit(1000)
 
   const cardsList = (cards || []) as CreditCard[]
 
@@ -152,6 +160,12 @@ export default async function CreditCardsPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Card Number
                     </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Statement
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Due
+                    </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Limit
                     </th>
@@ -189,13 +203,25 @@ export default async function CreditCardsPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {card.last_four_digits ? (
-                            <div className="flex items-center">
-                              <span className="text-sm text-gray-900">{maskCardNumber(card.last_four_digits)}</span>
-                              <CopyButton text={card.last_four_digits} />
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-gray-900 font-mono tracking-wider">
+                                {maskCardNumber(card.last_four_digits)}
+                              </span>
+                              <CopyButton text={card.card_number || card.last_four_digits} />
                             </div>
                           ) : (
                             <span className="text-sm text-gray-400">—</span>
                           )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <span className="text-sm text-gray-500">
+                            {card.statement_date ? `${card.statement_date}${getOrdinal(card.statement_date)}` : '—'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <span className="text-sm text-gray-500">
+                            {card.due_date ? `${card.due_date}${getOrdinal(card.due_date)}` : '—'}
+                          </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
                           <span className="text-sm font-medium text-gray-900">

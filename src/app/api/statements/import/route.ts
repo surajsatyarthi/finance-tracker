@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { CreditCard } from '@/types/database'
 
 type ImportTransaction = {
   date: string
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update credit card with statement information
-    const updateData: any = {}
+    const updateData: Partial<CreditCard> = {}
     if (statementData.credit_limit > 0) {
       updateData.credit_limit = statementData.credit_limit
     }
@@ -138,12 +139,13 @@ export async function POST(request: NextRequest) {
         skippedCount: skippedTransactions.length
       }
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Import error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json(
       {
         error: 'Failed to import transactions',
-        details: error.message
+        details: errorMessage
       },
       { status: 500 }
     )

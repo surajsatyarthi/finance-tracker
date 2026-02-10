@@ -30,6 +30,7 @@ export default async function AccountsPage() {
     .eq('user_id', user.id)
     .eq('is_active', true)
     .order('balance', { ascending: false })
+    .limit(1000)
 
   const accountsList = (accounts || []) as Account[]
 

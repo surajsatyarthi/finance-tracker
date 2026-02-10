@@ -3,6 +3,7 @@ import { redirect, notFound } from 'next/navigation'
 import AppLayout from '@/components/AppLayout'
 import Link from 'next/link'
 import type { Transaction } from '@/types/database'
+import DeleteTransactionButton from '../DeleteButton'
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -52,12 +53,15 @@ export default async function TransactionDetailsPage({ params }: { params: { id:
             <Link href="/transactions" className="text-sm text-blue-600 hover:text-blue-800">
               ← Back to Transactions
             </Link>
-            <Link
-              href={`/transactions/${params.id}/edit`}
-              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-            >
-              Edit Transaction
-            </Link>
+            <div className="flex gap-3">
+              <Link
+                href={`/transactions/${params.id}/edit`}
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+              >
+                Edit Transaction
+              </Link>
+              <DeleteTransactionButton id={params.id} description={txn.description} />
+            </div>
           </div>
 
           <div className="bg-white shadow rounded-lg overflow-hidden">

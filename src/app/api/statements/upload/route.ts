@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     const outputJsonPath = path.join(outputDir, `statement_${timestamp}.json`)
 
     try {
-      const { stdout, stderr } = await execAsync(
+      const { stderr } = await execAsync(
         `python3 "${extractorPath}" "${filepath}" "${outputJsonPath}"`
       )
 
@@ -73,22 +73,24 @@ export async function POST(request: NextRequest) {
         success: true,
         data: extractedData
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Extraction error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       return NextResponse.json(
         {
           error: 'Failed to extract data from PDF',
-          details: error.message
+          details: errorMessage
         },
         { status: 500 }
       )
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Upload error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json(
       {
         error: 'Failed to process upload',
-        details: error.message
+        details: errorMessage
       },
       { status: 500 }
     )

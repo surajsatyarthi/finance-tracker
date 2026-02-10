@@ -9,11 +9,6 @@ function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount)
 }
 
-function formatDate(dateString: string | null): string {
-  if (!dateString) return '-'
-  return new Date(dateString).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
 export default async function BNPLPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -25,6 +20,7 @@ export default async function BNPLPage() {
     .eq('user_id', user.id)
     .is('deleted_at', null)
     .order('next_due_date', { ascending: true })
+    .limit(1000)
 
   const list = (bnpls || []) as BNPL[]
   const totalLimit = list.reduce((sum, b) => sum + b.total_amount, 0)
@@ -119,7 +115,11 @@ export default async function BNPLPage() {
                       const available = bnpl.total_amount - bnpl.remaining_amount
                       return (
                         <tr key={bnpl.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 text-sm font-medium text-gray-900">{bnpl.merchant}</td>
+                          <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                            <Link href={`/bnpl/${bnpl.id}`} className="text-blue-600 hover:text-blue-800">
+                              {bnpl.merchant}
+                            </Link>
+                          </td>
                           <td className="px-6 py-4 text-sm text-right text-gray-900">{formatCurrency(bnpl.total_amount)}</td>
                           <td className="px-6 py-4 text-sm text-right text-red-600 font-semibold">{formatCurrency(bnpl.remaining_amount)}</td>
                           <td className="px-6 py-4 text-sm text-right text-green-600 font-semibold">{formatCurrency(available)}</td>

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import AppLayout from '@/components/AppLayout'
+import { CreditCard } from '@/types/database'
 
 type AnalysisResult = {
   creditCardName: string
@@ -38,18 +39,23 @@ type ExtractedStatement = {
   }>
 }
 
+type ImportResult = {
+  imported: number
+  skipped: number
+  total: number
+}
+
 export default function StatementAnalysisPage() {
   const router = useRouter()
   const supabase = createClient()
   const [userEmail, setUserEmail] = useState('')
-  const [loading, setLoading] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [importing, setImporting] = useState(false)
-  const [creditCards, setCreditCards] = useState<any[]>([])
+  const [creditCards, setCreditCards] = useState<CreditCard[]>([])
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [extractedStatement, setExtractedStatement] = useState<ExtractedStatement | null>(null)
-  const [importResult, setImportResult] = useState<any>(null)
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
 
   const [formData, setFormData] = useState({
     credit_card_id: '',
@@ -70,8 +76,9 @@ export default function StatementAnalysisPage() {
         .eq('user_id', user.id)
         .eq('is_active', true)
         .order('name')
+        .limit(1000)
 
-      setCreditCards(cards || [])
+      setCreditCards((cards || []) as CreditCard[])
     }
     loadData()
   }, [router, supabase])
@@ -98,6 +105,7 @@ export default function StatementAnalysisPage() {
       .is('deleted_at', null)
       .gte('next_due_date', formData.start_date)
       .lte('next_due_date', formData.end_date)
+      .limit(1000)
 
     const emiTotal = emis?.reduce((sum, emi) => sum + emi.monthly_emi, 0) || 0
     const emiBreakdown = emis?.map(emi => ({ name: emi.emi_name, amount: emi.monthly_emi })) || []
@@ -112,6 +120,7 @@ export default function StatementAnalysisPage() {
       .is('deleted_at', null)
       .gte('date', formData.start_date)
       .lte('date', formData.end_date)
+      .limit(1000)
 
     const nonEmiSpend = expenses?.reduce((sum, txn) => sum + txn.amount, 0) || 0
     const expenseCount = expenses?.length || 0
@@ -126,6 +135,7 @@ export default function StatementAnalysisPage() {
       .is('deleted_at', null)
       .gte('date', formData.start_date)
       .lte('date', formData.end_date)
+      .limit(1000)
 
     const refundTotal = refunds?.reduce((sum, txn) => sum + txn.amount, 0) || 0
     const refundCount = refunds?.length || 0
@@ -183,8 +193,8 @@ export default function StatementAnalysisPage() {
       }
 
       setExtractedStatement(data.data)
-    } catch (error: any) {
-      alert(`Upload failed: ${error.message}`)
+    } catch (error: unknown) {
+      alert(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setUploading(false)
     }
@@ -195,8 +205,8 @@ export default function StatementAnalysisPage() {
 
     // Find matching credit card
     const matchingCard = creditCards.find(card =>
-      extractedStatement.card_number.includes(card.last_four_digits) ||
-      card.card_number?.includes(extractedStatement.card_number.replace(/X/g, ''))
+      (card.last_four_digits && extractedStatement.card_number.includes(card.last_four_digits)) ||
+      (card.last_four_digits && extractedStatement.card_number.replace(/X/g, '').includes(card.last_four_digits))
     )
 
     if (!matchingCard) {
@@ -225,8 +235,8 @@ export default function StatementAnalysisPage() {
 
       setImportResult(data)
       setExtractedStatement(null)
-    } catch (error: any) {
-      alert(`Import failed: ${error.message}`)
+    } catch (error: unknown) {
+      alert(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setImporting(false)
     }

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import AppLayout from '@/components/AppLayout'
 import Link from 'next/link'
+import { Goal } from '@/types/database'
 import DeleteGoalButton from './DeleteButton'
 
 export default async function GoalsPage() {
@@ -18,8 +19,9 @@ export default async function GoalsPage() {
     .eq('user_id', user.id)
     .is('deleted_at', null)
     .order('target_date', { ascending: true })
+    .limit(1000)
 
-  const list = goals || []
+  const list = (goals || []) as Goal[]
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -29,11 +31,11 @@ export default async function GoalsPage() {
     }).format(amount)
   }
 
-  const totalTarget = list.reduce((sum: number, g: any) => sum + g.target_amount, 0)
-  const totalCurrent = list.reduce((sum: number, g: any) => sum + g.current_amount, 0)
+  const totalTarget = list.reduce((sum: number, g: Goal) => sum + g.target_amount, 0)
+  const totalCurrent = list.reduce((sum: number, g: Goal) => sum + g.current_amount, 0)
   const overallProgress = totalTarget > 0 ? (totalCurrent / totalTarget) * 100 : 0
   const totalRemaining = totalTarget - totalCurrent
-  const achievedGoals = list.filter((g: any) => g.current_amount >= g.target_amount).length
+  const achievedGoals = list.filter((g: Goal) => g.current_amount >= g.target_amount).length
   const pendingGoals = list.length - achievedGoals
 
   return (
@@ -123,7 +125,7 @@ export default async function GoalsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {list.map((goal: any) => {
+              {list.map((goal: Goal) => {
                 const progress = goal.target_amount > 0 ? (goal.current_amount / goal.target_amount) * 100 : 0
                 const remaining = goal.target_amount - goal.current_amount
                 const daysLeft = goal.target_date

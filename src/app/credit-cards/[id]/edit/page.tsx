@@ -15,7 +15,8 @@ export default function EditCreditCardPage() {
   const [formData, setFormData] = useState({
     name: '',
     bank: '',
-    card_type: '',
+    card_type: 'VISA' as string, // default
+    card_number: '',
     last_four_digits: '',
     credit_limit: '',
     current_balance: '',
@@ -55,6 +56,7 @@ export default function EditCreditCardPage() {
         name: card.name,
         bank: card.bank || '',
         card_type: card.card_type,
+        card_number: card.card_number || '',
         last_four_digits: card.last_four_digits || '',
         credit_limit: card.credit_limit.toString(),
         current_balance: card.current_balance.toString(),
@@ -80,6 +82,7 @@ export default function EditCreditCardPage() {
         name: formData.name,
         bank: formData.bank || null,
         card_type: formData.card_type,
+        card_number: formData.card_number || null,
         last_four_digits: formData.last_four_digits || null,
         credit_limit: parseFloat(formData.credit_limit),
         current_balance: parseFloat(formData.current_balance),
@@ -190,7 +193,7 @@ export default function EditCreditCardPage() {
                     id="card_type"
                     required
                     value={formData.card_type}
-                    onChange={(e) => setFormData({ ...formData, card_type: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, card_type: e.target.value as 'VISA' | 'MASTERCARD' | 'RUPAY' | 'AMEX' | 'JCB' | 'DISCOVER' })}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                   >
                     <option value="VISA">VISA</option>
@@ -202,20 +205,26 @@ export default function EditCreditCardPage() {
                   </select>
                 </div>
 
-                {/* Last 4 Digits */}
+                {/* Card Number */}
                 <div>
-                  <label htmlFor="last_four_digits" className="block text-sm font-medium text-gray-700">
-                    Last 4 Digits
+                  <label htmlFor="card_number" className="block text-sm font-medium text-gray-700">
+                    Card Number (Full or Last 4)
                   </label>
                   <input
                     type="text"
-                    id="last_four_digits"
-                    maxLength={4}
-                    pattern="[0-9]{4}"
-                    value={formData.last_four_digits}
-                    onChange={(e) => setFormData({ ...formData, last_four_digits: e.target.value })}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-400"
-                    placeholder="1234"
+                    id="card_number"
+                    maxLength={19}
+                    value={formData.card_number || ''}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '')
+                      setFormData({ 
+                        ...formData, 
+                        card_number: val,
+                        last_four_digits: val.slice(-4) 
+                      })
+                    }}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                    placeholder="Enter full number to enable copy"
                   />
                 </div>
 

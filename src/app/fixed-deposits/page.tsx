@@ -4,6 +4,8 @@ import AppLayout from '@/components/AppLayout'
 import Link from 'next/link'
 import DeleteFDButton from './DeleteButton'
 
+import { FixedDeposit } from '@/types/database'
+
 export default async function FixedDepositsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -18,8 +20,9 @@ export default async function FixedDepositsPage() {
     .eq('user_id', user.id)
     .is('deleted_at', null)
     .order('maturity_date', { ascending: true })
+    .limit(1000)
 
-  const list = fds || []
+  const list = (fds || []) as FixedDeposit[]
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -29,8 +32,8 @@ export default async function FixedDepositsPage() {
     }).format(amount)
   }
 
-  const totalPrincipal = list.reduce((sum: number, fd: any) => sum + fd.principal_amount, 0)
-  const totalMaturity = list.reduce((sum: number, fd: any) => sum + fd.maturity_amount, 0)
+  const totalPrincipal = list.reduce((sum: number, fd: FixedDeposit) => sum + fd.principal_amount, 0)
+  const totalMaturity = list.reduce((sum: number, fd: FixedDeposit) => sum + fd.maturity_amount, 0)
   const totalInterest = totalMaturity - totalPrincipal
 
   const getStatus = (maturityDate: string) => {
@@ -136,12 +139,14 @@ export default async function FixedDepositsPage() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {list.map((fd: any) => {
+                      {list.map((fd: FixedDeposit) => {
                         const status = getStatus(fd.maturity_date)
                         return (
                           <tr key={fd.id} className="hover:bg-gray-50">
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">{fd.bank_name}</div>
+                              <Link href={`/fixed-deposits/${fd.id}`} className="text-sm font-medium text-blue-600 hover:text-blue-800">
+                                {fd.bank_name}
+                              </Link>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                               {fd.fd_number || '—'}

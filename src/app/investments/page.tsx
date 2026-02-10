@@ -19,6 +19,7 @@ export default async function InvestmentsPage() {
     .eq('user_id', user.id)
     .is('deleted_at', null)
     .order('investment_name')
+    .limit(1000)
 
   const list = (investments || []) as Investment[]
 
@@ -153,7 +154,9 @@ export default async function InvestmentsPage() {
                         return (
                           <tr key={investment.id} className="hover:bg-gray-50">
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">{investment.investment_name}</div>
+                              <Link href={`/investments/${investment.id}`} className="text-sm font-medium text-blue-600 hover:text-blue-800">
+                                {investment.investment_name}
+                              </Link>
                               {investment.notes && (
                                 <div className="text-xs text-gray-500 truncate max-w-[200px]">{investment.notes}</div>
                               )}

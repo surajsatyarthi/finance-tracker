@@ -37,6 +37,7 @@ export default async function EMIsPage() {
     .eq('user_id', user.id)
     .is('deleted_at', null)
     .order('next_due_date', { ascending: true })
+    .limit(1000)
 
   const emisList = (emis || []) as EMI[]
 

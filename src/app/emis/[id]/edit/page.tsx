@@ -42,7 +42,7 @@ export default function EditEMIPage() {
 
       const [emiRes, cardsRes] = await Promise.all([
         supabase.from('emis').select('*').eq('id', id).eq('user_id', user.id).is('deleted_at', null).single(),
-        supabase.from('credit_cards').select('*').eq('user_id', user.id).eq('is_active', true)
+        supabase.from('credit_cards').select('*').eq('user_id', user.id).eq('is_active', true).limit(1000)
       ])
 
       if (!emiRes.data) {

@@ -1,9 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import AppLayout from '@/components/AppLayout'
+import type { Category, Account, Transaction } from '@/types/database'
+
+type TransactionWithCategory = Transaction & {
+  categories: {
+    name: string
+  } | null
+}
 
 type GroupedData = {
   [month: string]: {
@@ -20,10 +27,11 @@ export default function IncomePage() {
   const [userEmail, setUserEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [categories, setCategories] = useState<any[]>([])
-  const [accounts, setAccounts] = useState<any[]>([])
-  const [transactions, setTransactions] = useState<any[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [transactions, setTransactions] = useState<TransactionWithCategory[]>([])
   const [groupedData, setGroupedData] = useState<GroupedData>({})
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -34,52 +42,7 @@ export default function IncomePage() {
     notes: ''
   })
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  async function loadData() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
-    setUserEmail(user.email || '')
-
-    const { data: cats } = await supabase
-      .from('categories')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('type', 'income')
-      .is('deleted_at', null)
-      .order('name')
-
-    setCategories(cats || [])
-
-    const { data: accs } = await supabase
-      .from('accounts')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .order('name')
-
-    setAccounts(accs || [])
-
-    const { data: txns } = await supabase
-      .from('transactions')
-      .select(`
-        *,
-        categories (
-          name
-        )
-      `)
-      .eq('user_id', user.id)
-      .eq('type', 'income')
-      .is('deleted_at', null)
-      .order('date', { ascending: false })
-
-    setTransactions(txns || [])
-    groupTransactions(txns || [])
-  }
-
-  function groupTransactions(txns: any[]) {
+  const groupTransactions = useCallback((txns: TransactionWithCategory[]) => {
     const grouped: GroupedData = {}
 
     txns.forEach(txn => {
@@ -96,7 +59,57 @@ export default function IncomePage() {
     })
 
     setGroupedData(grouped)
-  }
+  }, [])
+
+  useEffect(() => {
+    const loadData = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
+      setUserEmail(user.email || '')
+
+      const { data: cats } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('type', 'income')
+        .is('deleted_at', null)
+        .order('name')
+        .limit(1000)
+
+      setCategories((cats || []) as Category[])
+
+      const { data: accs } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .order('name')
+        .limit(1000)
+
+      setAccounts((accs || []) as Account[])
+
+      const { data: txns } = await supabase
+        .from('transactions')
+        .select(`
+          *,
+          categories (
+            name
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('type', 'income')
+        .is('deleted_at', null)
+        .order('date', { ascending: false })
+        .limit(1000)
+
+      // Supabase returns the joined data, we need to cast it safely
+      const typedTxns = (txns || []) as unknown as TransactionWithCategory[]
+      setTransactions(typedTxns)
+      groupTransactions(typedTxns)
+    }
+
+    loadData()
+  }, [router, supabase, groupTransactions, refreshKey])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -134,7 +147,8 @@ export default function IncomePage() {
     })
 
     setLoading(false)
-    loadData()
+    setLoading(false)
+    setRefreshKey(prev => prev + 1)
   }
 
   const formatCurrency = (amount: number) => {

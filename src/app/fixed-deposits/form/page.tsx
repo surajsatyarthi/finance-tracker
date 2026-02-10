@@ -64,42 +64,71 @@ function FDFormContent() {
     loadData()
   }, [editId, router, supabase])
 
-  // Auto-calculate maturity date when start date and tenure change
-  useEffect(() => {
-    if (formData.start_date && formData.tenure_months) {
-      const startDate = new Date(formData.start_date)
-      const months = parseInt(formData.tenure_months)
-      if (!isNaN(months)) {
-        const maturityDate = new Date(startDate)
-        maturityDate.setMonth(maturityDate.getMonth() + months)
-        setFormData(prev => ({
-          ...prev,
-          maturity_date: maturityDate.toISOString().split('T')[0]
-        }))
-      }
-    }
-  }, [formData.start_date, formData.tenure_months])
+  // Helper to calculate maturity date
+  const calculateMaturityDate = (start: string, monthsStr: string) => {
+    if (!start || !monthsStr) return ''
+    const startDate = new Date(start)
+    const months = parseInt(monthsStr)
+    if (isNaN(months)) return ''
+    
+    const maturityDate = new Date(startDate)
+    maturityDate.setMonth(maturityDate.getMonth() + months)
+    return maturityDate.toISOString().split('T')[0]
+  }
 
-  // Auto-calculate maturity amount using compound interest
-  useEffect(() => {
-    if (formData.principal_amount && formData.interest_rate && formData.tenure_months) {
-      const principal = parseFloat(formData.principal_amount)
-      const rate = parseFloat(formData.interest_rate)
-      const months = parseInt(formData.tenure_months)
+  // Helper to calculate maturity amount
+  const calculateMaturityAmount = (principalStr: string, rateStr: string, monthsStr: string) => {
+    const principal = parseFloat(principalStr)
+    const rate = parseFloat(rateStr)
+    const months = parseInt(monthsStr)
 
-      if (!isNaN(principal) && !isNaN(rate) && !isNaN(months)) {
-        // Quarterly compounding (most common for FDs in India)
-        const quarters = months / 3
-        const ratePerQuarter = rate / 4 / 100
-        const maturityAmount = principal * Math.pow(1 + ratePerQuarter, quarters)
+    if (isNaN(principal) || isNaN(rate) || isNaN(months)) return ''
 
-        setFormData(prev => ({
-          ...prev,
-          maturity_amount: maturityAmount.toFixed(2)
-        }))
-      }
-    }
-  }, [formData.principal_amount, formData.interest_rate, formData.tenure_months])
+    // Quarterly compounding
+    const quarters = months / 3
+    const ratePerQuarter = rate / 4 / 100
+    const maturityAmount = principal * Math.pow(1 + ratePerQuarter, quarters)
+    return maturityAmount.toFixed(2)
+  }
+
+  const handleTenureChange = (val: string) => {
+    const newMaturityDate = calculateMaturityDate(formData.start_date, val)
+    const newMaturityAmount = calculateMaturityAmount(formData.principal_amount, formData.interest_rate, val)
+    
+    setFormData(prev => ({
+      ...prev,
+      tenure_months: val,
+      maturity_date: newMaturityDate || prev.maturity_date,
+      maturity_amount: newMaturityAmount || prev.maturity_amount
+    }))
+  }
+
+  const handleStartDateChange = (val: string) => {
+    const newMaturityDate = calculateMaturityDate(val, formData.tenure_months)
+    setFormData(prev => ({
+      ...prev,
+      start_date: val,
+      maturity_date: newMaturityDate || prev.maturity_date
+    }))
+  }
+
+  const handlePrincipalChange = (val: string) => {
+    const newMaturityAmount = calculateMaturityAmount(val, formData.interest_rate, formData.tenure_months)
+    setFormData(prev => ({
+      ...prev,
+      principal_amount: val,
+      maturity_amount: newMaturityAmount || prev.maturity_amount
+    }))
+  }
+
+  const handleInterestRateChange = (val: string) => {
+    const newMaturityAmount = calculateMaturityAmount(formData.principal_amount, val, formData.tenure_months)
+    setFormData(prev => ({
+      ...prev,
+      interest_rate: val,
+      maturity_amount: newMaturityAmount || prev.maturity_amount
+    }))
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -192,7 +221,7 @@ function FDFormContent() {
                   min="0"
                   step="0.01"
                   value={formData.principal_amount}
-                  onChange={(e) => setFormData({ ...formData, principal_amount: e.target.value })}
+                  onChange={(e) => handlePrincipalChange(e.target.value)}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900 placeholder:text-gray-400"
                   placeholder="100000"
                 />
@@ -207,7 +236,7 @@ function FDFormContent() {
                   min="0"
                   step="0.01"
                   value={formData.interest_rate}
-                  onChange={(e) => setFormData({ ...formData, interest_rate: e.target.value })}
+                  onChange={(e) => handleInterestRateChange(e.target.value)}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900 placeholder:text-gray-400"
                   placeholder="6.5"
                 />
@@ -223,7 +252,7 @@ function FDFormContent() {
                   required
                   min="1"
                   value={formData.tenure_months}
-                  onChange={(e) => setFormData({ ...formData, tenure_months: e.target.value })}
+                  onChange={(e) => handleTenureChange(e.target.value)}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900 placeholder:text-gray-400"
                   placeholder="12"
                 />
@@ -236,7 +265,7 @@ function FDFormContent() {
                   id="start_date"
                   required
                   value={formData.start_date}
-                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900"
                 />
               </div>

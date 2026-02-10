@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import AppLayout from '@/components/AppLayout'
@@ -14,16 +14,48 @@ type GroupedData = {
   }
 }
 
+type Category = {
+  id: string
+  name: string
+  type: string
+  user_id: string
+  deleted_at: string | null
+}
+
+type Account = {
+  id: string
+  name: string
+  type: string
+  balance: number
+  user_id: string
+  is_active: boolean
+}
+
+type Transaction = {
+  id: string
+  date: string
+  description: string
+  amount: number
+  type: string
+  category_id: string | null
+  account_id: string | null
+  user_id: string
+  categories?: {
+    name: string
+  }
+}
+
 export default function ExpensesPage() {
   const router = useRouter()
   const supabase = createClient()
   const [userEmail, setUserEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [categories, setCategories] = useState<any[]>([])
-  const [accounts, setAccounts] = useState<any[]>([])
-  const [transactions, setTransactions] = useState<any[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
   const [groupedData, setGroupedData] = useState<GroupedData>({})
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -34,52 +66,7 @@ export default function ExpensesPage() {
     notes: ''
   })
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  async function loadData() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
-    setUserEmail(user.email || '')
-
-    const { data: cats } = await supabase
-      .from('categories')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('type', 'expense')
-      .is('deleted_at', null)
-      .order('name')
-
-    setCategories(cats || [])
-
-    const { data: accs } = await supabase
-      .from('accounts')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .order('name')
-
-    setAccounts(accs || [])
-
-    const { data: txns } = await supabase
-      .from('transactions')
-      .select(`
-        *,
-        categories (
-          name
-        )
-      `)
-      .eq('user_id', user.id)
-      .eq('type', 'expense')
-      .is('deleted_at', null)
-      .order('date', { ascending: false })
-
-    setTransactions(txns || [])
-    groupTransactions(txns || [])
-  }
-
-  function groupTransactions(txns: any[]) {
+  const groupTransactions = useCallback((txns: Transaction[]) => {
     const grouped: GroupedData = {}
 
     txns.forEach(txn => {
@@ -96,7 +83,56 @@ export default function ExpensesPage() {
     })
 
     setGroupedData(grouped)
-  }
+  }, [])
+
+  useEffect(() => {
+    const loadData = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
+      setUserEmail(user.email || '')
+
+      const { data: cats } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('type', 'expense')
+        .is('deleted_at', null)
+        .order('name')
+        .limit(1000)
+
+      setCategories((cats || []) as Category[])
+
+      const { data: accs } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .order('name')
+        .limit(1000)
+
+      setAccounts((accs || []) as Account[])
+
+      const { data: txns } = await supabase
+        .from('transactions')
+        .select(`
+          *,
+          categories (
+            name
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('type', 'expense')
+        .is('deleted_at', null)
+        .order('date', { ascending: false })
+        .limit(1000)
+
+      const typedTxns = (txns || []) as unknown as Transaction[]
+      setTransactions(typedTxns)
+      groupTransactions(typedTxns)
+    }
+
+    loadData()
+  }, [router, supabase, groupTransactions, refreshKey])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -134,7 +170,8 @@ export default function ExpensesPage() {
     })
 
     setLoading(false)
-    loadData()
+    setLoading(false)
+    setRefreshKey(prev => prev + 1)
   }
 
   const formatCurrency = (amount: number) => {

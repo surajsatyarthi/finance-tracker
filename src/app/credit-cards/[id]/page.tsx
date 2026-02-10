@@ -4,6 +4,7 @@ import AppLayout from '@/components/AppLayout'
 import CopyButton from '@/components/CopyButton'
 import Link from 'next/link'
 import type { CreditCard } from '@/types/database'
+import DeleteCreditCardButton from '../DeleteButton'
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -62,14 +63,16 @@ export default async function CreditCardDetailsPage({ params }: { params: { id: 
             <Link href="/credit-cards" className="text-sm text-blue-600 hover:text-blue-800">
               ← Back to Credit Cards
             </Link>
-            <Link
-              href={`/credit-cards/${params.id}/edit`}
-              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-            >
-              Edit Card
-            </Link>
+            <div className="flex gap-3">
+              <Link
+                href={`/credit-cards/${params.id}/edit`}
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+              >
+                Edit Card
+              </Link>
+              <DeleteCreditCardButton id={params.id} cardName={creditCard.name} />
+            </div>
           </div>
-
           <div className="bg-white shadow rounded-lg overflow-hidden mb-6">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
               <h2 className="text-2xl font-semibold text-gray-900">{creditCard.name}</h2>

@@ -1,0 +1,19 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🦅 RALPH PROTOCOL: Running quality gates before commit..."
+echo ""
+
+# Run all quality gates
+npm run ralph:gates
+
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "❌ RALPH PROTOCOL VIOLATION: Quality gates failed!"
+  echo "   Fix the issues above before committing."
+  echo ""
+  exit 1
+fi
+
+echo ""
+echo "✅ RALPH PROTOCOL: All gates passed. Commit allowed."

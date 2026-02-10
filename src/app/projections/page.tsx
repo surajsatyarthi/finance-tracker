@@ -34,6 +34,7 @@ export default async function ProjectionsPage() {
     .select('balance')
     .eq('user_id', user.id)
     .eq('is_active', true)
+    .limit(1000)
 
   const currentBalance = accounts?.reduce((sum, acc) => sum + acc.balance, 0) || 0
 
@@ -48,6 +49,7 @@ export default async function ProjectionsPage() {
     `)
     .eq('user_id', user.id)
     .is('deleted_at', null)
+    .limit(1000)
 
   // Get EMIs
   const { data: emis } = await supabase
@@ -56,6 +58,7 @@ export default async function ProjectionsPage() {
     .eq('user_id', user.id)
     .is('deleted_at', null)
     .not('next_due_date', 'is', null)
+    .limit(1000)
 
   const totalMonthlyEmi = emis?.reduce((sum, emi) => sum + emi.monthly_emi, 0) || 0
 
@@ -66,6 +69,7 @@ export default async function ProjectionsPage() {
     .eq('user_id', user.id)
     .is('deleted_at', null)
     .not('next_due_date', 'is', null)
+    .limit(1000)
 
   const totalMonthlyBnpl = bnpls?.reduce((sum, bnpl) => sum + bnpl.installment_amount, 0) || 0
 
@@ -76,6 +80,7 @@ export default async function ProjectionsPage() {
     .eq('user_id', user.id)
     .eq('is_active', true)
     .not('emi_amount', 'is', null)
+    .limit(1000)
 
   const totalMonthlyLoan = loans?.reduce((sum, loan) => sum + (loan.emi_amount || 0), 0) || 0
 
@@ -85,6 +90,7 @@ export default async function ProjectionsPage() {
     .select('current_balance')
     .eq('user_id', user.id)
     .eq('is_active', true)
+    .limit(1000)
 
   const totalCreditCardBalance = creditCards?.reduce((sum, cc) => sum + cc.current_balance, 0) || 0
   const estimatedMonthlyCC = totalCreditCardBalance * 0.05
@@ -95,14 +101,24 @@ export default async function ProjectionsPage() {
     .select('maturity_date, maturity_amount')
     .eq('user_id', user.id)
     .is('deleted_at', null)
+    .limit(1000)
 
   // Calculate monthly income and expenses from budgets
   let monthlyIncome = 0
   let monthlyExpense = 0
 
-  budgets?.forEach((budget: any) => {
-    const amount = budget.period === 'yearly' ? budget.amount / 12 : budget.amount
-    if (budget.categories?.type === 'income') {
+  type BudgetWithCategory = {
+    amount: number
+    period: string
+    categories: {
+      type: string
+    } | null
+  }
+
+  budgets?.forEach((budget: unknown) => {
+    const b = budget as BudgetWithCategory
+    const amount = b.period === 'yearly' ? b.amount / 12 : b.amount
+    if (b.categories?.type === 'income') {
       monthlyIncome += amount
     } else {
       monthlyExpense += amount
@@ -275,7 +291,6 @@ export default async function ProjectionsPage() {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {projections.map((proj, idx) => {
                       const isCurrentMonth = idx === 0
-                      const isNegativeFlow = proj.netFlow < 0
                       const isLowBalance = proj.balance < currentBalance * 0.2
 
                       return (
@@ -360,7 +375,7 @@ export default async function ProjectionsPage() {
                 <li>⚠️ Caution: Your balance may drop to {formatCurrency(lowestBalance)} in {lowestBalanceMonth?.monthName}, which is less than 20% of your current balance.</li>
               )}
               {totalNetFlow >= 0 && (
-                <li>✅ Good news: You're projected to save {formatCurrency(totalNetFlow)} over the next 12 months.</li>
+                <li>✅ Good news: You&apos;re projected to save {formatCurrency(totalNetFlow)} over the next 12 months.</li>
               )}
               {endBalance >= currentBalance * 1.5 && (
                 <li>🎉 Excellent: Your balance is projected to grow by {((endBalance - currentBalance) / currentBalance * 100).toFixed(1)}% over the next year!</li>

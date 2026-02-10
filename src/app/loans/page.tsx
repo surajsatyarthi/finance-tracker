@@ -34,6 +34,7 @@ export default async function LoansPage() {
     .eq('user_id', user.id)
     .eq('is_active', true)
     .order('current_balance', { ascending: false })
+    .limit(1000)
 
   const loansList = (loans || []) as Loan[]
 

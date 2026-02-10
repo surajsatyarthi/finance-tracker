@@ -40,6 +40,7 @@ export default function NewEMIPage() {
         .select('*')
         .eq('user_id', user.id)
         .eq('is_active', true)
+        .limit(100)
       setCreditCards((cards || []) as CreditCard[])
     }
     loadData()

@@ -4,6 +4,16 @@ import AppLayout from '@/components/AppLayout'
 import Link from 'next/link'
 import DeleteBudgetButton from './DeleteButton'
 
+import { Budget } from '@/types/database'
+
+type BudgetWithCategory = Budget & {
+  categories: {
+    id: string
+    name: string
+    type: string
+  } | null
+}
+
 export default async function BudgetsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -25,8 +35,9 @@ export default async function BudgetsPage() {
     .eq('user_id', user.id)
     .is('deleted_at', null)
     .order('amount', { ascending: false })
+    .limit(1000)
 
-  const list = budgets || []
+  const list = (budgets || []) as BudgetWithCategory[]
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -36,7 +47,7 @@ export default async function BudgetsPage() {
     }).format(amount)
   }
 
-  const totalBudget = list.reduce((sum: number, b: any) => sum + b.amount, 0)
+  const totalBudget = list.reduce((sum: number, b: BudgetWithCategory) => sum + b.amount, 0)
 
   return (
     <AppLayout userEmail={user.email || ''}>
@@ -80,7 +91,7 @@ export default async function BudgetsPage() {
                         </td>
                       </tr>
                     ) : (
-                      list.map((budget: any) => (
+                      list.map((budget: BudgetWithCategory) => (
                         <tr key={budget.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">

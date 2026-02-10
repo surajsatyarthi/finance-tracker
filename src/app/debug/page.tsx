@@ -17,6 +17,7 @@ export default async function DebugPage() {
     .from('accounts')
     .select('*')
     .eq('user_id', user.id)
+    .limit(1000)
 
   // Try to fetch ALL accounts (will fail if RLS is properly set)
   const { data: allAccounts, error: allAccountsError } = await supabase

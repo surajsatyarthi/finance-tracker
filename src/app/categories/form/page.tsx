@@ -109,7 +109,7 @@ function CategoryFormContent() {
                 id="type"
                 required
                 value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value as 'income' | 'expense' })}
                 className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 ${!formData.type ? 'text-gray-500' : 'text-gray-900'}`}
               >
                 <option value="">Select type</option>

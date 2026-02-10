@@ -6,9 +6,9 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './tests/e2e',
-  
-  /* Maximum time one test can run for */
-  timeout: 30 * 1000,
+
+  /* Maximum time one test can run for (increased for Supabase auth delays) */
+  timeout: 60 * 1000,
   
   /* Run tests in files in parallel */
   fullyParallel: true,
@@ -34,21 +34,21 @@ export default defineConfig({
   use: {
     /* Base URL to use in actions like `await page.goto('/')` */
     baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3001',
-    
+
     /* Collect trace when retrying the failed test */
     trace: 'on-first-retry',
-    
+
     /* Screenshot on failure */
     screenshot: 'only-on-failure',
-    
+
     /* Video on failure */
     video: 'retain-on-failure',
-    
+
     /* Maximum time each action can take */
-    actionTimeout: 10 * 1000,
-    
-    /* Navigation timeout */
-    navigationTimeout: 15 * 1000,
+    actionTimeout: 15 * 1000,
+
+    /* Navigation timeout (increased for Supabase auth) */
+    navigationTimeout: 30 * 1000,
   },
 
   /* Configure projects for major browsers */

@@ -19,7 +19,8 @@ export default async function CategoriesPage() {
     .eq('user_id', user.id)
     .is('deleted_at', null)
     .order('type', { ascending: true })
-    .order('name', { ascending: true })
+   .order('name', { ascending: true })
+    .limit(1000)
 
   const list = (categories || []) as Category[]
   const incomeCategories = list.filter(c => c.type === 'income')

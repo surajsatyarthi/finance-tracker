@@ -40,7 +40,7 @@ export type CreditCard = {
   reward_point_value: number | null
   reward_points_expiry_months: number | null
   partner_merchants: string[] | null
-  benefits: any | null
+  benefits: Record<string, unknown> | null
   is_active: boolean
   created_at: string
   updated_at: string
@@ -182,6 +182,25 @@ export type Investment = {
   invested_amount: number
   current_value: number
   account_id: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+}
+
+export type FixedDeposit = {
+  id: string
+  user_id: string
+  bank_name: string
+  fd_number: string | null
+  principal_amount: number
+  interest_rate: number
+  tenure_months: number
+  start_date: string
+  maturity_date: string
+  maturity_amount: number
+  auto_renew: boolean
+  nominee_name: string | null
   notes: string | null
   created_at: string
   updated_at: string

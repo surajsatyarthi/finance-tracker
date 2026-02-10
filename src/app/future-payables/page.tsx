@@ -22,8 +22,6 @@ export default async function FuturePayablesPage() {
   }
 
   const today = new Date()
-  const todayStr = today.toISOString().split('T')[0]
-  const next30Days = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
   // Fetch EMIs
   const { data: emis } = await supabase
@@ -32,6 +30,7 @@ export default async function FuturePayablesPage() {
     .eq('user_id', user.id)
     .is('deleted_at', null)
     .not('next_due_date', 'is', null)
+    .limit(1000)
 
   // Fetch BNPLs
   const { data: bnpls } = await supabase
@@ -40,6 +39,7 @@ export default async function FuturePayablesPage() {
     .eq('user_id', user.id)
     .is('deleted_at', null)
     .not('next_due_date', 'is', null)
+    .limit(1000)
 
   // Fetch Credit Cards
   const { data: creditCards } = await supabase
@@ -48,6 +48,7 @@ export default async function FuturePayablesPage() {
     .eq('user_id', user.id)
     .eq('is_active', true)
     .not('due_date', 'is', null)
+    .limit(1000)
 
   // Fetch Loans
   const { data: loans } = await supabase
@@ -56,6 +57,7 @@ export default async function FuturePayablesPage() {
     .eq('user_id', user.id)
     .eq('is_active', true)
     .not('next_emi_date', 'is', null)
+    .limit(1000)
 
   const payables: Payable[] = []
 

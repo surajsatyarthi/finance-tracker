@@ -1,7 +1,22 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import AppLayout from '@/components/AppLayout'
+import { Transaction, Budget } from '@/types/database'
 
+type TransactionWithCategory = Transaction & {
+  categories: {
+    name: string
+    type: string
+  } | null
+}
+
+type BudgetWithCategory = Budget & {
+  categories: {
+    id: string
+    name: string
+    type: string
+  } | null
+}
 type MonthData = {
   month: string
   monthName: string
@@ -46,6 +61,7 @@ export default async function AnalyticsPage() {
     .is('deleted_at', null)
     .gte('date', sixMonthsAgo.toISOString().split('T')[0])
     .order('date', { ascending: true })
+    .limit(1000)
 
   // Get budgets
   const { data: budgets } = await supabase
@@ -60,6 +76,7 @@ export default async function AnalyticsPage() {
     `)
     .eq('user_id', user.id)
     .is('deleted_at', null)
+    .limit(1000)
 
   // Get accounts for net worth
   const { data: accounts } = await supabase
@@ -67,6 +84,7 @@ export default async function AnalyticsPage() {
     .select('balance')
     .eq('user_id', user.id)
     .eq('is_active', true)
+    .limit(1000)
 
   const totalNetWorth = accounts?.reduce((sum, acc) => sum + acc.balance, 0) || 0
 
@@ -76,6 +94,7 @@ export default async function AnalyticsPage() {
     .select('invested_amount, current_value')
     .eq('user_id', user.id)
     .is('deleted_at', null)
+    .limit(1000)
 
   const totalInvested = investments?.reduce((sum, inv) => sum + inv.invested_amount, 0) || 0
   const totalInvestmentValue = investments?.reduce((sum, inv) => sum + inv.current_value, 0) || 0
@@ -99,7 +118,11 @@ export default async function AnalyticsPage() {
     }
   }
 
-  transactions?.forEach((txn: any) => {
+
+
+
+
+  transactions?.forEach((txn: TransactionWithCategory) => {
     const monthKey = txn.date.substring(0, 7)
     if (monthlyData[monthKey]) {
       if (txn.type === 'income') {
@@ -122,35 +145,42 @@ export default async function AnalyticsPage() {
   const prevMonthData = monthlyData[prevMonthKey] || { income: 0, expenses: 0, net: 0 }
 
   // Category spending (current month)
-  const categorySpending: { [key: string]: CategorySpending } = {}
+  const categorySpending: { [key: string]: CategorySpending } = {};
 
-  transactions?.forEach((txn: any) => {
-    if (txn.type === 'expense' && txn.date.startsWith(currentMonthKey)) {
-      const catName = txn.categories?.name || 'Uncategorized'
-      if (!categorySpending[catName]) {
-        categorySpending[catName] = {
-          category: catName,
-          amount: 0,
-          percentage: 0,
-          budget: 0,
-          budgetUsed: 0
+  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+  const txnsList = transactions as any as TransactionWithCategory[]
+  if (txnsList) {
+    txnsList.forEach((txn) => {
+      if (txn.type === 'expense' && txn.date.startsWith(currentMonthKey)) {
+        const catName = txn.categories?.name || 'Uncategorized'
+        if (!categorySpending[catName]) {
+          categorySpending[catName] = {
+            category: catName,
+            amount: 0,
+            percentage: 0,
+            budget: 0,
+            budgetUsed: 0
+          }
         }
+        categorySpending[catName].amount += txn.amount
       }
-      categorySpending[catName].amount += txn.amount
-    }
-  })
+    })
+  }
 
   // Add budget data
-  budgets?.forEach((budget: any) => {
-    const catName = budget.categories?.name
-    if (catName && budget.categories?.type === 'expense') {
-      const monthlyBudget = budget.period === 'yearly' ? budget.amount / 12 : budget.amount
-      if (categorySpending[catName]) {
-        categorySpending[catName].budget = monthlyBudget
-        categorySpending[catName].budgetUsed = (categorySpending[catName].amount / monthlyBudget) * 100
+  const budgetsList = budgets as unknown as BudgetWithCategory[]
+  if (budgetsList) {
+    budgetsList.forEach((budget) => {
+      const catName = budget.categories?.name
+      if (catName && budget.categories?.type === 'expense') {
+        const monthlyBudget = budget.period === 'yearly' ? budget.amount / 12 : budget.amount
+        if (categorySpending[catName]) {
+          categorySpending[catName].budget = monthlyBudget
+          categorySpending[catName].budgetUsed = (categorySpending[catName].amount / monthlyBudget) * 100
+        }
       }
-    }
-  })
+    })
+  }
 
   // Calculate percentages
   const totalCategoryExpense = Object.values(categorySpending).reduce((sum, cat) => sum + cat.amount, 0)

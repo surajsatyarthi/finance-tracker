@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import AppLayout from '@/components/AppLayout'
 import Link from 'next/link'
+import { Category } from '@/types/database'
 
 function BudgetFormContent() {
   const router = useRouter()
@@ -16,7 +17,7 @@ function BudgetFormContent() {
   const [userEmail, setUserEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [categories, setCategories] = useState<any[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
 
   const [formData, setFormData] = useState({
     category_id: '',
@@ -39,6 +40,7 @@ function BudgetFormContent() {
         .is('deleted_at', null)
         .order('type')
         .order('name')
+        .limit(1000)
 
       setCategories(cats || [])
 

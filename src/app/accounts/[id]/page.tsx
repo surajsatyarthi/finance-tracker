@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import AppLayout from '@/components/AppLayout'
 import Link from 'next/link'
 import type { Account, Transaction } from '@/types/database'
+import DeleteAccountButton from '../DeleteButton'
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -64,12 +65,15 @@ export default async function AccountDetailPage({ params }: { params: { id: stri
                 <h2 className="text-2xl font-semibold text-gray-900">{accountData.name}</h2>
                 <p className="text-sm text-gray-500 mt-1 uppercase">{accountData.type}</p>
               </div>
-              <Link
-                href={`/accounts/${params.id}/edit`}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-              >
-                Edit
-              </Link>
+              <div className="flex gap-3">
+                <Link
+                  href={`/accounts/${params.id}/edit`}
+                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Edit
+                </Link>
+                <DeleteAccountButton id={params.id} accountName={accountData.name} />
+              </div>
             </div>
 
             <div className="px-6 py-6 space-y-4">

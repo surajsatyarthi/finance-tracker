@@ -2,6 +2,7 @@
   "name": "finance-tracker",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",
@@ -24,7 +25,11 @@
     "test:e2e:profile": "node tests/run-with-profile.mjs",
     "test:e2e:firefox": "playwright test --project=firefox",
     "test:e2e:webkit": "playwright test --project=webkit",
-    "test:e2e:mobile": "playwright test --project='Mobile Chrome' --project='Mobile Safari'"
+    "test:e2e:mobile": "playwright test --project='Mobile Chrome' --project='Mobile Safari'",
+    "alpha:validate": "node ../.agent/scripts/validate-protocol.js",
+    "alpha:collect": "node ../.agent/scripts/collect-evidence.js",
+    "alpha:enforce": "node ../.agent/scripts/enforce-gates.js",
+    "alpha:check": "npm run alpha:collect 001-LOCAL-SUPABASE && npm run alpha:validate 001-LOCAL-SUPABASE"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",

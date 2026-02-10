@@ -15,6 +15,7 @@ export default function NewCreditCardPage() {
     name: '',
     bank: '',
     card_type: '',
+    card_number: '',
     last_four_digits: '',
     credit_limit: '',
     current_balance: '',
@@ -56,6 +57,7 @@ export default function NewCreditCardPage() {
         name: formData.name,
         bank: formData.bank || null,
         card_type: formData.card_type,
+        card_number: formData.card_number || null, // Store full number
         last_four_digits: formData.last_four_digits || null,
         credit_limit: parseFloat(formData.credit_limit),
         current_balance: parseFloat(formData.current_balance) || 0,
@@ -142,7 +144,7 @@ export default function NewCreditCardPage() {
                     id="card_type"
                     required
                     value={formData.card_type}
-                    onChange={(e) => setFormData({ ...formData, card_type: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, card_type: e.target.value as 'VISA' | 'MASTERCARD' | 'RUPAY' | 'AMEX' | 'JCB' | 'DISCOVER' })}
                     className={`mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${formData.card_type === '' ? 'text-gray-500' : 'text-gray-900'}`}
                   >
                     <option value="" disabled>Select card network</option>
@@ -155,21 +157,30 @@ export default function NewCreditCardPage() {
                   </select>
                 </div>
 
-                {/* Last 4 Digits */}
+                {/* Last 4 Digits / Full Card Number */}
                 <div>
-                  <label htmlFor="last_four_digits" className="block text-sm font-medium text-gray-700">
-                    Last 4 Digits
+                  <label htmlFor="card_number" className="block text-sm font-medium text-gray-700">
+                    Card Number (Full or Last 4)
                   </label>
                   <input
                     type="text"
-                    id="last_four_digits"
-                    maxLength={4}
-                    pattern="[0-9]{4}"
-                    value={formData.last_four_digits}
-                    onChange={(e) => setFormData({ ...formData, last_four_digits: e.target.value })}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-400"
-                    placeholder="1234"
+                    id="card_number"
+                    maxLength={19}
+                    value={formData.card_number || ''}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '')
+                      setFormData({ 
+                        ...formData, 
+                        card_number: val,
+                        last_four_digits: val.slice(-4) 
+                      })
+                    }}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                    placeholder="1234 5678 1234 5678"
                   />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Enter full 16 digits to enable &ldquo;Copy&rdquo; feature, or just last 4.
+                  </p>
                 </div>
 
                 {/* Credit Limit */}
