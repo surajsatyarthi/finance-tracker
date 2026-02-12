@@ -29,7 +29,9 @@
     "alpha:validate": "node ../.agent/scripts/validate-protocol.js",
     "alpha:collect": "node ../.agent/scripts/collect-evidence.js",
     "alpha:enforce": "node ../.agent/scripts/enforce-gates.js",
-    "alpha:check": "npm run alpha:collect 001-LOCAL-SUPABASE && npm run alpha:validate 001-LOCAL-SUPABASE"
+    "alpha:check": "npm run alpha:collect 001-LOCAL-SUPABASE && npm run alpha:validate 001-LOCAL-SUPABASE",
+    "sync:protocols": "bash sync-protocols.sh",
+    "sync:protocols:init": "bash sync-protocols.sh --init"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
