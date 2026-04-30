@@ -1,38 +1,15 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Finance Tracker
+> Built and shipped as a personal tool used daily by 20+ people in my network. Demonstrates full product lifecycle ownership + production-grade Next.js/Supabase stack.
 
-## Getting Started
+A secure, full-stack personal finance dashboard designed to handle complex portfolio consolidation. Built to solve the pain point of tracking distributed assets across 10 bank accounts and 13 credit cards in a single, unified view.
 
-First, run the development server:
+### ⚙️ Tech Stack & Architecture
+- **Frontend:** Next.js 14, TypeScript, Tailwind CSS
+- **Backend & Auth:** Supabase, PostgreSQL
+- **Deployment:** Vercel (CI/CD pipeline integrated)
+- **Testing to ensure stability:** Playwright E2E test suite
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-# Environment variables verified
+### 🚀 Key Features
+- **Centralized Dashboard:** Unifies high-volume credit/bank accounts into a single data model.
+- **Bank-Level Security:** Enterprise-grade authentication and row-level security (RLS) via Supabase.
+- **Driven by User Feedback:** Iterated from a single-user prototype to a multi-user platform based on direct feedback from a close network of early adopters.
